@@ -1,539 +1,210 @@
-# Schedule ranking and constructor weights
+# Schedule selection and scoring
 
-Complete schedules are ranked by the `ScheduleRanking` OCaml module. The active
-scheduler constructs candidates lazily and chooses every eligible unbound
-output of a selected positive hypothesis. It also removes redundant orders of
-independent plain hypotheses. `QC_SCHEDULE_POR=0` disables that order reduction
-for diagnosis; it does not change output selection.
+A derived generator, enumerator or checker runs one *schedule* per
+constructor: an order in which to produce, match and check the constructor's
+variables and premises. QuickChick enumerates the possible schedules of each
+constructor, scores them with the selected *scorer*, and generates code from
+the best one. This document describes the scorers, how to write one in Rocq,
+and how the search stays exact and bounded.
+
+## Search
+
+For each constructor, the scheduler repeatedly picks the next premise to
+schedule and commits its steps. A positive premise produces all of its
+eligible unbound outputs; a premise whose arguments are all bound becomes a
+check. Orders that differ only by swapping two independent premises are
+explored once (`QC_SCHEDULE_POR=0` disables this reduction).
+
+Selection is exact: the chosen schedule is the best under the scorer among
+all candidates, and among equal scores the first one found wins. Candidate
+identifiers follow search order, so ties are deterministic. Two mechanisms
+keep the search bounded.
+
+- **Score pruning.** A partial schedule is cut when its bound shows that no
+  completion can beat the best complete schedule found so far. Because the
+  earlier candidate wins ties, cutting on "no better than the incumbent" does
+  not change the selection. Pruning is on by default. Scorers without a bound
+  (cardinality, and Rocq scorers that do not prove theirs) search
+  exhaustively up to 1,000 candidates per constructor; the cap applies only
+  to them.
+- **Independent groups.** Premises that share no unbound variables form
+  separate groups, searched on their own. Combining group scores can reverse a
+  local preference (a maximum absorbs a lead that a sum keeps), so each group
+  keeps every schedule that is not dominated, and the combinations of these
+  are ranked as ordinary candidates. With pruning on, a constructor with one
+  group is pruned and one with several is searched group by group.
+
+Each dependency derivation (a mode of another relation called by a schedule)
+is a search of its own, with its own incumbent, and its result is memoized.
+
+## Choosing a scorer
 
 `QuickChick Scorer <name>.` (or `QC Scorer <name>.`) selects the scorer for
-later derivations in the file. The choice follows undo and backtracking, is not
-exported to files that import this one, and a prepared `quickchick` test keeps
-the schedules it was prepared with. An unknown name is an error that lists the
-scorers. The `QC_SCHEDULE_RANKING` environment variable has been removed.
+the derivations that follow in the file. The choice follows undo and
+backtracking and is not exported to importing files; a prepared `quickchick`
+test keeps the schedules it was prepared with. An unknown name is an error
+listing the scorers.
 
-| Scorer | Primary criterion | Secondary criterion |
+| Scorer | Ranks by |
+| --- | --- |
+| `density_then_vars` (default; also `density`) | density, then fewer uses of bound variables |
+| `density_counts_then_vars` | density, then fewer steps at each worse density, then variable uses |
+| `density_only` | density |
+| `vars_then_density` | variable uses, then density |
+| `vars_only` | variable uses |
+| `budget_aware` | Specimen's six-field BudgetAware score |
+| `cardinality` (experimental) | filters by acceptance class |
+| any constant of type `SchedulingPolicy.policy` | that policy (see below) |
 
-| --- | --- | --- |
-| `density_then_vars` (default; also `density`) | Density | Fewer uses of previously bound variables |
-| `density_counts_then_vars` | Density | Fewer steps at each worse density, then fewer variable uses |
-| `density_only` | Density | None |
-| `vars_then_density` | Fewer uses of previously bound variables | Density |
-| `vars_only` | Fewer uses of previously bound variables | None |
-| `budget_aware` | Specimen's completed BudgetAware score | See below |
-| `cardinality` (experimental) | Filters by acceptance class | See below |
+**Density.** Each step has a grade: in ascending order Checking,
+Backtracking, Neutral, Partial and Total. A producer's density is its lowest
+step grade and higher is better; a checker's or enumerator's is its highest
+step grade and lower is better. A call to another relation takes the grade
+of that relation's mode, derived on demand. *Variable uses* counts how often
+already bound variables are read, which favours schedules that produce
+values rather than test them.
 
-Generation and theorem testing prefer higher density. Checking and enumeration
-prefer lower density. Densities, in ascending order, are Checking, Backtracking,
-Neutral, Partial, and Total. A producer uses the lowest density among its steps;
-a checker or enumerator uses the highest. An empty producer schedule is Total;
-an empty checker or enumerator schedule is Checking. Candidate identifiers break
-remaining ties. They follow search order, so among equal scores the first
-schedule the search finds wins.
-The former environment aliases remain accepted as names, such as `vars_density`.
+**BudgetAware.** `budget_aware` ports Specimen's completed score: selectivity,
+density, fabrication, locality, input-check dependencies and variable
+dependencies, compared lexicographically. A relation's score combines, over
+its input-pattern coverage leaves, the best score among each leaf's
+constructors. An uncovered leaf, a recursive call, or a dependency that is
+not yet derived scores Partial. A schedule the score cannot represent (one
+with a `let` step) is an error rather than a fallback.
 
-### Scorers written in Rocq
+**Cardinality** (experimental) reads a schedule as a query plan. Counts are
+growth classes in the size bound (`1 < fin < poly < exp`). Each filter (a
+check, a refutable match on a produced value, or a producer given generated
+inputs) has an acceptance class: what it admits over what reaches it. The
+score counts filters with acceptance `1/exp`, then `1/poly`, then unknown,
+then constant; fewer is better. It has no pruning bound, and its scores can
+depend on which other modes the search has already derived.
 
-Any other name must be a constant of type `QuickChick.SchedulingPolicy.policy`
-(`src/SchedulingPolicy.v`). A policy chooses its own score type `S`; its
-`scorer` scores each step of a candidate, combines them into a schedule score
-(`score_schedule` also sees the whole schedule), and compares scores. Lower is
-better, and among equal scores the first candidate found wins.
+## Writing a scorer in Rocq
 
-`QC Scorer my_policy.` compiles the policy once. The plugin extracts the
-policy's scorer, comparison and bound, with the view types mapped onto the
-plugin's own OCaml types, compiles them with `ocamlfind ocamlopt -shared`, and
-loads the result with `Dynlink`. Scoring then runs at native speed. Compiled
-objects are cached in the system temporary directory, under
-`QuickChick-scorers`, by a digest of the extracted code and of the plugin.
+A scorer is a value of `QuickChick.SchedulingPolicy.policy`
+(`src/SchedulingPolicy.v`). It chooses its own score type, scores the steps
+of a candidate, combines them into a schedule score (seeing the whole
+schedule if it wants), and compares scores; lower is better.
+`doc/ScoringDemo.v` is a complete example.
 
-The policy receives read-only views of each candidate: its steps with their
-sources, grades and patterns, the constructor's locals and original inputs,
-and the state of each dependency request. A dependency already derived in
-this derivation is `Completed` with its score under the policy, computed by
-the policy's `score_leaf` over each coverage leaf's constructors and its
-`score_inductive` over the leaves. One being derived is `InProgress`; one an
-instance in context supplies is `SuppliedInstance`; any other is `Pending`.
-Recursive steps add no request; the policy sees their source category. A
-variable keeps its local id throughout a derivation. `test/compiled_density.v` writes the
-built-in `density_then_vars` ranking as a policy; on a large typing relation
-it makes the built-in's selection for all 862 constructor modes.
+`QC Scorer my_policy.` extracts the policy to OCaml, compiles it with
+`ocamlfind ocamlopt`, and loads it into the plugin, so scoring runs as native
+code. The compiled object is cached in the system temporary directory, under
+`QuickChick-scorers`, keyed by the extracted code and the plugin.
 
-A policy may declare, in `policy_grouping`, how its score combines over
-footprint-disjoint hypothesis groups: a unit, a combine function, and its
-comparison as a lexicographic list of fields, each `Additive` (a sum) or
-`Extremal` (a maximum or minimum). The plugin then searches each group
-separately and keeps a Pareto set per group, as it does for the built-in
-scorers. The plugin trusts these laws. `QC_SCHEDULE_GROUPS=verify` checks
-the grouped result against joint search; set `QC_SCHEDULE_MAX_CANDIDATES=0`
-with it, since the capped joint search can miss the grouped winner. With
-`policy_grouping := None` each constructor is searched jointly.
+**Views.** The policy sees each candidate's steps with their sources, grades
+and patterns, the constructor's locals and inputs, and the state of each
+dependency a step calls: `Completed` with its score under the same policy (a
+relation's score is computed by the policy's `score_leaf` and
+`score_inductive` over its coverage leaves), `InProgress`, `SuppliedInstance`
+when an instance in context provides it, or `Pending`. Local identifiers are
+stable throughout a derivation.
 
-A policy is pruned with its `lower_bound` when `policy_bound_sound` proves
-that bound admissible: no complete schedule below a search node scores better
-than the bound (`bound_admissible`, over `completes` in
-`src/SchedulingPolicy.v`). The schedule below is scored in a context that
-may know more than the node's (`ctx_refines`): a pending or in-progress
-dependency may have completed. A step scorer must therefore score an unknown
-dependency no worse than any completed one (`step_refines`).
-`spec_step_scorer` builds scorers that read only the specification;
-`dependency_step_scorer` builds scorers that also read the completed score of
-the dependency a step calls (`step_dependency` in the context), given that
-an unknown dependency scores no worse than any completed one. Policies built
-from either have proved bounds. A search node lists its committed steps, each with
-its grade and whether that grade is final, the remaining hypotheses, how
-many of them must become positive checks, and how many further variable uses
-every schedule below incurs (`step_uses` defines the engine's count). The plugin cuts a branch when the
-best schedule found so far is no worse than the bound; since the first of
-equal scores wins, the selection is unchanged. Without a proof the policy
-runs unpruned, under the 1,000-candidate cap. A proof that depends on axioms,
-such as an admitted lemma, still enables pruning, and selecting the policy
-warns about it. `QC_SCHEDULE_SCORE_PRUNING=verify` checks every bound against
-every completed descendant.
+**Grouping.** `policy_grouping` declares how the score combines over
+independent groups: a unit, a combine function, and the comparison as a
+lexicographic list of fields, each `Additive` (a sum) or `Extremal` (a
+maximum or minimum). The plugin trusts these laws; declaring a maximum
+`Additive` is unsound. With `policy_grouping := None` each constructor is
+searched jointly.
 
-`src/SchedulingPolicyLaws.v` builds policies with proved bounds.
-`fold_policy M f floor kind` combines step scores in an ordered monoid `M`
-(`nat_max` and `nat_sum` are provided); a step score may depend on the steps
-before it. Its bound combines the committed steps' scores, masking uncertain
-grades, and an optional `floor` that every positive check reaches, counted
-once per forced check (`fold_bound_admissible`). `lex_policy p q` compares
-two policies lexicographically, with a proved bound when both have one
-(`lex_bound_admissible`). `uses_policy` sums `step_uses`; its bound adds the
-node's future uses to the committed ones (`uses_bound_admissible`). All
-declare their grouping. `test/compiled_density.v` builds `density_then_vars`
-as `lex_policy` of a maximum of grades and `uses_policy`. On the same relation
-it makes the built-in's selection on every key, pruned and in verify mode, with no
-bound violation, and it prunes exactly as much as the built-in. It takes
-20 s against 10 s, the cost of quoting each search node for the policy.
+**Pruning.** A policy is pruned with its `lower_bound` when
+`policy_bound_sound` proves the bound admissible: no complete schedule below
+a search node scores better than the bound at that node (`bound_admissible`).
+A search node lists its committed steps (each with its grade and whether that
+grade is final), the remaining premises, how many of them must become
+positive checks, and the variable uses every completion still incurs. The
+schedule below may be scored in a context that knows more, since a pending
+dependency may have completed meanwhile, so a step scorer must score an
+unknown dependency no worse than any completed one. A proof that uses axioms,
+such as an admitted lemma, still enables pruning, with a warning. Without a
+proof the policy is searched unpruned, under the candidate cap.
 
-### Cardinality ranking (experimental)
+`src/SchedulingPolicyLaws.v` builds policies with these proofs:
 
-`QC Scorer cardinality` reads a schedule as a query plan. Counts
-are growth classes in the size bound (`1 < fin < poly < exp`). Type classes
-come from the inductive definitions. Each completed relation mode records its
-solution count for given inputs, from its constructors' chosen schedules: a
-constructor that starts by matching an input recurses on smaller inputs, and
-such constructors with different head constructors are alternatives. A filter
-(a check, a refutable match on a produced value, or a producer fed generated
-inputs) has acceptance admitted/reaching as a class; a variable nested under
-a constructor in a checked argument is admitted only by the relation's
-constructors with that head there. A check is also bounded by its scarcest
-generated variable's conditional count: how many values that variable can
-take when everything else in the relation is fixed, from the relation's
-definition (a variable also occurring elsewhere in the conclusion is fixed;
-one pinned by a hypothesis takes that hypothesis's count). The score counts filters with acceptance
-`1/exp`, then `1/poly`, then unknown, then constant; lower is better, and
-candidate identifiers break ties. A candidate whose free generation of a type
-lacks an instance is excluded. Score pruning does not apply yet, so the
-unpruned candidate cap does (`QC_SCHEDULE_MAX_CANDIDATES` overrides it for
-diagnosis; 0 removes it). `test/cardinality_ranking` checks the case that
-BudgetAware ties: inventing a list and then checking the relation that
-determines it.
+- `fold_policy M f floor kind` combines step scores in an ordered monoid `M`
+  (`nat_max` and `nat_sum` are provided). Its bound combines the committed
+  steps' scores and, once per forced check, an optional `floor` that every
+  positive check reaches.
+- `spec_step_scorer` builds a step scorer that reads only the specification;
+  `dependency_step_scorer` one that also reads the completed score of the
+  dependency a step calls.
+- `lex_policy p q` compares two policies lexicographically, and `uses_policy`
+  counts variable uses with a bound that includes the node's future uses.
 
-### BudgetAware ranking
+`test/compiled_density.v` writes the default density ranking as such a
+policy. On a large typing relation it selects exactly what the built-in does,
+with the same pruning, in about twice the time: the cost is quoting each
+search node into the policy's view types.
 
-`QC Scorer budget_aware` ranks each
-constructor's candidate schedules by `BudgetAwareScore`, the port of
-Specimen's completed six-field score (selectivity, density, fabrication,
-locality, input-check dependencies, variable dependencies), compared
-lexicographically. Ties keep the lowest candidate identifier. A candidate
-the scorer cannot represent, such as one with a `let` step, is a user error
-rather than a fallback to density ranking.
+## Pruning bounds
 
-A relation's score combines, over the same input-pattern coverage leaves the
-density ranking uses, the best score among each leaf's constructors; an
-uncovered leaf scores Partial, as in Specimen. It is stored with the
-relation's completed memo entry. A dependency contributes its stored score
-only when that entry is complete and cycle-independent. Self-recursive,
-mutually recursive in-progress and cycle-dependent calls, and existing
-instances without a measured schedule, are unknown and score as Partial with
-no fabrication. Constructor schedules are chosen per constructor, as in
-Specimen; this is not a joint optimum over the relation's aggregate.
+The built-in bounds are computed from a node's committed steps. Density uses
+the committed grades plus Checking for each forced check. BudgetAware scores
+the committed steps with unresolved dependencies at their best. Both add a
+look-ahead for variable uses: a variable a committed step binds counts once
+in each remaining positive premise that mentions it, and an unbound variable
+that is a bare argument of k remaining premises counts k - 1 times, since
+only one of them can produce it. A dependency's grade enters a bound only
+when its derivation read no provisional grade; otherwise the bound uses the
+best possible grade, which keeps it admissible.
 
-Grouped search uses BudgetAware's grouped policy in this mode, and
-`QC_SCHEDULE_GROUPS=verify` compares best BudgetAware scores with the joint
-search. Theorem testing still ranks by density.
+`test/bound_proofs/` proves these bounds admissible and the cuts exact, for a
+model of the OCaml code: `DensityPrefixBound.v` for every density ranking,
+`BudgetAwarePrefixBound.v` for BudgetAware, and `DensityLookahead.v` for the
+look-ahead. Their premises are that committed steps and forced checks keep
+their grades in every completion, a variable is produced at most once, and
+outputs are unbound when a premise is scheduled.
+`QC_SCHEDULE_SCORE_PRUNING=verify` checks every bound against every completed
+descendant at run time; `test/pruning_verify` and `test/pruning_verify_budget`
+run in that mode.
 
-Score pruning (`QC_SCHEDULE_SCORE_PRUNING`, below) also applies here. A
-prefix's bound is BudgetAware's own score of the committed steps, with an
-unstable dependency at its best score and a forced check at Checking
-density: a step's score does not depend on its position, and each variable
-is produced once, so no field improves when steps are added. Because the
-first fields often tie for every candidate, variable dependencies get the
-floor's look-ahead: a non-input variable the prefix binds is counted for each
-remaining hypothesis that mentions it, and an unbound variable that is a bare
-argument of k remaining hypotheses is counted k - 1 times. The bound is
-computed first without deriving dependencies, which is already admissible,
-and with them only when selectivity ties. `test/pruning_verify_budget`
-checks it in verification mode.
+## Dependencies and the memo
 
-The opt-in `density_counts_then_vars` policy breaks a worst-density tie by
-counting annotated steps at each density, starting with the worst grade for the
-derivation direction. It counts a recursive dependency's computed density once
-at the call site; it does not expand the dependency's internal schedule. Thus
-the count is bounded by the selected schedule's steps. This is a measure of the
-chosen calls, not a count of underlying constraints. It uses the scheduler's
-current recursive density annotations, including its existing treatment of
-recursive cycles.
-
-`QC_SCHEDULE_TRACE=1` reports the selected policy, candidate count, identifier,
-density, and variable-use count. `QC_SCHEDULE_TIE_REPORT=1` enables tie diagnostics;
-`QC_SCHEDULE_TIE_LIMIT` limits their output (default 3; 0 means no limit).
-These are existing diagnostic environment settings, not new Rocq options.
-`QC_SCHEDULE_SELECTION_LOG=<file>` appends one line per selected constructor
-schedule (relation, output positions, mode, constructor, schedule), for
-comparing rankings across runs.
-
-Completed dependency entries whose derivation read no provisional grade from
-outside itself are shared by all candidates of a top-level derivation; other
-entries are recomputed per candidate, so a candidate's score does not depend
-on which candidates were scored before it. `QC_SCHEDULE_REUSE_STABLE=0`
-disables the sharing for diagnosis. Theorem candidates share these entries too.
-A shared entry is copied without the entries added while it was derived, such
-as a mutually recursive relation that is cycle-dependent inside it; a later
-derivation rederives those on demand, and code generation, which finds a
-schedule's dependencies in the memo, first restores them.
-
-A cycle-dependent derivation is determined by its key and the memo entries it
-read from outside itself: the in-progress ancestors it saw and the completed
-entries it used. It is recorded with those reads and the memo entries it
-added, and replayed wherever the same reads observe the same values and none
-of the keys it derived is in progress. `QC_SCHEDULE_CONTEXT_REUSE=0` disables
-this; over the full test suite the distinct selected schedules are identical
-either way.
+A relation mode derived during a derivation is memoized with its schedule,
+grade and score. An entry whose derivation read no provisional grade from
+outside itself is shared by every candidate of the top-level derivation.
+Other entries depend on what was in progress when they were derived; such an
+entry is recorded with the entries it read and replayed wherever those reads
+see the same values. A candidate's score therefore does not depend on which
+candidates were scored before it.
 
 Selecting the best theorem schedule (`quickchick` with index 0) scores
-candidates lazily in identifier order. A candidate's density is the minimum
-grade of its steps and its variable uses are structural, so once the grades
-seen so far bound it no better than the incumbent, which precedes it and wins
-ties, its remaining dependency modes are not derived. Other indices, the
-listing tactics and `try_all_quickchick_schedules` rank every candidate.
-`QC_THEOREM_LAZY_SCORING=0` disables lazy scoring; under
-`QC_SCHEDULE_SCORE_PRUNING=verify` the lazy and exhaustive selections are
-compared.
-The trace also prints `selected-counts=Checking,Backtracking,Neutral,Partial,Total`
-for the counted-density policy (as five integers).
+candidates lazily: once the grades seen so far show a candidate cannot beat
+the incumbent, its remaining dependencies are not derived. Other indices, the
+listing tactics and `try_all_quickchick_schedules` score every candidate. In
+`quickchick n i`, `n` is the test size and `i` a schedule index; indices range
+over the grouped combinations, and an out-of-range index is an error.
 
-## Search limits
+## Constructor weights
 
-The active search branches over the next hypothesis, commits its typed steps,
-and skips orders that differ only by a certified independent swap. It does not
-yet use a score bound or an environment-dominance memo. It stops after 1000
-candidates before deduplication and warns on truncation. Final ranking selects
-among those candidates, so a capped run has no global-optimality guarantee.
-Order reduction can change candidate identifiers; indexed alternatives refer
-to the reduced candidate list.
+Derived generators choose among constructors by weight. By default a base
+constructor has weight 1 and a recursive one the current size.
+`QuickChickWeights [(C, 3); (D, size)]` overrides this per constructor, with a
+number or `size`, which means the current size plus one. Enumerators and
+checkers do not use weights. A weight is looked up by the constructor's name
+and is not substituted through functor application.
 
-### Independent hypothesis groups
+## Diagnostics
 
-When a constructor's hypotheses split into groups that share no unbound
-variables (after unification aliasing, and including variables named in other
-variables' types), constructor derivation searches each group separately. A
-group's local schedules are scored on their own. Density combines across
-groups by its extremum and the other ranking fields add, so a group's single
-best schedule is not always part of the best combination. Each group therefore
-keeps every candidate not dominated in both density and the remaining fields.
-A dynamic program over combined density then yields at most five combinations,
-which are ranked as ordinary candidates. The best complete score is unchanged.
+These environment variables are for diagnosis and comparison; none is needed
+in normal use.
 
-Combinations place groups one after another, so ties between equal-scoring
-schedules can select a different order of independent steps than the joint
-search. `QC_SCHEDULE_GROUPS=0` restores the joint search;
-`QC_SCHEDULE_GROUPS=verify` runs both and fails if the best score differs or a
-grouped candidate is not one the joint search produces without order
-reduction, up to fresh-name renaming. `QC_SCHEDULE_GROUPS_LOG=<file>` appends
-one line per verified constructor search. The prefix score-pruning modes
-still use the joint search.
+| Variable | Effect |
+| --- | --- |
+| `QC_SCHEDULE_TRACE=1` | Report each selection: policy, candidate count, identifier and score. |
+| `QC_SCHEDULE_TRACE_BOUNDS=1` | With the trace, report every bound and leaf score. |
+| `QC_SCHEDULE_TIE_REPORT=1`, `QC_SCHEDULE_TIE_LIMIT=n` | Report ties among the best candidates (default limit 3; 0 for none). |
+| `QC_SCHEDULE_SELECTION_LOG=file` | Append one line per selected constructor schedule. |
+| `QC_SCHEDULE_SCORE_PRUNING` | `verify` checks bounds instead of cutting; `0`, `false`, `no` or `off` disables pruning. |
+| `QC_SCHEDULE_GROUPS` | `0` searches jointly; `verify` also runs the joint search and fails if the best score differs. |
+| `QC_SCHEDULE_GROUPS_LOG=file` | With `verify`, append one line per verified constructor. |
+| `QC_SCHEDULE_MAX_CANDIDATES=n` | Change the unpruned candidate cap (0 removes it). |
+| `QC_SCHEDULE_POR=0` | Disable swap reduction. |
+| `QC_SCHEDULE_REUSE_STABLE=0`, `QC_SCHEDULE_CONTEXT_REUSE=0` | Disable memo sharing or contextual replay. |
+| `QC_THEOREM_LAZY_SCORING=0` | Score every theorem candidate. |
+| `QC_BUDGET_AWARE_DEMO=relation` | Print BudgetAware scores of every candidate for that relation (used by `test/budget_aware`). |
+| `QC_CARDINALITY_TRACE=1` | Print the cardinality count of each mode. |
 
-Theorem testing uses the same grouped search. In `quickchick n i`, `n` is the
-test size and `i` a schedule index; `quickchick_idx i` keeps the default size.
-Indices, `try_all_quickchick_schedules`, and the `schedules`,
-`valid_schedules`, `Derive Schedules` and `Derive Valid Schedules` listings range over the
-grouped combinations, not every joint ordering, so a theorem can offer fewer
-schedules than before. An out-of-range index is a user error.
-`QC_SCHEDULE_GROUPS=0` restores the full list. Under `verify`, theorem testing
-also checks that the best score matches the joint search.
-
-#### Policy contract
-
-`GroupedScore` implements the group search for any score type. A policy gives
-a unit, a `combine` function and a lexicographic list of fields, each declared
-`Additive` or `Extremal`. Two laws make the search exact:
-
-1. Separability. A schedule built from footprint-disjoint groups and the
-   shared steps (constructor matches and equality checks) scores as the
-   `combine` of their separate scores, in any order. `combine` is
-   associative and commutative, with the unit as identity.
-2. Field order. Each field combines on its own. Combining both sides with the
-   same score preserves an `Additive` field's strict order and its ties, as a
-   sum does. It preserves an `Extremal` field's non-strict order only, as max
-   or min do.
-
-From these, a candidate dominates another when, field by field, an additive
-field is strictly better, or equal with the rest dominating; or an extremal
-field is no worse and the rest dominate. Each group keeps its undominated
-candidates. States with equal extremal fields receive the same future
-combinations, under which additive fields keep their order, so the dynamic
-program keeps one state per class of extremal values.
-
-Declaring a max field `Additive` is unsound: it treats a lead that combination
-can absorb as decisive. `GroupedScore.check_laws` tests the field and
-combination laws on sample scores. It cannot test separability, which depends
-on the scorer.
-
-The built-in rankings are instances: density is extremal; the histogram and
-variable uses are additive. BudgetAware is also an instance
-(`BudgetAwareScore.group_policy`). Selectivity, fabrication and both dependency
-counts are additive; density and locality are extremal. Its scorer is
-separable because each step naming a variable lies in that variable's group,
-so selectivity's per-variable sets do not overlap, and the shared steps
-produce no variable and pin none. It is used for selection under `QC Scorer budget_aware`.
-The test `plugin/test_grouped_score.ml` checks the generic search against
-brute force on random policies, BudgetAware's laws and exactness, and
-separability on fixture schedules.
-
-Custom Rocq policies have no grouped instance yet. A policy that inspects the
-whole schedule, or whose score depends on the order of independent steps,
-must declare its laws or keep the joint search.
-
-Policy-driven branch-and-bound is still being developed. A policy bound must
-be no worse than every completed descendant of the actual typed search node.
-The internal prefix-pruning callback is exercised by a narrow variable-use
-test, but public derivation does not use it. Recursive dependency scores need
-stable full-mode keys before density can safely prune. Custom policies should
-retain score-based pruning through the same admissibility contract. Small
-exhaustive searches serve as the validation oracle.
-The counted-density policy currently ranks completed candidates only; its
-histogram is not used as a partial-node pruning bound.
-
-`test/pruning_bounds.v` proves the candidate prefix bounds for both density
-directions and the counted-density key. Under a committed prefix with finalized
-step grades, every completed descendant appends nonnegative grade counts;
-generation's worst grade can only worsen, and checking's can only worsen in
-its comparison direction. The file also proves that a stateful nonnegative
-variable-use scan cannot reduce its accumulated count. Candidate identifiers
-are excluded from the bound, so equal scores must remain searchable.
-The proof also shows that a strictly better incumbent remains better than any
-completion whose score is componentwise above the node bound.
-It also proves a conservative bound with unresolved recursive grades: treat
-each such call as the best possible density (`Total` for generation,
-`Checking` for checking) and count it in no histogram bucket. Once the
-dependency's grade is known, replace that optimistic contribution with its
-actual grade. The proof shows that resolving a call can only tighten or
-preserve the bound in either density direction. This keeps the bound admissible,
-though it may be too weak to prune before dependency resolution.
-
-For plain positive direct-variable relations, the proof additionally gives
-`committed checks + max(0, remaining hypotheses - unbound variables)` as a
-lower bound on check count: each remaining non-check consumes at least one
-fresh variable. This stronger formula needs a separate typed certificate before
-use with indexed arguments, forced bindings, negative premises, or rewriting.
-The current plugin is not formally verified against the proof's assumptions:
-converted prefix steps and recursive dependency grades must remain unchanged
-in descendants. A typed exhaustive fixture checks the counted key against
-every descendant, but that is evidence for the fixture, not a replacement for
-the adapter proof. No public score pruning is enabled.
-When a committed producer call needs a dependency grade, the bound should
-resolve that dependency then, using its actual mode and applied relation. It
-should not postpone all dependency work until a leaf. Completed scoring sorts
-the candidate's steps before discovering dependencies, however. Adding a future
-step can change which dependency encounters a provisional cycle grade first.
-The scorer now records whether a completed memo entry read such a grade. For
-the current heuristic, an applied relation is checked for an existing instance
-before its generic declaration is scored; omitted applied arguments alone do
-not show that this generic score changes within one derivation. The unresolved
-bound question is whether a cycle-dependent grade computed from a partial
-candidate remains valid after other calls are discovered. A future policy that
-scores applied calls directly will also need a full applied/context key. Until
-these cases are established, the proved optimistic grade is used for an
-uncertified call. Direct checks, matches, unconstrained
-bindings, lets, and direct recursive calls have fixed local grades. Some of
-these steps still trigger dependency discovery for code generation, but their
-own grade is fixed.
-
-`test/dependency_cycle_laws.v` states the relevant graph argument precisely.
-If evaluating a key has visited every dependency it may score, a later unseen
-key cannot newly become part of a cycle with that completed key. For an
-acyclic dependency graph, deterministic score equations have a unique result,
-regardless of evaluation order. The current constructor scorer visits every
-generated candidate and its step dependencies before marking a key done;
-candidate-local memo snapshots make the cycle marker conservative. A direct
-source-to-model correspondence test is still needed before the marker enables
-production pruning. A cycle-dependent result remains uncertified by this
-argument.
-
-`test/scoring_cycles` demonstrates why that distinction matters. For the same
-generator memo key, resolving one side of an asymmetric mutual relation first
-gives `Partial`, while resolving the other side first gives `Total`. A connected
-parent derivation reaches both results in separate candidate-local scoring
-passes. A prefix bound that treated the earlier `Partial` as permanent could
-prune a completion whose call is `Total`; `test/pruning_bounds.v` computes the
-resulting bound reversal. This is a cycle-order effect, not an applied-argument
-cache collision. The public scheduler still ranks with its existing heuristic;
-it does not prune from these partial grades.
-
-Exact scores for a mutual group cannot be read from the provisional memo
-entry. A possible context-based scorer would first fix the proof context,
-available instances, full applied relation and mode keys, and the candidate
-schedules for each member. It would then score every candidate symbolically in
-terms of the other members' scores and solve the group together. Acyclic calls
-keep their existing exact on-demand scores. For a cyclic group, the scoring
-policy must also say what a cycle means: equations such as `A = B` and `B = A`
-have several solutions even on the five-grade density scale. Choosing the
-first DFS seed is not a context-only answer. A direct recursive-call grade,
-or an explicitly chosen fixed-point convention with a termination/productivity
-interpretation, can make the meaning deterministic. Either choice may change
-the present ranking and needs separate compatibility review.
-
-The five-grade density component admits a finite SCC analysis once its mode
-alternatives and aggregation are fixed. It does not follow that the whole
-BudgetAware score has a finite exact fixed point: additive fabrication and
-dependency counts can yield equations such as `x = 1 + x`. Lexicographic
-selection among candidate schedules also requires checking whether its
-equations are monotone before using iteration. A practical first probe should
-enumerate the small asymmetric mutual fixture's complete mode graph, solve
-its density equations under a stated cycle rule, and compare every selected
-constructor and parent score with the current order-dependent results. For the
-current pruning work, use the optimistic grade for a cycle-dependent call and
-the exact grade only for a certified cycle-independent call. In generator
-minimization the optimistic density is `Total`; in checker/enumerator
-minimization it is `Checking`. A prefix bound must also give unresolved calls
-the best possible values for every earlier lexicographic coordinate; an
-optimistic density alone cannot rescue an overestimated selectivity or
-fabrication bound. This deliberately weakens pruning until the mutual group
-has a stable scoring rule. Do not replace the bound with a provisional memo
-grade merely because the call has returned during one traversal.
-
-A separate completed-score library now mirrors the pinned Specimen
-`BudgetAwareScore` on concrete QuickChick steps. Fifteen differential cases
-match the Lean reference, including all six coordinates, finite-pinning
-analysis, recursive locality, fabrication propagated from an enumerator,
-and coverage aggregation; see `test/budget_aware`. The scorer also accepts
-real scheduler candidates, including their match and equality preludes.
-The unifier exposes prepared fixed inputs and dependency requests retain
-applied type arguments. The `budget_aware` ranking above uses this library with
-completed dependency scores from the memo. The search bound must still be
-built and checked separately.
-Unsupported QuickChick-only `let` and defined-source
-steps return an error rather than silently receiving an approximate score.
-
-Finite pinning follows Specimen's ground-constructor rule. The environment
-lookup selects the requested member of a mutual inductive, intersects ground
-argument positions across its constructors, and returns no pins if translation
-fails. It caches only within a derivation, so undo cannot retain stale metadata.
-No deeper finite-domain inference is planned without evidence that it improves
-selected schedules.
-
-The internal ranking module now builds this conservative prefix key from
-certified call-site grades, unresolved calls, and a lower bound on committed
-variable uses. It compares an incumbent with that key without candidate IDs
-and prunes only on a strict improvement. The ranked-key test checks every
-resolution of up to two unknown grades, every possible appended grade, both
-density directions, and all built-in policies. The typed prefix-search test
-compares each bound with every descendant of a five-premise fixture and
-checks that callback pruning retains its optimal modes. With a deliberately
-unknown producer dependency, checker counted-density search visits 53 nodes
-and 13 leaves versus 61 nodes and 16 leaves without score pruning; the other
-built-in policies make no cuts on this fixture. These grades are synthetic;
-the real-scorer results below are the evidence for the production adapter.
-
-The prefix search also exposes the number of unprocessed positive hypotheses
-whose variables are all bound. Each must become a check: the environment only
-grows, and maximal-output scheduling cannot select an already bound output.
-Eager checking is disabled here, so none has appeared in the prefix steps.
-The bound adds one `Checking` grade per such hypothesis. Negative hypotheses
-are excluded because their check grade differs. Exhaustive typed search checks
-this floor against every descendant, including a nested-argument case.
-
-`UnifyQC.type_to_schedules` now forwards optional observation and pruning
-callbacks after its variable correction, together with the fixed match and
-equality preludes. The ordinary command path supplies neither callback and
-keeps its previous search behavior. A typed test checks that observed terminal
-schedules equal the returned candidates, that open corrected prefixes remain
-prefixes of their descendants, and that a nonempty match prelude is visible
-at this boundary.
-
-The constructor scorer now uses those callbacks unless the internal
-`QC_SCHEDULE_SCORE_PRUNING` environment switch disables them. It scores completed
-leaves with the ordinary scorer in a temporary memo session. For a committed
-step with a fixed grade it uses that grade; for a nonrecursive producer it
-resolves the dependency on demand and uses its grade only if the computation
-never read a provisional or cycle-dependent memo entry. Other calls keep the
-optimistic grade. The bound includes fixed match and equality preludes and
-the committed variable-use count. Temporary scoring restores memo and
-uncertainty state before final candidate scoring. Per-constructor bound probes
-cache a call-site result by corrected step and schedule mode, so repeated
-prefixes do not rederive the same dependency merely to bound it.
-The forced-check floor comes from the scheduler's environment before variable
-names are corrected for display; it does not infer bindings from renamed steps.
-
-`QC_SCHEDULE_SCORE_PRUNING=verify` enumerates all leaves and checks each
-bound against every completed descendant, then compares the scores seen at
-the leaves with final candidate rescoring. Setting it to `1` enables cuts.
-Pruning is on by default, because exact selection without a candidate cap
-needs it to stay bounded; `0`, `false`, `no` or `off` disables it.
-Cardinality ranking has no bounds and ignores the switch. With pruning on,
-and in its verification mode, searches have no candidate cap; without pruning
-(and under cardinality ranking) the 1000-candidate cap remains. With pruning on, a constructor whose
-hypotheses split into several independent groups is still searched group by
-group, without cuts; a single group is searched jointly and pruned.
-Verification mode always searches jointly.
-
-Cuts are exact, not only optimal in score. Candidate identifiers follow
-search order, so the incumbent precedes every candidate of a node explored
-after it; a node is cut when the incumbent is at least as good as its bound,
-and the incumbent also wins every tie. Each dependency derivation prunes
-against its own incumbent, at every nesting level. The variable-use bound adds
-uses that every completion must incur: a variable bound by a committed step
-counts once in each remaining positive hypothesis that mentions it, either in
-the step source or, inside a constrained output, in the equality check that
-replaces it; and an unbound variable that is a bare argument of k remaining
-positive hypotheses counts k - 1 times, since only one of them can produce it.
-`plugin/test_prefix_search.ml` checks these bounds against every completed
-descendant and checks that tie pruning selects the exhaustive winner for each
-built-in policy. Rocq proofs in `test/bound_proofs/`, checked by every
-build, establish them for a model of the OCaml bounds: `DensityPrefixBound.v`
-shows the bound
-admissible and cuts exact for every built-in policy, `BudgetAwarePrefixBound.v`
-does the same for BudgetAware, including selectivity and the look-ahead's
-counting argument, and `DensityLookahead.v` applies that argument to the
-density bound. Their premises are what verification mode checks: committed
-steps and forced checks keep their grades in every completion, a variable is
-produced at most once, outputs are unbound when a hypothesis is scheduled,
-and a hypothesis's steps count each of its non-input, non-output variables.
-`test/pruning_verify` and `test/pruning_verify_budget` run their theories in
-that mode, and the full test suite also passes in it.
-
-`test/prefix_adapter_laws.v` proves the list-level adapter rule: stepwise
-conversion distributes over appended choices, and sorting unconstrained
-blocks preserves an earlier prefix when that prefix ends in a producer, check,
-or match. It also proves variable-use counts are unchanged by an injective
-renaming of binders and occurrences. The actual converter allocates new names
-for constrained-output matches on each call, so equality of observed prefixes
-must be checked up to that renaming. The typed oracle checked 711,239
-prefix–descendant pairs across small footprints and focused fixed, indexed,
-negative, and nested-pattern cases; one pair required alpha-renaming. This is
-an adapter model and executable correspondence check, not a formal
-verification of the OCaml converter.
-
-At pinned Specimen revision `121cf234`, scoring bundles explicitly associate
-comparison and aggregation with pruning strategy, including a no-pruning option.
-QuickChick's `SchedulingPolicy` module states the same contract in Rocq: a
-policy's score, comparison, grouping and prefix bound, with a proof that the
-bound is admissible. `QC Scorer` compiles such a policy and selects with it,
-as described above. `test/scoring_policy.v` computes example scores and bounds
-over hand-written views, independently of derivation.
-
-## Constructor weighting
-
-Scheduled generation currently gives base constructors weight 1 and recursive
-constructors the current size. Enumeration and checking do not use these random
-weights. Fuel and base/recursive branch selection are separate safeguards and
-must remain independent of distribution policy.
-
-The planned weighting boundary is a function used by code generation, separate
-from schedule ranking. The current rule remains the default. Initial extensions
-can be named policies; a Rocq weight function could instead be referenced in
-generated code, avoiding evaluation of arbitrary Rocq functions in the plugin.
-Its argument contract, zero/all-zero behavior, and extraction tests still need
-design and validation. This document does not introduce a new weighting setting.
+Dune does not track environment variables, so compare modes in separate
+build directories.

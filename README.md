@@ -70,9 +70,9 @@ If successful, you should see "success" at the end.
 ## Documentation
 
 The public API is summarized in [QuickChickInterface.v](doc/QuickChickInterface.v).
-See the [derivation commands](doc/DerivationDispatch.md) and
-[3.0 migration guide](doc/3.0Migration.md) for the scheduled engine and legacy
-commands.
+See the [derivation commands](doc/DerivationDispatch.md),
+[schedule selection and scorers](doc/SchedulingPolicies.md), and the
+[3.0 migration guide](doc/3.0Migration.md).
 
 ### Top-level Commands
 
@@ -85,6 +85,7 @@ commands.
 - `QuickChick Derive EnumSizedSuchThat for (fun x => p)`
 - `QuickChick Derive ArbitrarySizedSuchThat for (fun x => let (x1,x2...) := x in p)`
 - `QuickCheckWith args c`
+- `QC Scorer name` (choose how derived schedules are ranked)
 - `MutateCheck c p`
 - `MutateCheckWith args c p`
 - `MutateCheckMany c ps`
@@ -103,8 +104,8 @@ To keep bare `Derive` commands in an older file, replace that import with:
 From QuickChick Require Import LegacyDerive.
 ```
 
-This compatibility import enables the old spelling, including class lists and
-`using` clauses. It uses the same derivation engine as `QuickChick Derive`. It
+This compatibility import enables the old spelling, including class lists. It
+uses the same derivation engine as `QuickChick Derive`. It
 can still conflict with other plugins' `Derive` commands, so prefer
 `QuickChick Derive` when combining plugins. `Derive Inductive Schedule` and `Derive Valid Schedules` remain available
 with the normal import.

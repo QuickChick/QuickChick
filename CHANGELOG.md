@@ -62,8 +62,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   a producing hypothesis are shrunk only when an existing checker for that
   hypothesis (for example from `QuickChick Derive Checker`) confirms each shrunk
   value; otherwise they are not shrunk.
-- Tested with Coq 8.20, Rocq 9.0 and Rocq 9.1. Rocq 9.2 and later need a release of
-  `coq-simple-io` that supports them. During large derivations `coqc` has
+- Tested with Coq 8.15, 8.16 and 8.20, Rocq 9.0 and 9.1, and Rocq's development
+  version (9.4). During large derivations `coqc` has
   occasionally aborted with "stack smashing detected" on OCaml 5.2 and, more
   rarely, 5.4; rerunning succeeds. It did not occur in testing on OCaml 4.13.
 

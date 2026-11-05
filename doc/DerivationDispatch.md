@@ -87,8 +87,7 @@ that member at fuel zero.
 `test/derivation_contracts.v` checks the preserved public contracts.
 `test/public_derivation.v` covers implicit and explicit type arguments, pair
 outputs, custom checker dictionaries, missing requirements, mutual datatypes,
-universe polymorphism, fresh names, both legacy spellings, and public generator/checker/enumerator
-requirement propagation with dictionary-dependent results.
-`test/enum_constraint_chain.v` covers the generator/checker/enumerator chain in
-the scheduled engine. Validation currently covers Coq 8.20 with an explicitly
-selected local plugin; the full supported-version matrix remains outstanding.
+universe polymorphism, fresh names, the bare `Derive` spelling, and
+generator/checker/enumerator requirement propagation with dictionary-dependent
+results. `test/enum_constraint_chain.v` covers the generator/checker/enumerator
+chain, and `test/function_conclusion.v` conclusions that apply functions.
