@@ -4,23 +4,23 @@ open Error
 open Pp
 open GenericLib
 open RelationInfo
-open DensityMemo
+open ModeMemo
 open ScheduleScoring
 open ScheduleContext
 open ScheduleSelection
 let all_theorem_schedules ?(best_only = false) (thm : rocq_type) =
   let rank ~lazy_best schedule_matches =
     let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i,List.map (fun (v,p) -> S_Match (v,p)) ms, ((List.map check_eq eqs @ steps), sort)) schedule_matches in
-    let initial_inductive_memo = !density_inductive_memo in
-    let initial_density_memo = !density_memo in
+    let initial_inductive_memo = !mode_memo in
+    let initial_grade_memo = !grade_memo in
     let incumbent = ref None in
     let scored = Fun.protect
       ~finally:(fun () ->
-        density_inductive_memo := initial_inductive_memo;
-        density_memo := initial_density_memo)
+        mode_memo := initial_inductive_memo;
+        grade_memo := initial_grade_memo)
       (fun () -> List.filter_map (fun (i, ms_steps, schd) ->
-        density_inductive_memo := with_stable_entries initial_inductive_memo;
-        density_memo := initial_density_memo;
+        mode_memo := with_stable_entries initial_inductive_memo;
+        grade_memo := initial_grade_memo;
         if lazy_best && (match !incumbent with
             | Some best -> theorem_candidate_loses ~incumbent:best ms_steps schd
             | None -> false)
@@ -44,19 +44,19 @@ let all_theorem_schedules ?(best_only = false) (thm : rocq_type) =
           | _ -> incumbent := Some features
         end;
         collect_stable_entries initial_inductive_memo;
-        let inductive_memo = !density_inductive_memo in
-        let density_memo_after = !density_memo in
+        let inductive_memo = !mode_memo in
+        let grade_memo_after = !grade_memo in
         if are_schedule_steps_valid i result then
-          Some (i, result, inductive_memo, density_memo_after)
+          Some (i, result, inductive_memo, grade_memo_after)
         else None) schedules) in
     let ranked = sort_schedules_by_density_and_var_uses
       (List.map (fun (i, result, _, _) -> i, result) scored) D_Thm in
     List.map (fun ((schd_steps_density, schd_sort) as scored_schedule, density, num_var_uses, id) ->
-      let (_, _, inductive_memo, density_memo_after) =
+      let (_, _, inductive_memo, grade_memo_after) =
         List.find (fun (i, _, _, _) -> i = id) scored in
       scored_schedule,
       ((List.map fst schd_steps_density, schd_sort), density, num_var_uses,
-       inductive_memo, density_memo_after)) ranked in
+       inductive_memo, grade_memo_after)) ranked in
   let matches select_groups =
     UnifyQC.type_to_schedules ?select_groups thm None None [] [] D_Thm true in
   let lazy_best = best_only && theorem_lazy_scoring () in
@@ -91,7 +91,7 @@ let collect_inductive_dependents (instance : rocq_constr * int list * derive_sor
   let (ind_instance, output_idxs, ds, opt) = instance in
   match ind_instance with
   | DTyCtr (ind_name,_) -> 
-    let (inductive_schd, density) = inductive_density_value (InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !density_inductive_memo) in
+    let (inductive_schd, density) = mode_entry_value (InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !mode_memo) in
     inductive_schedule_dependents inductive_schd
   | DTyParam param -> []
     (* failwith "collect_inductive_dependents: Need to handle instances of parameter type variables, like A in list A" *)
@@ -111,8 +111,8 @@ let lookup_and_remove_inductive_schedule (instance : rocq_constr * int list * de
   let (ind_instance, output_idxs, ds, opt) = instance in
   match ind_instance with
   | DTyCtr (ind_name,_)  | DNot (DTyCtr (ind_name, _)) ->
-    (try (let (inductive_schd, density) = inductive_density_value (InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !density_inductive_memo) in
-    if to_remove then density_inductive_memo := InductiveScheduleKeyMap.remove (ind_name, output_idxs, ds, opt) !density_inductive_memo;
+    (try (let (inductive_schd, density) = mode_entry_value (InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !mode_memo) in
+    if to_remove then mode_memo := InductiveScheduleKeyMap.remove (ind_name, output_idxs, ds, opt) !mode_memo;
     Some (inductive_schd, ds, opt)) with Not_found -> None)
   | DTyVar v -> failwith "lookup_and_remove_inductive_schedule: Need to handle instances of parameter type variables, like A in list A"
   | _ -> failwith ("lookup_and_remove_inductive_schedule: not a DTyCtr or DTyVar: " ^ rocq_constr_to_string ind_instance)
@@ -236,9 +236,9 @@ module InductiveSchedMap = Map.Make(struct type t = inductive_schedule * derive_
 
 let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[],WDefault)], [(([],CheckerSchedule),[],[],WDefault)])
    
-let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone ((dec_eq_sched_phony, Checking), true, None)) InductiveScheduleKeyMap.empty
+let init_mode_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (ModeDone ((dec_eq_sched_phony, Checking), true, None)) InductiveScheduleKeyMap.empty
 
-let reset_density_inductive_memo () =
+let reset_mode_memo () =
   GenericLib.clear_constrained_output_cache ();
   Hashtbl.reset cardinality_counts;
   Hashtbl.reset cardinality_shapes;
@@ -247,33 +247,33 @@ let reset_density_inductive_memo () =
   Hashtbl.reset stable_closures;
   clear_inductive_name_cache ();
   clear_schedule_instance_cache ();
-  stable_density_entries := InductiveScheduleKeyMap.empty;
+  stable_mode_entries := InductiveScheduleKeyMap.empty;
   stable_merge := None;
   Hashtbl.reset contextual_derivations;
-  density_inductive_memo := init_density_inductive_memo
+  mode_memo := init_mode_memo
 
 (* Diagnostic scoring must not consume or leave behind entries from another
    proof context. Normal derivation commands establish their own memo state. *)
-let with_fresh_density_memo f =
-  let old_inductive = !density_inductive_memo in
-  let old_stable = !stable_density_entries in
+let with_fresh_mode_memo f =
+  let old_inductive = !mode_memo in
+  let old_stable = !stable_mode_entries in
   let old_contextual = Hashtbl.copy contextual_derivations in
   let old_closures = Hashtbl.copy stable_closures in
-  let old_rule = !density_memo in
+  let old_rule = !grade_memo in
   let old_relations = !rocq_relation_memo in
   Fun.protect
     ~finally:(fun () ->
-      density_inductive_memo := old_inductive;
-      stable_density_entries := old_stable;
+      mode_memo := old_inductive;
+      stable_mode_entries := old_stable;
       Hashtbl.reset contextual_derivations;
       Hashtbl.iter (Hashtbl.replace contextual_derivations) old_contextual;
       Hashtbl.reset stable_closures;
       Hashtbl.iter (Hashtbl.replace stable_closures) old_closures;
-      density_memo := old_rule;
+      grade_memo := old_rule;
       rocq_relation_memo := old_relations)
     (fun () ->
-      reset_density_inductive_memo ();
-      density_memo := RelationInstMap.empty;
+      reset_mode_memo ();
+      grade_memo := RelationInstMap.empty;
       rocq_relation_memo := TyCtrMap.empty;
       f ())
 
@@ -365,13 +365,13 @@ let collect_all_used_inductive_schd_names ind_schd_name : string list * (((induc
       Error.msg_debug (str ("Collecting inductive schedule: " ^ ind_schd_name) ++ fnl ());
       let (ind_name, ois, ds, opt) = parse_ind_schd_name ind_schd_name in
       (match lookup_and_remove_inductive_schedule (DTyCtr (ind_name,[]), ois, ds, opt) false with
-      | None -> Error.msg_debug (str ("collect_all_used_inductive_schd_names: Could not find inductive schedule in density_inductive_memo: " ^ ind_schd_name)); []
+      | None -> Error.msg_debug (str ("collect_all_used_inductive_schd_names: Could not find inductive schedule in mode_memo: " ^ ind_schd_name)); []
       | Some (ind_schd, ds, opt) ->
         let dependents = List.concat_map extract_type_applications @@ inductive_schedule_dependents ind_schd in
         let deduplicate_dependents = List.sort_uniq compare dependents in
 
         let dependents_names = List.filter_map (fun ((ind, _, ois, ds, dep_opt) as dep) ->
-          if InductiveScheduleKeyMap.mem (ind, ois, ds, dep_opt) !density_inductive_memo then
+          if InductiveScheduleKeyMap.mem (ind, ois, ds, dep_opt) !mode_memo then
             Some (construct_ind_schd_name dep) else None) deduplicate_dependents in
 
         Error.msg_debug (str ("Dependent's names: " ^ String.concat ", " dependents_names) ++ fnl ());
@@ -549,13 +549,13 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
     (let components = propagate_schedule_requirements (List.rev !components) in
      List.iter (List.iter (fun ((name,_,_,_,_) as schedule, ds, constrained) ->
        let ind, outputs, _, _ = parse_ind_schd_name name in
-       let entry = match InductiveScheduleKeyMap.find_opt (ind, outputs, ds, constrained) !density_inductive_memo with
-         | Some (DensityDone ((_, density), cycle_independent, budget)) ->
-           DensityDone ((schedule, density), cycle_independent, budget)
-         | Some (DensityInProgress (_, density)) ->
-           DensityInProgress (schedule, density)
-         | None -> DensityDone ((schedule, Checking), false, None) in
-       density_inductive_memo := InductiveScheduleKeyMap.add (ind, outputs, ds, constrained) entry !density_inductive_memo)) components;
+       let entry = match InductiveScheduleKeyMap.find_opt (ind, outputs, ds, constrained) !mode_memo with
+         | Some (ModeDone ((_, density), cycle_independent, budget)) ->
+           ModeDone ((schedule, density), cycle_independent, budget)
+         | Some (ModeInProgress (_, density)) ->
+           ModeInProgress (schedule, density)
+         | None -> ModeDone ((schedule, Checking), false, None) in
+       mode_memo := InductiveScheduleKeyMap.add (ind, outputs, ds, constrained) entry !mode_memo)) components;
      components)
 
 let valid_schedules =
@@ -563,7 +563,7 @@ let valid_schedules =
     let c = Proofview.Goal.concl gl in
     let e = Proofview.Goal.env gl in
     let evd = Proofview.Goal.sigma gl in
-    with_schedule_context e evd (fun () -> with_fresh_density_memo (fun () ->
+    with_schedule_context e evd (fun () -> with_fresh_mode_memo (fun () ->
     match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
     | Some dt -> 
       begin
@@ -627,7 +627,7 @@ let theorem_dependencies =
       match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
       | Some dt ->
         begin
-          density_memo := RelationInstMap.empty;
+          grade_memo := RelationInstMap.empty;
           clear_inductive_name_cache ();
           clear_schedule_instance_cache ();
           msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
@@ -825,7 +825,7 @@ let define_schedule_components ~local components pieces =
 let derive_schedule ind ois ds opt =
   match GenericLib.ind_reference_to_rocq_relations ind with
     | Some (idx, rs) ->
-      reset_density_inductive_memo ();
+      reset_mode_memo ();
       inductive_set := inductive_set_init;
       rocq_relation_memo := TyCtrMap.empty;
       (* inductive_dependency_map := StringMap.empty; *)
@@ -842,7 +842,7 @@ let derive_schedule ind ois ds opt =
           "; check the required dependency instances.")) in
       Error.msg_debug (str "Inductive Schedule:\n" ++ str (inductive_schedule_to_string inductive_schedule) ++ fnl ());
       msg_debug (str "Density: " ++ str (density_to_string density) ++ fnl ());
-      density_inductive_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !density_inductive_memo;
+      mode_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !mode_memo;
 
       let ind_schd_name = match inductive_schedule with (n,_,_,_,_) -> n in
       complete_stable_closures ();

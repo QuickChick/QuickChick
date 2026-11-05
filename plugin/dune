@@ -156,9 +156,9 @@
  (deps ../scripts/mycppo relationInfo.ml.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:relationInfo.ml.cppo} %{target})))
 (rule
- (target densityMemo.ml)
- (deps ../scripts/mycppo densityMemo.ml.cppo)
- (action (run sh %{dep:../scripts/mycppo} %{dep:densityMemo.ml.cppo} %{target})))
+ (target modeMemo.ml)
+ (deps ../scripts/mycppo modeMemo.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:modeMemo.ml.cppo} %{target})))
 (rule
  (target scheduleScoring.ml)
  (deps ../scripts/mycppo scheduleScoring.ml.cppo)

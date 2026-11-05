@@ -77,7 +77,7 @@ plugin/rocqRelation.ml
 plugin/scheduleCode.ml
 plugin/scheduleSearch.ml
 plugin/relationInfo.ml
-plugin/densityMemo.ml
+plugin/modeMemo.ml
 plugin/scheduleScoring.ml
 plugin/scheduleContext.ml
 plugin/scheduleSelection.ml

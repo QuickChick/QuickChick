@@ -4,7 +4,7 @@ open Error
 open Pp
 open GenericLib
 open RelationInfo
-open DensityMemo
+open ModeMemo
 (* A step grade as a scoring policy sees it. *)
 let policy_grade = function
   | Checking -> PolicyViews.Checking
@@ -27,12 +27,12 @@ let budget_dependency_score (request : BudgetAwareScore.dependency_request) =
   let find constrained =
     let memo_key = (key.BudgetAwareScore.relation, key.BudgetAwareScore.output_indices,
       key.BudgetAwareScore.derive_sort, constrained) in
-    let entry = InductiveScheduleKeyMap.find_opt memo_key !density_inductive_memo in
-    record_density_read memo_key entry;
+    let entry = InductiveScheduleKeyMap.find_opt memo_key !mode_memo in
+    record_mode_read memo_key entry;
     entry in
   match find true, find false with
-  | Some (DensityDone (_, true, Some (BudgetScore score))), _ -> Some score
-  | _, Some (DensityDone (_, true, Some (BudgetScore score))) -> Some score
+  | Some (ModeDone (_, true, Some (BudgetScore score))), _ -> Some score
+  | _, Some (ModeDone (_, true, Some (BudgetScore score))) -> Some score
   | _ -> None
 
 (* [QuickChick Scorer <policy>] ranks constructor schedules by a compiled
@@ -405,7 +405,7 @@ and analyze_rules (rs : rule list) ois : (constructor * rule_density) list =
 
 and final_density (dt : rocq_relation) ois (should_print : bool) (ds : derive_sort) : rule_density =
   let (ind_name, _, _, _) = dt in
-  if RelationInstMap.mem (ind_name, ois, ds) !density_memo then RelationInstMap.find (ind_name, ois, ds) !density_memo
+  if RelationInstMap.mem (ind_name, ois, ds) !grade_memo then RelationInstMap.find (ind_name, ois, ds) !grade_memo
   else
   let inductive = (match get_inductive_name ind_name with | Some i -> i | None -> failwith "final_density: not an inductive type") in
   let tree = cover_tuple_patterns (input_patterns_of_rocq_relation dt ois) (rocq_relation_arity dt) (types_to_constructor_lookup (seek_rocq_relations inductive)) in
@@ -422,7 +422,7 @@ and final_density (dt : rocq_relation) ois (should_print : bool) (ds : derive_so
                 Partial 
                else 
                 Backtracking in
-  density_memo := RelationInstMap.add (ind_name, ois, ds) result !density_memo;
+  grade_memo := RelationInstMap.add (ind_name, ois, ds) result !grade_memo;
   if should_print then (Feedback.msg_notice (str "Rule pattern coverage tree:" ++ fnl ());
                         print_coverage_tree ind_name tree ois; Feedback.msg_notice (fnl ());
                         Feedback.msg_notice (str "Set of patterns and densities of their covering rules:" ++ fnl ());

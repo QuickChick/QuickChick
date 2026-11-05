@@ -518,103 +518,11 @@ verification of the OCaml converter.
 
 At pinned Specimen revision `121cf234`, scoring bundles explicitly associate
 comparison and aggregation with pruning strategy, including a no-pruning option.
-QuickChick now has an experimental `QuickChick.SchedulingPolicy` Rocq module.
-It defines a typed score across steps, complete schedules, coverage leaves,
-and inductive summaries. A policy also supplies an ordering and a partial-node
-bound; strict pruning keeps ties. The scheduler view includes applied symbolic
-terms, scoped local ids, dependency states, finite-pin metadata, leaf patterns,
-and search decisions.
-`test/scoring_policy.v` computes examples with a user-defined record score and
-a bound that reads search state. This is an interface test, not a selected
-derivation. The plugin's first quotation stage converts scheduler terms and
-patterns to the corresponding symbolic view. It preserves shadowed binders and
-applied arguments, and exposes implicit type holes as `TImplicitHole`; a test uses a real scheduler
-candidate. An internal diagnostic now elaborates that view as a Rocq term and
-evaluates a Rocq-defined function with VM reduction. The derivation probe covers
-an indexed polymorphic relation and a user-defined record score. Quotation
-resolves global names to qualified paths and represents `Type`, `Prop`, and
-`Set` as sorts. The probe is enabled only by `QC_POLICY_QUOTE_PROBE=1`, with
-`QC_POLICY_SCORE_PROBE` naming the Rocq function; it does not select a policy.
-The remaining bridge must retain scores across dependency calls, compare them
-through the policy, and feed policy bounds into search. Existing ranking and
-settings remain active.
-
-The diagnostic also quotes real `Check`, unconstrained, and relation-producer
-steps and evaluates a Rocq callback named by `QC_POLICY_STEP_PROBE`. The
-focused fixture covers a polymorphic checker, a generated output, a relation
-output, a finite-pinned output, and a relation with a separate input. Rocq
-sees the output count, bound-source input count, and finite-pin count as
-`(0,2,0)`, `(1,0,0)`, `(1,0,0)`, `(1,0,1)`, and `(1,1,0)` respectively in
-those cases. Recursive helper references use a distinct generated-name node.
-This step probe inspects the first candidate of each constructor. A separate
-`QC_POLICY_SCHEDULE_PROBE` callback receives the first fully scored candidate
-as a Rocq `schedule_view`, including ordered steps, density annotations, and
-the result when present. On a nested-output derivation, the callback confirms
-that the producer's output ID is the subsequent match input, the matched
-payload ID is the result, and the grades are one `Partial` and one
-`Backtracking`. Synthetic output types that the scheduler stores as `DHole`
-are represented as `TOpaque` with the same local ID. `LetStep` likewise has an
-opaque local type; it has no real derivation fixture yet. The probe does not
-rank candidates or certify a policy bound.
-
-`QC_POLICY_COMPARE_PROBE` names a Rocq function of type `S -> S -> comparison`
-when `QC_POLICY_SCHEDULE_PROBE` names a function from `schedule_view` to `S`.
-The plugin keeps each result as a typed Rocq term and asks Rocq to compare
-them. On a four-candidate relation, a record-valued policy preferring the
-first `policy_compare_c` source chooses candidate 3; the observed comparison
-results are two `Lt` and one `Eq`. This is diagnostic only. It does not replace
-the default completed-schedule ranker, and no bound callback or recursive
-score context is connected yet. `TImplicitHole` is distinct from `TOpaque`:
-the former is a source-level implicit placeholder, while the latter marks
-metadata the scheduler did not retain.
-
-Run `python3 test/check_policy_bridge.py` with the local validation `coqc` on
-`PATH` after building `@install`. It recompiles the focused Rocq fixture with
-diagnostics enabled and checks record evaluation, source inputs and pins,
-match/result binder links, and four-candidate comparison. The scorer compares
-the final segment of a qualified name so the test works under both Dune and
-direct `coqc` module paths. It also checks that default ranking still selects
-candidate 0 while the diagnostic Rocq comparator prefers candidate 3. The
-first-candidate and all-candidate diagnostics share one finite-pin lookup cache
-per constructor. The ordinary Dune theory build does not enable
-these diagnostic callbacks.
-The comparator fixture also uses a polymorphic record parameterized by
-`list nat`; scores from separate callback evaluations remain type-compatible
-when the plugin applies their Rocq comparator. A wrong result type is rejected.
-
-A further internal `QC_POLICY_RECORD_PROBE` accepts a named Rocq `scorer`
-record. It invokes both `score_step` and `score_schedule` on every candidate
-whose source obligations all resolve to existing instances. Its context quotes
-the root application and output positions, original inputs, typed result and
-producer locals, and each supplied dependency's full application. The
-`list nat` fixture distinguishes that dependency from an unparameterized `list` and
-checks the step score contributes to the schedule score. Candidates with a
-pending derived or recursive dependency, an unknown local type, or an
-unrepresented match-bound local are skipped. This is a diagnostic subset;
-general `Completed` dependency scores and policy selection still need the
-separate typed memo described in the scoring design.
-The regression also derives `policy_quote_missing A`, whose generator needs
-`GenSized A` from its eventual caller. It receives no supplied-instance score
-notice, while concrete `nat` and `list nat` sources do. The diagnostic uses
-direct resolution of the elaborated class obligation in the current context,
-without adding hypothetical typeclass premises. Parameter sources are checked
-by the same rule. Recursive helper sources are explicitly excluded: their
-rewritten syntax no longer contains a complete applied dependency key.
-When every candidate is eligible, the probe applies the record's `compare_scores`
-to their typed Rocq scores. It preserves candidate order on ties. The
-four-candidate fixture supplies all needed generator and checker modes, then
-selects candidate 3 with two strict improvements and one tie. If any candidate
-is ineligible, no best-candidate notice is emitted. This comparison remains
-diagnostic; it is not used for policy search or pruning.
-
-`QC_POLICY_RECORD_PENDING_PROBE` uses the same Rocq `scorer` interface but
-includes unresolved nonrecursive requests as `Pending` in the context. A
-Rocq-defined scorer observes one pending `GenSized A` dependency in
-`policy_quote_missing A` and one supplied dependency in `policy_quote_list`.
-It still skips recursive helper sources until their full request can be
-carried through rewriting. The older supplied-only Rocq helper remains
-available; both helpers produce the same score when every dependency is
-supplied. Neither probe selects a production schedule.
+QuickChick's `SchedulingPolicy` module states the same contract in Rocq: a
+policy's score, comparison, grouping and prefix bound, with a proof that the
+bound is admissible. `QC Scorer` compiles such a policy and selects with it,
+as described above. `test/scoring_policy.v` computes example scores and bounds
+over hand-written views, independently of derivation.
 
 ## Constructor weighting
 

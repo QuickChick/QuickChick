@@ -1,67 +1,20 @@
 (* Diagnostics of one constructor's schedule selection, switched on by
-   environment variables: the Rocq policy probes, the BudgetAware
-   demonstration used by test/budget_aware, and verification that grouped
-   search keeps the joint search's best score. None changes a selection. *)
+   environment variables: the BudgetAware demonstration used by
+   test/budget_aware, and verification that grouped search keeps the joint
+   search's best score. Neither changes a selection. *)
 open Pp
 open GenericLib
 open RelationInfo
-open DensityMemo
+open ModeMemo
 open ScheduleScoring
 open ScheduleContext
 let materialize = SchedulePruning.materialize
-
-(* QC_POLICY_QUOTE_PROBE: quote a constructor type for a Rocq policy. *)
-let quote_probe typ =
-  if Sys.getenv_opt "QC_POLICY_QUOTE_PROBE" = Some "1" then begin
-    let view = match ScoringView.quote_term
-      ~global:ScoringView.global_name (ScoringView.scope []) typ with
-      | Ok (view, _) -> view
-      | Error message -> failwith message in
-    let env = Global.env () in
-    ignore (CoqExpr.interp_open_coq_expr env (Evd.from_env env)
-      (ScoringView.term_expression view));
-    let report = match Sys.getenv_opt "QC_POLICY_SCORE_PROBE" with
-      | None -> "checked Rocq term view"
-      | Some scorer ->
-        (match ScoringView.evaluate env scorer view with
-         | Error message -> failwith message
-         | Ok (sigma, value, typ) ->
-           match ScoringView.nat_of_value env sigma typ value with
-           | Some n -> Printf.sprintf "Rocq score=%d" n
-           | None -> "Rocq score=" ^
-             Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma value)) in
-    Feedback.msg_notice (str ("[policy-quote] " ^ report))
-  end;
-  ()
-
-(* QC_POLICY_STEP_PROBE: score each step of the first candidate. *)
-let step_probe result_vars schedules =
-  (match Sys.getenv_opt "QC_POLICY_STEP_PROBE", schedules with
-   | Some scorer, (_, _, _, (steps, _)) :: _ ->
-     let names = List.map fst result_vars @
-       List.concat_map ScoringView.step_variables steps
-       |> List.sort_uniq Stdlib.compare in
-     let scope = ScoringView.scope names in
-     let finite_pins = BudgetAwareScore.finite_pins_from_environment () in
-     List.iteri (fun index step ->
-       let expression = match ScoringView.step_expression
-         ~global:ScoringView.global_name ~finite_pins scope step with
-         | Ok expression -> expression
-         | Error message -> failwith message in
-       match ScoringView.evaluate_expression (Global.env ()) scorer expression with
-       | Error message -> failwith message
-       | Ok (sigma, value, _) ->
-         Feedback.msg_notice (str (Printf.sprintf
-           "[policy-step] step=%d score=%s" index
-           (Pp.string_of_ppcmds
-             (Printer.pr_econstr_env (Global.env ()) sigma value))))) steps
-   | _ -> ())
 
 (* QC_SCHEDULE_GROUPS=verify: grouped search must produce only orderings the
    joint search admits and keep its best score. *)
 let verify_grouped_search ~grade_schedule ~typ ~ind_name ~ctr_name ~result_vars
     ~output_vars ~ds ~opt ~prefer_dense ~policy ~prepared_inputs
-    ~initial_inductive_memo ~initial_density_memo schedule_matches schedules
+    ~initial_inductive_memo ~initial_grade_memo schedule_matches schedules
     schedule_densities =
     let joint = UnifyQC.type_to_schedules typ (Some ind_name) (Some ctr_name)
       result_vars output_vars ds opt in
@@ -110,10 +63,10 @@ let verify_grouped_search ~grade_schedule ~typ ~ind_name ~ctr_name ~result_vars
         (failwith ("grouped schedule search produced a schedule outside the joint search for constructor "
           ^ constructor_to_string ctr_name ^ "\n grouped: " ^ canonical triple
           ^ String.concat "" (List.map (fun t -> "\n joint: " ^ t) unreduced_canonical)))) schedule_matches;
-    let scored_joint = with_temporary_density_state (fun () ->
+    let scored_joint = with_temporary_memo_state (fun () ->
       List.mapi (fun i triple ->
-        density_inductive_memo := initial_inductive_memo;
-        density_memo := initial_density_memo;
+        mode_memo := initial_inductive_memo;
+        grade_memo := initial_grade_memo;
         let ms_steps, schd = materialize triple in
         try Some (i, triple, scored_schedule_features ds i (grade_schedule ms_steps schd))
         with Noninductive_dependency _ | Unavailable_mode _ -> None) joint
@@ -135,17 +88,17 @@ let verify_grouped_search ~grade_schedule ~typ ~ind_name ~ctr_name ~result_vars
         | _, None -> best
         | Some b, Some s when BudgetAwareScore.compare b s <= 0 -> best
         | _, Some s -> Some s) None in
-      let joint_best = with_temporary_density_state (fun () -> best_budget
+      let joint_best = with_temporary_memo_state (fun () -> best_budget
         (List.map (fun triple ->
-          density_inductive_memo := initial_inductive_memo;
-          density_memo := initial_density_memo;
+          mode_memo := initial_inductive_memo;
+          grade_memo := initial_grade_memo;
           let ms_steps, schd = materialize triple in
           try score (List.map fst (fst (grade_schedule ms_steps schd)))
           with Noninductive_dependency _ | Unavailable_mode _ -> None) joint)) in
-      let grouped_best = with_temporary_density_state (fun () -> best_budget
-        (List.map (fun (_, (steps, _), inductive_memo, density_memo_after) ->
-          density_inductive_memo := inductive_memo;
-          density_memo := density_memo_after;
+      let grouped_best = with_temporary_memo_state (fun () -> best_budget
+        (List.map (fun (_, (steps, _), inductive_memo, grade_memo_after) ->
+          mode_memo := inductive_memo;
+          grade_memo := grade_memo_after;
           score (List.map fst steps)) schedule_densities)) in
       let same = match joint_best, grouped_best with
         | None, None -> true
@@ -204,7 +157,7 @@ let budget_aware_demo ~select_best_schedule ~ind_name ~ctr_name ~result_vars
          | None -> InductiveScheduleKeyMap.find_opt
              (key.B.relation, key.B.output_indices, key.B.derive_sort, false) memo in
        match entry with
-       | Some (DensityDone (((_, inputs, _, base, recursive), _), true, _)) ->
+       | Some (ModeDone (((_, inputs, _, base, recursive), _), true, _)) ->
          (match base @ recursive with
           | [((steps, _), _, _, _)] ->
             let dependencies = B.required_dependencies key steps in
@@ -273,179 +226,3 @@ let budget_aware_demo ~select_best_schedule ~ind_name ~ctr_name ~result_vars
          (match selected with None -> "none" | Some (id, _, _) -> string_of_int id)))
      end
    | _ -> ())
-
-(* QC_POLICY_SCHEDULE_PROBE, QC_POLICY_COMPARE_PROBE, QC_POLICY_RECORD_PROBE:
-   evaluate a Rocq policy on the candidates. *)
-let policy_probes ~ind_name ~ctr_name ~result_vars ~output_vars ~ds
-    schedule_densities =
-  let policy_finite_pins = lazy (BudgetAwareScore.finite_pins_from_environment ()) in
-  let policy_schedule_expression (steps, sort) =
-     let result = match sort with
-       | ProducerSchedule (_, _, result) | TheoremSchedule (result, _) ->
-         Some result
-       | CheckerSchedule -> None in
-     let names = List.map fst result_vars @
-       List.concat_map (fun (step, _) -> ScoringView.step_variables step) steps @
-       (match result with None -> [] | Some term -> ScoringView.free_vars_term term)
-       |> List.sort_uniq Stdlib.compare in
-     let scope = ScoringView.scope names in
-     let expression = match ScoringView.schedule_expression
-       ~global:ScoringView.global_name
-       ~finite_pins:(Lazy.force policy_finite_pins)
-       ~grade:policy_grade scope steps result with
-       | Ok expression -> expression
-       | Error message -> failwith message in
-     expression in
-  (match Sys.getenv_opt "QC_POLICY_SCHEDULE_PROBE",
-    Sys.getenv_opt "QC_POLICY_COMPARE_PROBE", schedule_densities with
-   | Some scorer, None, (_, schedule, _, _) :: _ ->
-     (match ScoringView.evaluate_expression (Global.env ()) scorer
-       (policy_schedule_expression schedule) with
-      | Error message -> failwith message
-      | Ok (sigma, value, _) ->
-        Feedback.msg_notice (str ("[policy-schedule] score=" ^
-          Pp.string_of_ppcmds
-            (Printer.pr_econstr_env (Global.env ()) sigma value))))
-   | Some scorer, Some comparator, _ :: _ ->
-     let env = Global.env () in
-     let sigma = ref (Evd.from_env env) in
-     let scores = List.map (fun (id, schedule, _, _) ->
-       match ScoringView.evaluate_expression_in env !sigma scorer
-         (policy_schedule_expression schedule) with
-       | Error message -> failwith message
-       | Ok (next_sigma, value, _) ->
-         sigma := next_sigma;
-         id, value) schedule_densities in
-     if List.length scores > 1 then
-       Feedback.msg_notice (str ("[policy-compare] values=" ^
-         String.concat "; " (List.map (fun (id, value) ->
-           Printf.sprintf "%d:%s" id
-             (Pp.string_of_ppcmds (Printer.pr_econstr_env env !sigma value)))
-           scores)));
-     let orders = ref [] in
-     let best = List.fold_left (fun best (id, value) -> match best with
-       | None -> Some (id, value)
-       | Some (_, best_value) as current ->
-         (match ScoringView.compare_values env !sigma comparator value best_value with
-          | Error message -> failwith message
-          | Ok (next_sigma, order) ->
-            sigma := next_sigma;
-            orders := order :: !orders;
-            if order < 0 then Some (id, value) else current)) None scores in
-     (match best with
-      | None -> assert false
-      | Some (id, _) ->
-        let count order = List.length (List.filter ((=) order) !orders) in
-        Feedback.msg_notice (str (Printf.sprintf
-          "[policy-compare] candidates=%d best=%d lt=%d eq=%d gt=%d"
-          (List.length scores) id (count (-1)) (count 0) (count 1))))
-   | None, Some _, _ ->
-     failwith "SchedulingPolicy: comparator probe requires a scorer probe"
-   | _ -> ());
-  (match Sys.getenv_opt "QC_POLICY_RECORD_PROBE",
-    Sys.getenv_opt "QC_POLICY_RECORD_PENDING_PROBE" with
-   | None, None -> ()
-   | Some _, Some _ ->
-     failwith "SchedulingPolicy: choose one record probe"
-   | (Some scorer, None) | (None, Some scorer) ->
-     let include_pending = Sys.getenv_opt "QC_POLICY_RECORD_PENDING_PROBE" <> None in
-     let record_label = if include_pending then "policy-record-pending"
-       else "policy-record" in
-     let collect_dependencies steps =
-       let rec collect acc = function
-         | [] -> Some (List.rev acc)
-         | (step, _) :: rest ->
-           (match step with
-            | S_Match _ | S_Let _ -> collect acc rest
-            | S_UC (_, (SrcRec _ | SrcMutrec _ | SrcDef _), _)
-            | S_ST (_, (SrcRec _ | SrcMutrec _ | SrcDef _), _)
-            | S_Check ((SrcRec _ | SrcMutrec _ | SrcDef _), _) -> None
-            | _ ->
-              let request = match step with
-                | S_UC (_, SrcNonrec (DTyParam _ as parameter), ps) ->
-                  Some (parameter, [], producer_sort_to_derive_sort ps, false)
-                | _ -> schedule_step_dependence step in
-              match request with
-              | None -> None
-              | Some ((relation, indices, mode, constrained) as request) ->
-                let args = match relation with
-                  | DTyCtr (_, args) | DNot (DTyCtr (_, args)) -> args
-                  | _ -> [] in
-                let outputs = List.filteri
-                  (fun index _ -> List.mem index indices) args
-                  |> List.concat_map variables_in_hypothesis in
-                let status =
-                  if has_supplied_schedule_instance relation outputs mode constrained
-                  then ScoringView.Supplied else ScoringView.Pending in
-                if status = ScoringView.Pending && not include_pending then None
-                else collect
-                  (if List.exists (fun (key, _) -> key = request) acc
-                   then acc else (request, status) :: acc) rest) in
-       collect [] steps in
-     let eligible = List.filter_map (fun (id, ((steps, sort) as schedule), _, _) ->
-       let local_types = List.fold_left (fun locals (step, _) ->
-         let outputs = match step with
-           | S_UC (name, SrcNonrec typ, _) -> [name, typ]
-           | S_ST (outputs, _, _) -> outputs
-           | _ -> [] in
-         List.fold_left (fun locals (name, typ) ->
-           if List.mem_assoc name locals then locals else locals @ [name, typ])
-           locals outputs) result_vars steps in
-       let known_locals = List.map fst local_types in
-       let complete_telescope =
-         List.for_all (fun (_, typ) -> typ <> DHole) local_types &&
-         List.for_all (fun (step, _) ->
-           List.for_all (fun name -> List.mem name known_locals)
-             (ScoringView.step_variables step)) steps in
-       match sort, complete_telescope, collect_dependencies steps with
-       | ProducerSchedule (constrained, _, result), true, Some dependencies ->
-         Some (id, schedule, constrained, result, local_types, dependencies)
-       | _ -> None) schedule_densities in
-     let env = Global.env () in
-     let sigma = ref (Evd.from_env env) in
-     let scores = List.map (fun (id, ((steps, _) as schedule), constrained,
-         result, local_types, dependencies) ->
-       let names = List.map fst result_vars @
-         List.concat_map (fun (step, _) -> ScoringView.step_variables step) steps @
-         ScoringView.free_vars_term result |> List.sort_uniq Stdlib.compare in
-       let scope = ScoringView.scope names in
-       let context = match ScoringView.dependency_context_expression
-         ~global:ScoringView.global_name scope ind_name result_vars local_types
-         output_vars ds constrained dependencies with
-         | Ok context -> context
-         | Error message -> failwith message in
-       let expression = ScoringView.score_one_schedule_expression scorer
-         context (policy_schedule_expression schedule) in
-       match ScoringView.evaluate_term_in env !sigma expression with
-       | Error message -> failwith message
-       | Ok (next_sigma, value, _) ->
-         sigma := next_sigma;
-         id, value) eligible in
-     (match scores with
-      | [] -> ()
-      | (_, value) :: _ ->
-        Feedback.msg_notice (str ("[" ^ record_label ^ "] constructor=" ^
-          constructor_to_string ctr_name ^ " score=" ^
-          Pp.string_of_ppcmds (Printer.pr_econstr_env env !sigma value)));
-     if List.length eligible = List.length schedule_densities &&
-        List.length scores > 1 then begin
-       let orders = ref [] in
-       let best = List.fold_left (fun best (id, value) -> match best with
-         | None -> Some (id, value)
-         | Some (_, best_value) as current ->
-           (match ScoringView.compare_record_scores env !sigma scorer
-             value best_value with
-            | Error message -> failwith message
-            | Ok (next_sigma, order) ->
-              sigma := next_sigma;
-              orders := order :: !orders;
-              if order < 0 then Some (id, value) else current)) None scores in
-       match best with
-       | None -> assert false
-       | Some (id, _) ->
-         let count order = List.length (List.filter ((=) order) !orders) in
-         Feedback.msg_notice (str (Printf.sprintf
-           "[%s-compare] candidates=%d best=%d lt=%d eq=%d gt=%d"
-           record_label (List.length scores) id
-           (count (-1)) (count 0) (count 1)))
-     end))

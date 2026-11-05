@@ -3,7 +3,7 @@
 open Pp
 open GenericLib
 open RelationInfo
-open DensityMemo
+open ModeMemo
 open ScheduleScoring
 (* The proof context is borrowed only while preparing one test. Global
    declarations may grow during that preparation, so refresh the base environment. *)
@@ -475,12 +475,12 @@ let compiled_context ind_name result_vars output_vars ds ~constrained steps term
         | DTyCtr (name, _) ->
           let find c =
             let key = (name, indices, mode, c) in
-            let entry = InductiveScheduleKeyMap.find_opt key !density_inductive_memo in
-            record_density_read key entry;
+            let entry = InductiveScheduleKeyMap.find_opt key !mode_memo in
+            record_mode_read key entry;
             entry in
           (match find constrained with
-           | Some (DensityDone (_, true, Some (PolicyScore score))) -> Some (ScoringView.Completed score)
-           | Some (DensityInProgress _) -> Some ScoringView.InProgress
+           | Some (ModeDone (_, true, Some (PolicyScore score))) -> Some (ScoringView.Completed score)
+           | Some (ModeInProgress _) -> Some ScoringView.InProgress
            | _ -> None)
         | _ -> None in
       (* An obligation that cannot even be elaborated is not supplied. *)
@@ -580,16 +580,16 @@ let with_score_pruning_suspended f =
   score_pruning_suspended := true;
   Fun.protect ~finally:(fun () -> score_pruning_suspended := previous) f
 
-let with_temporary_density_state f =
-  let saved_inductive = !density_inductive_memo in
-  let saved_rule = !density_memo in
+let with_temporary_memo_state f =
+  let saved_inductive = !mode_memo in
+  let saved_rule = !grade_memo in
   let saved_relations = !rocq_relation_memo in
-  let saved_uncertainty = !density_uncertainty_events in
+  let saved_uncertainty = !provisional_reads in
   Fun.protect ~finally:(fun () ->
-    density_inductive_memo := saved_inductive;
-    density_memo := saved_rule;
+    mode_memo := saved_inductive;
+    grade_memo := saved_rule;
     rocq_relation_memo := saved_relations;
-    density_uncertainty_events := saved_uncertainty)
+    provisional_reads := saved_uncertainty)
     (fun () -> with_score_pruning_suspended f)
 
 (* A completed, cycle-independent dependency entry is determined by its key,
@@ -603,11 +603,11 @@ let reuse_stable_entries () =
 (* Scoring a candidate derives its dependencies in scratch memo state. Shared
    stable entries are visible to it and new ones are kept; everything else
    it derives is discarded. Rankings never manage memo state themselves. *)
-let with_candidate_density_state f =
-  with_temporary_density_state (fun () ->
+let with_candidate_memo_state f =
+  with_temporary_memo_state (fun () ->
     let reuse = reuse_stable_entries () in
-    if reuse then density_inductive_memo := with_stable_entries !density_inductive_memo;
-    let before = !density_inductive_memo in
+    if reuse then mode_memo := with_stable_entries !mode_memo;
+    let before = !mode_memo in
     let result = f () in
     if reuse then collect_stable_entries before;
     result)
@@ -617,7 +617,7 @@ let with_candidate_density_state f =
    annotation. A candidate whose dependencies cannot be derived scores [None]. *)
 let score_group_candidates derive score groups =
   List.map (List.map (fun schedule ->
-    try with_candidate_density_state (fun () -> score schedule (derive schedule))
+    try with_candidate_memo_state (fun () -> score schedule (derive schedule))
     with Noninductive_dependency _ | Unavailable_mode _ -> None)) groups
 
 let budget_key ind_name result_vars output_vars ds = {

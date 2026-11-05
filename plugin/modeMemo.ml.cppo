@@ -29,7 +29,7 @@ end
 
 module RelationInstMap = Map.Make(RelationInstOrd)
 
-let density_memo : rule_density RelationInstMap.t ref = ref RelationInstMap.empty
+let grade_memo : rule_density RelationInstMap.t ref = ref RelationInstMap.empty
 
 (* Constrained and unconstrained scheduling take different construction paths.
    They cannot share a cached inductive schedule or its density. *)
@@ -49,25 +49,25 @@ type relation_score =
   | BudgetScore of BudgetAwareScore.score
   | PolicyScore of PolicyRegistry.score
 
-type inductive_density_entry =
-  | DensityInProgress of (inductive_schedule * rule_density)
-  | DensityDone of (inductive_schedule * rule_density) * bool * relation_score option
+type mode_entry =
+  | ModeInProgress of (inductive_schedule * rule_density)
+  | ModeDone of (inductive_schedule * rule_density) * bool * relation_score option
 
 (* A completed entry is cycle-independent only if its computation never read
    a provisional or cycle-dependent grade. Under fixed scoring inputs, later
    roots cannot introduce a new cycle into such a completed dependency.
    The flag is not portable across proof contexts or scoring policies. *)
-let density_uncertainty_events = ref 0
+let provisional_reads = ref 0
 
-let density_inductive_memo :
-  inductive_density_entry InductiveScheduleKeyMap.t ref =
+let mode_memo :
+  mode_entry InductiveScheduleKeyMap.t ref =
   ref InductiveScheduleKeyMap.empty
 
-let inductive_density_value = function
-  | DensityInProgress value ->
-    incr density_uncertainty_events; value
-  | DensityDone (value, cycle_independent, _) ->
-    if not cycle_independent then incr density_uncertainty_events;
+let mode_entry_value = function
+  | ModeInProgress value ->
+    incr provisional_reads; value
+  | ModeDone (value, cycle_independent, _) ->
+    if not cycle_independent then incr provisional_reads;
     value
 
 (* Cycle independence is decided as in Tarjan's algorithm. Each derivation
@@ -76,8 +76,8 @@ let inductive_density_value = function
    depth or deeper: its result is then determined by its key alone. A
    cycle-dependent entry keeps the lowest depth it read until the derivation
    at that depth finishes; it is then permanently provisional. *)
-let density_depth = ref 0
-let density_low_read = ref max_int
+let memo_depth = ref 0
+let lowest_provisional_read = ref max_int
 let in_progress_depth : int InductiveScheduleKeyMap.t ref =
   ref InductiveScheduleKeyMap.empty
 let cycle_low : int InductiveScheduleKeyMap.t ref =
@@ -86,7 +86,7 @@ let cycle_low : int InductiveScheduleKeyMap.t ref =
 (* Completed, cycle-independent entries are determined by their key, so they
    are shared by every candidate of one top-level derivation; only provisional
    entries are isolated per candidate. Cleared with the top-level memo. *)
-let stable_density_entries : inductive_density_entry InductiveScheduleKeyMap.t ref =
+let stable_mode_entries : mode_entry InductiveScheduleKeyMap.t ref =
   ref InductiveScheduleKeyMap.empty
 
 (* A cycle-dependent derivation is determined by its key and by the memo
@@ -97,8 +97,8 @@ let stable_density_entries : inductive_density_entry InductiveScheduleKeyMap.t r
    progress. Completed cycle-independent entries are determined by their key
    and may be absent: replay adds them. *)
 type contextual_derivation = {
-  context_reads : (InductiveScheduleKeyMap.key * inductive_density_entry option) list;
-  context_delta : (InductiveScheduleKeyMap.key * inductive_density_entry) list;
+  context_reads : (InductiveScheduleKeyMap.key * mode_entry option) list;
+  context_delta : (InductiveScheduleKeyMap.key * mode_entry) list;
   context_value : inductive_schedule * rule_density;
 }
 
@@ -108,19 +108,19 @@ let contextual_derivations :
 (* One table per active derivation: the first observation of each key read
    while it is active, including reads made by nested derivations. *)
 let derivation_frames :
-  (InductiveScheduleKeyMap.key, inductive_density_entry option) Hashtbl.t list ref = ref []
+  (InductiveScheduleKeyMap.key, mode_entry option) Hashtbl.t list ref = ref []
 
-let record_density_read key observed =
+let record_mode_read key observed =
   List.iter (fun frame ->
     if not (Hashtbl.mem frame key) then Hashtbl.add frame key observed) !derivation_frames
 
 let is_stable_entry = function
-  | DensityDone (_, true, _) -> true
+  | ModeDone (_, true, _) -> true
   | _ -> false
 
 let context_holds record =
   List.for_all (fun (key, observed) ->
-    let current = InductiveScheduleKeyMap.find_opt key !density_inductive_memo in
+    let current = InductiveScheduleKeyMap.find_opt key !mode_memo in
     match observed, current with
     | None, None -> true
     | None, Some now ->
@@ -139,14 +139,14 @@ let context_holds record =
    so a later derivation rederives them on demand; code generation, which
    finds a schedule's dependencies in the memo, restores them first. *)
 let stable_closures :
-  (InductiveScheduleKeyMap.key, (InductiveScheduleKeyMap.key * inductive_density_entry) list)
+  (InductiveScheduleKeyMap.key, (InductiveScheduleKeyMap.key * mode_entry) list)
   Hashtbl.t = Hashtbl.create 64
 
 let memo_delta memo_at_start =
   InductiveScheduleKeyMap.fold (fun k entry acc ->
     match InductiveScheduleKeyMap.find_opt k memo_at_start with
     | Some before when before == entry -> acc
-    | _ -> (k, entry) :: acc) !density_inductive_memo []
+    | _ -> (k, entry) :: acc) !mode_memo []
 
 (* Add the shared completed entries to a memo, keeping its own bindings.
    Candidates of one search start from the same memo, and the shared entries
@@ -155,7 +155,7 @@ let memo_delta memo_at_start =
 let stable_merge = ref None
 
 let with_stable_entries memo =
-  let stable = !stable_density_entries in
+  let stable = !stable_mode_entries in
   match !stable_merge with
   | Some (base, shared, merged) when base == memo && shared == stable -> merged
   | _ ->
@@ -173,40 +173,40 @@ let complete_stable_closures () =
     | [] -> ()
     | key :: rest ->
       let added = List.filter_map (fun (k, entry) ->
-        if InductiveScheduleKeyMap.mem k !density_inductive_memo then None
+        if InductiveScheduleKeyMap.mem k !mode_memo then None
         else begin
-          density_inductive_memo := InductiveScheduleKeyMap.add k entry !density_inductive_memo;
+          mode_memo := InductiveScheduleKeyMap.add k entry !mode_memo;
           Some k
         end) (Stdlib.Option.value ~default:[] (Hashtbl.find_opt stable_closures key)) in
       complete (added @ rest) in
-  complete (List.map fst (InductiveScheduleKeyMap.bindings !density_inductive_memo))
+  complete (List.map fst (InductiveScheduleKeyMap.bindings !mode_memo))
 
 (* Share the completed, cycle-independent entries derived since [before]. *)
 (* A scoring run that derived nothing leaves the memo physically unchanged. *)
 let collect_stable_entries before =
-  if !density_inductive_memo != before then
+  if !mode_memo != before then
   InductiveScheduleKeyMap.iter (fun key entry -> match entry with
-    | DensityDone (_, true, _) when not (InductiveScheduleKeyMap.mem key before) ->
-      stable_density_entries := InductiveScheduleKeyMap.add key entry !stable_density_entries
-    | _ -> ()) !density_inductive_memo
+    | ModeDone (_, true, _) when not (InductiveScheduleKeyMap.mem key before) ->
+      stable_mode_entries := InductiveScheduleKeyMap.add key entry !stable_mode_entries
+    | _ -> ()) !mode_memo
 
-let read_inductive_density key entry =
+let read_mode_entry key entry =
   let low = match entry with
-    | DensityInProgress _ ->
+    | ModeInProgress _ ->
       Some (Stdlib.Option.value ~default:min_int
         (InductiveScheduleKeyMap.find_opt key !in_progress_depth))
-    | DensityDone (_, false, _) ->
+    | ModeDone (_, false, _) ->
       Some (Stdlib.Option.value ~default:min_int
         (InductiveScheduleKeyMap.find_opt key !cycle_low))
-    | DensityDone (_, true, _) -> None in
-  Stdlib.Option.iter (fun low -> density_low_read := min !density_low_read low) low;
-  inductive_density_value entry
+    | ModeDone (_, true, _) -> None in
+  Stdlib.Option.iter (fun low -> lowest_provisional_read := min !lowest_provisional_read low) low;
+  mode_entry_value entry
 
-let enter_density_derivation key =
-  let depth = !density_depth + 1 in
-  let saved_low = !density_low_read in
-  density_depth := depth;
-  density_low_read := max_int;
+let enter_mode_derivation key =
+  let depth = !memo_depth + 1 in
+  let saved_low = !lowest_provisional_read in
+  memo_depth := depth;
+  lowest_provisional_read := max_int;
   in_progress_depth := InductiveScheduleKeyMap.add key depth !in_progress_depth;
   depth, saved_low
 
@@ -219,34 +219,34 @@ let remember_contextual_derivation key frame memo_at_start value =
   Hashtbl.replace contextual_derivations key
     (record :: List.filteri (fun i _ -> i < 3) previous)
 
-let leave_density_derivation key depth saved_low =
+let leave_mode_derivation key depth saved_low =
   in_progress_depth := InductiveScheduleKeyMap.remove key !in_progress_depth;
   cycle_low := InductiveScheduleKeyMap.map (fun low ->
     if low >= depth then min_int else low) !cycle_low;
-  density_depth := depth - 1;
-  density_low_read := min saved_low !density_low_read
+  memo_depth := depth - 1;
+  lowest_provisional_read := min saved_low !lowest_provisional_read
 
 (* Reuse a recorded derivation: repeat its outside reads, so the caller's
    cycle bookkeeping and parent frames see them, then add its memo entries. *)
 let replay_contextual_derivation key record =
-  let outer_low = !density_low_read in
-  density_low_read := max_int;
+  let outer_low = !lowest_provisional_read in
+  lowest_provisional_read := max_int;
   List.iter (fun (k, observed) ->
-    record_density_read k observed;
+    record_mode_read k observed;
     match observed with
     | Some entry ->
-      ignore (read_inductive_density k entry);
-      if not (InductiveScheduleKeyMap.mem k !density_inductive_memo) then
-        density_inductive_memo := InductiveScheduleKeyMap.add k entry !density_inductive_memo
+      ignore (read_mode_entry k entry);
+      if not (InductiveScheduleKeyMap.mem k !mode_memo) then
+        mode_memo := InductiveScheduleKeyMap.add k entry !mode_memo
     | None -> ()) record.context_reads;
-  let low = !density_low_read in
-  density_low_read := min outer_low low;
+  let low = !lowest_provisional_read in
+  lowest_provisional_read := min outer_low low;
   List.iter (fun (k, entry) ->
-    record_density_read k None;
-    if not (InductiveScheduleKeyMap.mem k !density_inductive_memo) then begin
-      density_inductive_memo := InductiveScheduleKeyMap.add k entry !density_inductive_memo;
+    record_mode_read k None;
+    if not (InductiveScheduleKeyMap.mem k !mode_memo) then begin
+      mode_memo := InductiveScheduleKeyMap.add k entry !mode_memo;
       match entry with
-      | DensityDone (_, false, _) ->
+      | ModeDone (_, false, _) ->
         cycle_low := InductiveScheduleKeyMap.add k (if k = key then low else min_int) !cycle_low
       | _ -> ()
     end) record.context_delta;

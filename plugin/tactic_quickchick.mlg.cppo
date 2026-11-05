@@ -101,7 +101,7 @@ let remember_induct h =
 
 open GenericLib
 open RelationInfo
-open DensityMemo
+open ModeMemo
 open ScheduleScoring
 open ScheduleContext
 open ScheduleSelection
@@ -122,7 +122,7 @@ let quickchick_it size idx =
       begin
         msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
         let open GenericLib in 
-        reset_density_inductive_memo ();
+        reset_mode_memo ();
         inductive_set := inductive_set_init;
         rocq_relation_memo := TyCtrMap.empty;
 
@@ -133,9 +133,9 @@ let quickchick_it size idx =
 
         let selected_schedule = 
           (match List.nth_opt theorem_schedules idx with
-          | Some (schd, _, _, inductive_memo, density_memo_after) ->
-            density_inductive_memo := inductive_memo;
-            density_memo := density_memo_after;
+          | Some (schd, _, _, inductive_memo, grade_memo_after) ->
+            mode_memo := inductive_memo;
+            grade_memo := grade_memo_after;
             schd
           | None -> CErrors.user_err (str (Printf.sprintf
               "quickchick: schedule index %d was requested, but only %d theorem schedule%s available."
@@ -146,9 +146,9 @@ let quickchick_it size idx =
 
         (* Register theorem as a phony inductive schedule *)
         let phony_theorem_ind_schd = ("theorem", [], [],[selected_schedule,[],[],WDefault],[]) in
-        density_inductive_memo := InductiveScheduleKeyMap.add (ty_ctr_of_string "theorem", [], D_Thm, true) (DensityDone ((phony_theorem_ind_schd, Checking), true, None)) !density_inductive_memo;
+        mode_memo := InductiveScheduleKeyMap.add (ty_ctr_of_string "theorem", [], D_Thm, true) (ModeDone ((phony_theorem_ind_schd, Checking), true, None)) !mode_memo;
 
-        density_inductive_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !density_inductive_memo;
+        mode_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !mode_memo;
         complete_stable_closures ();
         let dependents, inductive_dependency_map = collect_all_used_inductive_schd_names "theorem" in
         Error.msg_debug (str "Dependents: " ++ str (String.concat ", " dependents) ++ fnl ());
@@ -449,7 +449,7 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
     | Some (idx, rs) -> 
       let open GenericLib in
       let (ind_name, params, constructors, result_typ) = List.nth rs idx in
-      reset_density_inductive_memo ();
+      reset_mode_memo ();
       Feedback.msg_notice (str "Inductive name: " 
                         ++ str (ty_ctr_to_string ind_name)
                         ++ str "\n Parameters: "
@@ -516,7 +516,7 @@ VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
                         ++ str (String.concat ", " (List.map string_of_int ois)) 
                         ++ str "\n\n");
 
-      density_memo := RelationInstMap.empty;
+      grade_memo := RelationInstMap.empty;
       clear_inductive_name_cache ();
       clear_schedule_instance_cache ();
       Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
@@ -569,7 +569,7 @@ VERNAC COMMAND EXTEND DeriveDensity CLASSIFIED AS SIDEFF
    | ["Derive" "Density" constr(ind) int_list(ois) "derive" string(ds)] ->
     { match GenericLib.ind_reference_to_rocq_relations ind with
     | Some (idx, rs) ->
-      reset_density_inductive_memo ();
+      reset_mode_memo ();
       inductive_set := inductive_set_init;
       rocq_relation_memo := TyCtrMap.empty;
       (* inductive_dependency_map := StringMap.empty; *)

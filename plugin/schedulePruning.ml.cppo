@@ -6,7 +6,7 @@
 open Pp
 open GenericLib
 open RelationInfo
-open DensityMemo
+open ModeMemo
 open ScheduleScoring
 open ScheduleContext
 
@@ -122,7 +122,7 @@ let score_schedule ctx ~use_cache neutral_steps ((steps, sort) as schedule) =
 let leaf_cache_enabled ctx = ctx.mode = `Prune && ctx.reuse_stable
 
 let leaf_score ctx triple = timed ctx.stats.leaf_cpu (fun () ->
-  with_candidate_density_state (fun () ->
+  with_candidate_memo_state (fun () ->
     let match_steps, schedule = materialize triple in
     let scored = score_schedule ctx ~use_cache:(leaf_cache_enabled ctx)
       match_steps schedule in
@@ -132,7 +132,7 @@ let leaf_score ctx triple = timed ctx.stats.leaf_cpu (fun () ->
 (* The density bound of a committed prefix: its steps' grades, Checking for
    each forced check, and the variable uses the prefix and the floor imply. *)
 let bound_score ctx check_floor triple = timed ctx.stats.bound_cpu (fun () ->
-  with_candidate_density_state (fun () ->
+  with_candidate_memo_state (fun () ->
     let ds = ctx.ds in
     let match_steps, (steps, sort) = materialize triple in
     let known_grades =
@@ -145,10 +145,10 @@ let bound_score ctx check_floor triple = timed ctx.stats.bound_cpu (fun () ->
            | Some cached -> incr ctx.stats.bound_cache_hits; cached
            | None ->
              incr ctx.stats.bound_cache_misses;
-             let before = !density_uncertainty_events in
+             let before = !provisional_reads in
              let scored = ctx.grade [] ([step], sort) in
              let grade = match scored with
-               | ([( _, grade)], _) when !density_uncertainty_events = before ->
+               | ([( _, grade)], _) when !provisional_reads = before ->
                  Some (density_rank grade)
                | _ -> None in
              Hashtbl.add ctx.bound_grade_cache (step, sort) grade;
@@ -235,7 +235,7 @@ let budget_pruner ctx ~key ~prepared_inputs =
           | Some score -> Some score
           | None -> Some BudgetAwareScore.empty) } in
     Result.to_option (BudgetAwareScore.score_schedule context key steps) in
-  let budget_leaf triple = with_candidate_density_state (fun () ->
+  let budget_leaf triple = with_candidate_memo_state (fun () ->
     let match_steps, schedule = materialize triple in
     let scored = score_schedule ctx ~use_cache:(leaf_cache_enabled ctx)
       match_steps schedule in
@@ -270,7 +270,7 @@ let budget_pruner ctx ~key ~prepared_inputs =
       (budget_score ~optimistic:true committed) in
   (* Grading the prefix's steps derives their dependencies, so the bound
      reads their scores instead of the optimistic default. *)
-  let derived_bound check_floor triple = with_candidate_density_state (fun () ->
+  let derived_bound check_floor triple = with_candidate_memo_state (fun () ->
     ignore (bound_score ctx check_floor triple);
     prefix_bound check_floor triple) in
   let on_leaf path triple =
@@ -316,12 +316,12 @@ let compiled_pruner ctx policy ~ind_name ~result_vars ~output_vars =
   let grade_cache = Hashtbl.create 32 in
   let observed_bounds = ref [] in
   let better a b = policy.PolicyRegistry.compare a b = PolicyViews.Lt in
-  let leaf triple = with_candidate_density_state (fun () ->
+  let leaf triple = with_candidate_memo_state (fun () ->
     let match_steps, schedule = materialize triple in
     let scored = score_schedule ctx ~use_cache:(leaf_cache_enabled ctx)
       match_steps schedule in
     compiled_schedule_score policy ind_name result_vars output_vars ds scored) in
-  let bound check_floor triple = with_candidate_density_state (fun () ->
+  let bound check_floor triple = with_candidate_memo_state (fun () ->
     let match_steps, (steps, sort) = materialize triple in
     let neutral = neutral_grade ds in
     let graded = List.map (fun step -> step, neutral, true) match_steps @
@@ -333,9 +333,9 @@ let compiled_pruner ctx policy ~ind_name ~result_vars ~output_vars =
           match Hashtbl.find_opt grade_cache (step, sort) with
           | Some (grade, certain) -> step, grade, certain
           | None ->
-            let before = !density_uncertainty_events in
+            let before = !provisional_reads in
             let grade, certain = match ctx.grade [] ([step], sort) with
-              | ([(_, grade)], _) -> grade, !density_uncertainty_events = before
+              | ([(_, grade)], _) -> grade, !provisional_reads = before
               | _ -> neutral, false in
             Hashtbl.add grade_cache (step, sort) (grade, certain);
             step, grade, certain) steps in
