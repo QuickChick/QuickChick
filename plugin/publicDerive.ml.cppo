@@ -80,7 +80,7 @@ let publish ~mode ~constrained (sigma, bodies) =
 let derive_simple ~enumerator ind =
   let mode = if enumerator then "Enum" else "Gen" in
   publish ~mode ~constrained:false
-    (Tactic_quickchick.compile_public ~mode ~outputs:[] ~constrained:false ~all_mutual:true ind)
+    (ScheduleDerivation.compile_public ~mode ~outputs:[] ~constrained:false ~all_mutual:true ind)
 
 type reorder = {
   free : Names.Id.t list;
@@ -277,5 +277,5 @@ let publish_reordered ~mode r =
 let derive_dependent ~mode expression =
   let ind, outputs, reorder = dependent_target ~mode expression in
   publish ~mode ~constrained:true
-    (Tactic_quickchick.compile_public ~mode ~outputs ~constrained:true ~all_mutual:false ind);
+    (ScheduleDerivation.compile_public ~mode ~outputs ~constrained:true ~all_mutual:false ind);
   Option.iter (publish_reordered ~mode) reorder

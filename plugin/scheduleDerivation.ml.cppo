@@ -1,0 +1,943 @@
+(* Theorem schedules, mutual and dependent derivations, and declaring the
+   generated definitions and instances. *)
+open Error
+open Pp
+open GenericLib
+open RelationInfo
+open DensityMemo
+open ScheduleScoring
+open ScheduleContext
+open ScheduleSelection
+let all_theorem_schedules ?(best_only = false) (thm : rocq_type) =
+  let rank ~lazy_best schedule_matches =
+    let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i,List.map (fun (v,p) -> S_Match (v,p)) ms, ((List.map check_eq eqs @ steps), sort)) schedule_matches in
+    let initial_inductive_memo = !density_inductive_memo in
+    let initial_density_memo = !density_memo in
+    let incumbent = ref None in
+    let scored = Fun.protect
+      ~finally:(fun () ->
+        density_inductive_memo := initial_inductive_memo;
+        density_memo := initial_density_memo)
+      (fun () -> List.filter_map (fun (i, ms_steps, schd) ->
+        density_inductive_memo := with_stable_entries initial_inductive_memo;
+        density_memo := initial_density_memo;
+        if lazy_best && (match !incumbent with
+            | Some best -> theorem_candidate_loses ~incumbent:best ms_steps schd
+            | None -> false)
+        then begin
+          collect_stable_entries initial_inductive_memo;
+          if schedule_trace_enabled () then
+            Feedback.msg_notice (str (Printf.sprintf "[theorem-lazy] candidate=%d skipped\n" i));
+          None
+        end else
+        let result = schedule_density ms_steps schd in
+        if lazy_best then begin
+          let features = scored_schedule_features D_Thm i result in
+          if schedule_trace_enabled () then
+            Feedback.msg_notice (str (Printf.sprintf
+              "[theorem-lazy] candidate=%d scored density=%d uses=%d\n" i
+              features.ScheduleRanking.density_rank features.ScheduleRanking.variable_uses)
+              ++ str (schedule_to_string schd));
+          match !incumbent with
+          | Some best when ScheduleRanking.compare ~prefer_dense:true
+              (schedule_ranking_policy ()) features best >= 0 -> ()
+          | _ -> incumbent := Some features
+        end;
+        collect_stable_entries initial_inductive_memo;
+        let inductive_memo = !density_inductive_memo in
+        let density_memo_after = !density_memo in
+        if are_schedule_steps_valid i result then
+          Some (i, result, inductive_memo, density_memo_after)
+        else None) schedules) in
+    let ranked = sort_schedules_by_density_and_var_uses
+      (List.map (fun (i, result, _, _) -> i, result) scored) D_Thm in
+    List.map (fun ((schd_steps_density, schd_sort) as scored_schedule, density, num_var_uses, id) ->
+      let (_, _, inductive_memo, density_memo_after) =
+        List.find (fun (i, _, _, _) -> i = id) scored in
+      scored_schedule,
+      ((List.map fst schd_steps_density, schd_sort), density, num_var_uses,
+       inductive_memo, density_memo_after)) ranked in
+  let matches select_groups =
+    UnifyQC.type_to_schedules ?select_groups thm None None [] [] D_Thm true in
+  let lazy_best = best_only && theorem_lazy_scoring () in
+  let rank_exhaustive = rank ~lazy_best:false in
+  let rank = rank ~lazy_best in
+  let ranked = rank (matches (grouped_selector D_Thm)) in
+  if lazy_best && Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" = Some "verify" then begin
+    let best entries = match entries with
+      | (scored, _) :: _ -> Some (scored_schedule_features D_Thm 0 scored)
+      | [] -> None in
+    let exhaustive = rank_exhaustive (matches (grouped_selector D_Thm)) in
+    if best exhaustive <> best ranked then
+      failwith "lazy theorem scoring changed the selected schedule"
+  end;
+  if schedule_group_mode () = `Verify then begin
+    let best entries = match entries with
+      | (scored, _) :: _ -> Some { (scored_schedule_features D_Thm 0 scored)
+                                   with ScheduleRanking.candidate_id = 0 }
+      | [] -> None in
+    let joint = rank (matches None) in
+    if best joint <> best ranked then
+      failwith "grouped theorem schedule search changed the best score"
+  end;
+  List.map snd ranked
+
+let best_theorem_schedule (thm : rocq_type) : schedule =
+  match all_theorem_schedules ~best_only:true thm with
+  | (schedule, _, _, _, _) :: _ -> schedule
+  | [] -> failwith "best_theorem_schedule: No valid schedules found"
+
+let collect_inductive_dependents (instance : rocq_constr * int list * derive_sort * bool) : (rocq_constr * int list * derive_sort * bool) list =
+  let (ind_instance, output_idxs, ds, opt) = instance in
+  match ind_instance with
+  | DTyCtr (ind_name,_) -> 
+    let (inductive_schd, density) = inductive_density_value (InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !density_inductive_memo) in
+    inductive_schedule_dependents inductive_schd
+  | DTyParam param -> []
+    (* failwith "collect_inductive_dependents: Need to handle instances of parameter type variables, like A in list A" *)
+  | _ -> failwith "collect_inductive_dependents: not a DTyCtr or DTyVar"
+
+let resolved_dependency (relation, output_indices, ds, constrained) =
+  let args = match relation with
+    | DTyCtr (_, args) | DNot (DTyCtr (_, args)) -> args
+    | _ -> [] in
+  let outputs = List.concat (filter_mapi (fun i arg ->
+    if List.mem i output_indices then Some (variables_in_hypothesis arg) else None) args) in
+  (* Code generation decides here whether a dependency is compiled; recheck
+     against the current context rather than a cached answer. *)
+  has_schedule_instance ~cached:false relation outputs ds constrained
+
+let lookup_and_remove_inductive_schedule (instance : rocq_constr * int list * derive_sort * bool) (to_remove : bool) : (inductive_schedule * derive_sort * bool) option =
+  let (ind_instance, output_idxs, ds, opt) = instance in
+  match ind_instance with
+  | DTyCtr (ind_name,_)  | DNot (DTyCtr (ind_name, _)) ->
+    (try (let (inductive_schd, density) = inductive_density_value (InductiveScheduleKeyMap.find (ind_name, output_idxs, ds, opt) !density_inductive_memo) in
+    if to_remove then density_inductive_memo := InductiveScheduleKeyMap.remove (ind_name, output_idxs, ds, opt) !density_inductive_memo;
+    Some (inductive_schd, ds, opt)) with Not_found -> None)
+  | DTyVar v -> failwith "lookup_and_remove_inductive_schedule: Need to handle instances of parameter type variables, like A in list A"
+  | _ -> failwith ("lookup_and_remove_inductive_schedule: not a DTyCtr or DTyVar: " ^ rocq_constr_to_string ind_instance)
+
+let update_source step src =
+  match step with
+  | S_UC (v,_,ps) -> S_UC (v, src, ps)
+  | S_Check (_,pol) -> S_Check (src, pol)
+  | S_ST (vs,_,ps) -> S_ST (vs, src, ps)
+  | S_Match (v,pat) -> S_Match (v, pat)
+  | S_Let (v,c) -> S_Let (v,c)
+
+let nonrec_to_mutrec_call name ois ty opt param_typeclasses : source =
+  match ty with
+  | DTyCtr (ind, args) -> 
+    let input_args = filter_mapi (fun i arg -> if List.mem i ois then None else Some arg) args in
+    let typeclass_count = List.length (List.concat_map snd param_typeclasses) in
+    SrcDef (var_of_string name, input_args @ List.init typeclass_count (fun _ -> DHole))
+  | _ -> failwith "nonrec_to_mutrec_call: not a DTyCtr"
+
+let rec_call_add_typeclass_holes name args typeclass_count : source =
+  SrcRec (name, args @ List.init typeclass_count (fun _ -> DHole))
+
+let rec_calls_add_typeclass_holes (schedule,matches) param_typeclasses : (schedule * (var * pat) list) =
+  let typeclass_count = List.length (List.concat_map snd param_typeclasses) in
+
+  let aux step =
+    match step with
+    | S_UC (v, SrcRec (f, args), ps) ->
+      S_UC (v, rec_call_add_typeclass_holes f args typeclass_count, ps)
+    | S_ST (vs, SrcRec (f, args), ps) ->
+      S_ST (vs, rec_call_add_typeclass_holes f args typeclass_count, ps)
+    | S_Check (SrcRec (f, args), pol) ->
+      S_Check (rec_call_add_typeclass_holes f args typeclass_count, pol)
+    | _ -> 
+      step in
+  let (steps, sort) = schedule in
+  (List.map aux steps, sort), matches
+
+let nonrecursive_type step =
+  match step with
+  | S_UC (_,SrcNonrec ty,_)
+  | S_ST (_,SrcNonrec ty,_) 
+  | S_Check (SrcNonrec ty,_) -> ty
+  | S_Match _ -> failwith "nonrecursive_type: step must not be a match"
+  | S_Let _ -> failwith "nonrecursive_type: step must not be a let"
+  | _ -> failwith "nonrecursive_type: step must have nonrecursive source"
+
+let insert_mutrec_call name ois step opt param_typeclasses =
+  update_source step (nonrec_to_mutrec_call name ois (nonrecursive_type step) opt param_typeclasses)
+
+let insert_mutrec_calls ?within ((schedule,matches) : schedule * (var * pat) list) : schedule * (var * pat) list =
+  let (schedule_steps_deps,schd_sort_dep) = schedule_with_dependents schedule in
+  let zero = DCtr (constructor_of_string "Coq.Init.Datatypes.O", []) in
+  let succ n = DCtr (constructor_of_string "Coq.Init.Datatypes.S", [n]) in 
+  let three = succ (succ (succ zero)) in
+  let mul n m = DCtr (constructor_of_string "Coq.Init.Nat.mul", [n; m]) in (*TODO: Add Constants to the language so I don't have to apply functions as if they are constructors.*)
+  let updated_steps = List.map (fun (step,depopt) -> 
+                                    (match (depopt >>= fun dep -> if resolved_dependency dep then None else
+                                      (match lookup_and_remove_inductive_schedule dep false with
+                                       | Some ((name,_,_,_,_),_,_) as found ->
+                                           (match within with Some names when not (List.mem name names) -> None | _ -> found)
+                                       | None -> None)) with
+                                    | None -> step
+                                    | Some ((ind_schd_name,_,param_typeclasses,_,_),ds,opt) -> (*TODO: use the info from this inductive schedule to determine whether any 
+                                                                               arguments of Dec_Eq or Show or Gen are needed*)
+                                                                             (* Likely adding this explicitly to the definition of an inductive schedule
+                                                                                for ease of access.*)
+                                      let Some (_,ois,_,_) = depopt in insert_mutrec_call ind_schd_name ois step opt param_typeclasses)) 
+                        schedule_steps_deps in 
+          
+  let updated_sort = match schd_sort_dep with
+    | (TheoremSchedule (t,true), Some (ctr, ois, ds, opt)) ->
+      Error.msg_debug (str ("Inserting mutrec calls for theorem: " ^ rocq_constr_to_string ctr) ++ fnl ()); 
+      (match (if resolved_dependency (ctr, ois, ds, opt) then None else
+        (match lookup_and_remove_inductive_schedule (ctr, ois, ds, opt) false with
+         | Some ((name,_,_,_,_),_,_) as found ->
+             (match within with Some names when not (List.mem name names) -> None | _ -> found)
+         | None -> None)) with
+      | None -> TheoremSchedule (t,true)
+      | Some ((schd_name,_,param_typeclasses,_,_), _, _) ->
+        let typeclass_holes = List.init (List.length (List.concat_map snd param_typeclasses)) (fun _ -> DHole) in
+      (match t with
+      | DTyCtr (_, args) -> 
+        let input_args = filter_mapi (fun i arg -> if List.mem i ois then None else Some arg) args in
+        let fuel_arg = mul three (DTyVar (var_of_string "size")) in
+        let new_conclusion = DApp (DTyVar (var_of_string schd_name), fuel_arg :: input_args @ typeclass_holes) in
+        TheoremSchedule (new_conclusion, false)
+      | DNot (DTyCtr (_, args)) ->
+        let input_args = filter_mapi (fun i arg -> if List.mem i ois then None else Some arg) args in
+        let fuel_arg = mul three (DTyVar (var_of_string "size")) in
+        let new_conclusion = DNot (DApp (DTyVar (var_of_string schd_name), fuel_arg :: input_args @ typeclass_holes)) in
+        TheoremSchedule (new_conclusion, false)
+      | _ -> failwith "insert_mutrec_calls: TheoremSchedule must have DTyCtr at toplevel"))
+    | (schd_sort,_) -> schd_sort in
+
+  (updated_steps, updated_sort), matches
+
+let insert_mutrec_calls_inductive_schedule ?within (is : inductive_schedule) : inductive_schedule =
+  let (name, result_vars, param_deps, nonrecursive_hyps, recursive_hyps) = is in
+  Error.msg_debug (str ("Inserting mutrec calls for inductive schedule: " ^ name) ++ fnl ());
+  let update add_holes (schedule, matches, binders, weight) =
+    let local_binders = List.filter (fun (v, _) -> not (List.mem_assoc v result_vars)) binders in
+    with_schedule_inputs (result_vars @ local_binders) (fun () ->
+      let updated = insert_mutrec_calls ?within (schedule, matches) in
+      let schedule, matches = if add_holes then rec_calls_add_typeclass_holes updated param_deps else updated in
+      schedule, matches, binders, weight) in
+  let updated_nonrecursive_hyps = List.map (update false) nonrecursive_hyps in
+  let updated_recursive_hyps = List.map (update true) recursive_hyps in
+  (name, result_vars, param_deps, updated_nonrecursive_hyps, updated_recursive_hyps)
+
+module InductiveSchedSet = Set.Make(struct type t = inductive_schedule * derive_sort * bool let compare = compare end)
+
+module InductiveSchedMap = Map.Make(struct type t = inductive_schedule * derive_sort * bool 
+  let compare ((ind_name,_,_,_,_), ds1, opt1) ((ind_name,_,_,_,_), ds2, opt2) =
+    match compare ind_name ind_name with
+    | 0 -> (match compare ds1 ds2 with
+            | 0 -> compare opt1 opt2
+            | r -> r)
+    | r -> r end)
+
+let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[],WDefault)], [(([],CheckerSchedule),[],[],WDefault)])
+   
+let init_density_inductive_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (DensityDone ((dec_eq_sched_phony, Checking), true, None)) InductiveScheduleKeyMap.empty
+
+let reset_density_inductive_memo () =
+  GenericLib.clear_constrained_output_cache ();
+  Hashtbl.reset cardinality_counts;
+  Hashtbl.reset cardinality_shapes;
+  Hashtbl.reset cardinality_conditional_memo;
+  Hashtbl.reset cardinality_type_cache;
+  Hashtbl.reset stable_closures;
+  clear_inductive_name_cache ();
+  clear_schedule_instance_cache ();
+  stable_density_entries := InductiveScheduleKeyMap.empty;
+  stable_merge := None;
+  Hashtbl.reset contextual_derivations;
+  density_inductive_memo := init_density_inductive_memo
+
+(* Diagnostic scoring must not consume or leave behind entries from another
+   proof context. Normal derivation commands establish their own memo state. *)
+let with_fresh_density_memo f =
+  let old_inductive = !density_inductive_memo in
+  let old_stable = !stable_density_entries in
+  let old_contextual = Hashtbl.copy contextual_derivations in
+  let old_closures = Hashtbl.copy stable_closures in
+  let old_rule = !density_memo in
+  let old_relations = !rocq_relation_memo in
+  Fun.protect
+    ~finally:(fun () ->
+      density_inductive_memo := old_inductive;
+      stable_density_entries := old_stable;
+      Hashtbl.reset contextual_derivations;
+      Hashtbl.iter (Hashtbl.replace contextual_derivations) old_contextual;
+      Hashtbl.reset stable_closures;
+      Hashtbl.iter (Hashtbl.replace stable_closures) old_closures;
+      density_memo := old_rule;
+      rocq_relation_memo := old_relations)
+    (fun () ->
+      reset_density_inductive_memo ();
+      density_memo := RelationInstMap.empty;
+      rocq_relation_memo := TyCtrMap.empty;
+      f ())
+
+let inductive_set_init = InductiveSchedSet.singleton (dec_eq_sched_phony, D_Check, false)
+
+let inductive_set = ref inductive_set_init
+
+module StringMap = Map.Make(String)
+
+let concat_pair_map (f : 'a -> ('b list * 'c list)) (l : 'a list) : ('b list * 'c list) =
+  List.fold_left (fun (bs,cs) a -> let (b,c) = f a in (bs @ b, cs @ c)) ([],[]) l
+
+let parse_ind_schd_name (ind_schd_name : string) : ty_ctr * int list * derive_sort * bool =
+  if ind_schd_name = "theorem" then ty_ctr_of_string "theorem", [], D_Thm, true
+  else begin
+
+  let parse_class_name (class_name : string) : derive_sort * bool = 
+    match class_name with
+    | "DecOpt" -> D_Check, true
+    | "GenSized" -> D_Gen, false
+    | "GenSizedSuchThat" -> D_Gen, true
+    | "EnumSized" -> D_Enum, false
+    | "EnumSizedSuchThat" -> D_Enum, true
+    | _ -> failwith "parse_ind_schd_name: invalid class_name" 
+  in
+
+  let parse_mode (mode : string) : int list =
+    filter_mapi (fun i c -> if c = 'O' then Some i else if c = 'I' then None else failwith ("Incorrect character in mode: " ^ mode)) (List.of_seq @@ String.to_seq mode) 
+  in
+
+  let parts = String.split_on_char '_' ind_schd_name in
+  if List.length parts < 3 then failwith ("parse_ind_schd_name: invalid format" ^ ind_schd_name);
+
+  let grab_first_middle_and_last xs = 
+    match xs with
+    | first :: xs' ->
+      let rec aux acc = function
+        | [last] -> (List.rev acc, last)
+        | x :: xs'' -> aux (x :: acc) xs''
+        | _ -> failwith "grab_first_middle_and_last: not enough elements" in
+      let (middle, last) = aux [] xs' in
+      first, middle, last
+    | _ -> failwith "grab_first_middle_and_last: not enough elements" in   
+
+  let class_name, ind_name_segments, mode = grab_first_middle_and_last parts in
+
+  let ind_name = ty_ctr_of_string (String.concat "_" ind_name_segments) in
+
+  let ds, opt = parse_class_name class_name in
+
+  ind_name, parse_mode mode, ds, opt
+  end
+
+let construct_ind_schd_name ((ind_name, argc, ois, ds, opt) : ty_ctr * int * int list * derive_sort * bool) : string =
+  let class_name = match ds with
+    | D_Check -> "DecOpt"
+    | D_Gen -> if opt then "GenSizedSuchThat" else "GenSized"
+    | D_Enum -> if opt then "EnumSizedSuchThat" else "EnumSized"
+    | D_Thm -> "Theorem" in
+  let mode = String.init argc (fun i -> if List.mem i ois then 'O' else 'I') in
+  Printf.sprintf "%s_%s_%s" class_name (ty_ctr_to_string ind_name) mode
+
+let collect_all_used_inductive_schd_names ind_schd_name : string list * (((inductive_schedule * derive_sort * bool) * string list) StringMap.t ref)  = 
+  let inductive_dependency_map : ((inductive_schedule * derive_sort * bool) * string list) StringMap.t ref = ref StringMap.empty in
+  let rec collect_all_used_inductive_schd_names' (ind_schd_name : string) : string list =
+    Error.msg_debug (str ("Collecting inductive schedule: " ^ ind_schd_name) ++ fnl ());
+    let rec extract_type_applications (rocq, output_idxs, ds, opt) : (ty_ctr * int * int list * derive_sort * bool) list =
+      match rocq with
+      | DTyCtr (ind_name, args) ->
+        (ind_name, List.length args, output_idxs, ds, opt) ::
+        List.concat_map (fun arg ->
+          match arg with
+          (* | DTyCtr (applied_ind_name, applied_args) -> extract_type_applications (arg, [], (match ds with D_Gen | D_Thm -> D_Gen | D_Enum | D_Check -> D_Enum), false) *)
+          | _ -> []) args
+      | DNot r -> extract_type_applications (r, output_idxs, ds, opt)
+      | _ -> [] in
+      
+    let parse_dependent (rocq, output_idxs, ds, opt) =
+      match rocq with
+      | DTyCtr (ind_name, args) -> ind_name, List.length args, output_idxs, ds, opt
+      | DNot (DTyCtr (ind_name, args)) -> ind_name, List.length args, output_idxs, ds, opt
+      | DTyParam v -> 
+        failwith "collect_all_used_inductive_schd_names: Need to handle instances of parameter type variables, like A in list A"
+      | _ -> failwith "collect_all_used_inductive_schd_names: not a DTyCtr" in
+
+    match StringMap.find_opt ind_schd_name !inductive_dependency_map with
+    | Some _ -> []
+    | None -> begin
+      Error.msg_debug (str ("Collecting inductive schedule: " ^ ind_schd_name) ++ fnl ());
+      let (ind_name, ois, ds, opt) = parse_ind_schd_name ind_schd_name in
+      (match lookup_and_remove_inductive_schedule (DTyCtr (ind_name,[]), ois, ds, opt) false with
+      | None -> Error.msg_debug (str ("collect_all_used_inductive_schd_names: Could not find inductive schedule in density_inductive_memo: " ^ ind_schd_name)); []
+      | Some (ind_schd, ds, opt) ->
+        let dependents = List.concat_map extract_type_applications @@ inductive_schedule_dependents ind_schd in
+        let deduplicate_dependents = List.sort_uniq compare dependents in
+
+        let dependents_names = List.filter_map (fun ((ind, _, ois, ds, dep_opt) as dep) ->
+          if InductiveScheduleKeyMap.mem (ind, ois, ds, dep_opt) !density_inductive_memo then
+            Some (construct_ind_schd_name dep) else None) deduplicate_dependents in
+
+        Error.msg_debug (str ("Dependent's names: " ^ String.concat ", " dependents_names) ++ fnl ());
+
+        let replace_nonrecursives = ind_schd in
+
+        inductive_dependency_map := StringMap.add ind_schd_name ((replace_nonrecursives, ds, opt), dependents_names) !inductive_dependency_map;
+
+        ind_schd_name :: dependents_names @ List.concat_map collect_all_used_inductive_schd_names' dependents_names)
+    end in
+
+  (List.sort_uniq compare @@ collect_all_used_inductive_schd_names' ind_schd_name), inductive_dependency_map
+
+module StringSet = Set.Make(String)
+
+let rec take_while (p : 'a -> bool) (l : 'a list) : ('a list) * ('a list) =
+  match l with
+  | a :: l' when p a -> 
+    let (start,rest) = take_while p l' in
+    (a :: start, rest)
+  | _ -> ([], l)
+
+(* Propagate complete premises, with the dependency's formal arguments replaced
+   by the actual call arguments. Keep raw schedules until this fixed point is
+   reached: recursive call dictionaries depend on the final signatures. *)
+let propagate_schedule_requirements components =
+  let open GenericLib in
+  let all = ref (List.concat components) in
+  let same_requirement inputs a b =
+    (* Kernel conversion ignores bound-variable spelling. Comparing printed
+       syntax can grow the fixed point forever when predicates are alpha-renamed. *)
+    let close body = mexp_to_constr_expr
+      (MFun (List.map (fun (v,t) -> PVar v, Some t) inputs, body)) D_Check in
+    let env = schedule_env () in
+    let sigma, a = Constrintern.interp_constr_evars env (schedule_sigma env) (close a) in
+    let sigma, b = Constrintern.interp_constr_evars env sigma (close b) in
+    try ignore (Evarconv.unify env sigma Compat.conv a b); true
+    with Pretype_errors.PretypeError _ -> false in
+  let requirements_of ((name, inputs, _, base, recursive), ds, _) =
+    if ds = D_Thm then [] else
+    with_schedule_inputs inputs (fun () ->
+      let add acc requirement =
+        if List.exists (fun r -> same_requirement inputs r requirement) acc
+        then acc else acc @ [requirement] in
+      let from_obligation relation outputs sort constrained =
+        let env, sigma, goal, names = elaborate_obligation relation outputs sort constrained in
+        match instance_requirements ~allow_root:(match relation with DTyParam _ -> true | _ -> false)
+          env sigma goal names with Some requirements -> requirements | None -> [] in
+      let from_dependency relation outputs sort constrained =
+        let existing = from_obligation relation outputs sort constrained in
+        if has_schedule_instance relation outputs sort constrained then existing else
+        let relation = match relation with DNot p -> p | p -> p in
+        match relation with
+        | DTyCtr (ind, args) ->
+          let output_indices = filter_mapi (fun i arg ->
+            if List.exists (fun v -> List.mem v outputs) (obligation_variables arg) then Some i else None) args in
+          let dependency_name = construct_ind_schd_name (ind, List.length args, output_indices, sort, constrained) in
+          (match List.find_opt (fun ((n,_,_,_,_),_,_) -> n = dependency_name) !all with
+          | None -> existing
+          | Some ((_, dep_inputs, requirements, _, _), _, _) ->
+            let input_args = filter_mapi (fun i arg -> if List.mem i output_indices then None
+              else Some arg) args in
+            let actuals = List.map product_free_rocq_type_to_mexp input_args in
+            List.concat_map (fun requirement ->
+              let fn = mexp_to_constr_expr (MFun (List.map (fun (v,t) -> PVar v, Some t) dep_inputs, requirement)) sort in
+              let expression = MEscape (Constrexpr_ops.mkAppC
+                (fn, List.map (fun arg -> mexp_to_constr_expr arg sort) actuals)) in
+              let env, sigma, goal, names = elaborate_schedule_expression
+                (List.concat_map obligation_variables input_args) [] sort expression in
+              match instance_requirements ~allow_root:true env sigma goal names with
+              | Some needed -> needed
+              | None -> CErrors.user_err (str ("QuickChick cannot propagate a dependency requirement into " ^ name)))
+              (List.concat_map snd requirements))
+        | _ -> existing in
+      let step_requirements = function
+        | S_UC (_, SrcNonrec ty, ps) ->
+          from_dependency ty [] (producer_sort_to_derive_sort ps) false
+        | S_ST (outputs, SrcNonrec relation, ps) ->
+          from_dependency relation (List.map fst outputs) (producer_sort_to_derive_sort ps) true
+        | S_Check (SrcNonrec relation, _) -> from_dependency relation [] D_Check true
+        | _ -> [] in
+      List.fold_left add [] (List.concat_map (fun ((steps,_),_,binders,_) ->
+        let binders = List.filter (fun (v, _) -> not (List.mem_assoc v inputs)) binders in
+        with_schedule_inputs (inputs @ binders) (fun () ->
+          List.concat_map step_requirements steps)) (base @ recursive))) in
+  let rec fixed_point () =
+    let changed = ref false in
+    let updated = List.map (fun (((name, inputs, previous, base, recursive), ds, constrained) as entry) ->
+      let needed = requirements_of entry in
+      let old = List.concat_map snd previous in
+      let needed = List.fold_left (fun acc ty ->
+        if List.exists (fun t -> same_requirement inputs t ty) acc then acc else acc @ [ty]) old needed in
+      if List.length needed <> List.length old then changed := true;
+      let requirements = if needed = [] then [] else [var_of_string "requirement", needed] in
+      (name, inputs, requirements, base, recursive), ds, constrained) !all in
+    all := updated;
+    if !changed then fixed_point () in
+  fixed_point ();
+  List.map (List.map (fun ((name,_,_,_,_),_,_) ->
+    List.find (fun ((n,_,_,_,_),_,_) -> name = n) !all)) components
+
+let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
+    : (inductive_schedule * derive_sort * bool) list list =
+  let index = ref 0 in
+  let stack = ref [] in
+  let components = ref [] in
+  let dep_count = List.length schedules in
+  let in_stack = Array.make dep_count false in
+  let eq_sentinel_index = -1 in
+  let vertex_indices = ref (StringMap.add "DecOpt_Coq.Init.Logic.eq_III" eq_sentinel_index
+                            (StringMap.singleton "DecOpt_eq_III" eq_sentinel_index)) in
+  let vertex_lowlinks = ref StringMap.empty in
+
+  Error.msg_debug (str "Tarjan's algorithm for schedules: " ++ str (String.concat ", " schedules) ++ fnl ());
+
+  let rec strong_connect (v_name : string) =
+    (* Assign discovery index and lowlink for v *)
+    if StringMap.mem v_name !vertex_indices then () else begin 
+    Error.msg_debug (str "Strong connecting " ++ str v_name ++ fnl ());
+    vertex_indices := StringMap.add v_name !index !vertex_indices;
+    vertex_lowlinks := StringMap.add v_name !index !vertex_lowlinks;
+    in_stack.(!index) <- true;
+    (* Feedback.msg_notice (str ("Pushing " ^ v_name) ++ fnl ()); *)
+    let (v, dependent_names) = try StringMap.find v_name !inductive_dependency_map with Not_found -> failwith ("strong_connect: Could not find " ^ v_name) in
+    stack := v :: !stack;
+    index := !index + 1;
+
+    (* Process each dependent of v *)
+    Error.msg_debug (str ("Processing " ^ (let ((vn,_,_,_,_),_,_) = v in vn) ^ " with dependents: " ^ String.concat ", " dependent_names) ++ fnl ());
+    List.iter (fun w_name ->
+      if not (StringMap.mem w_name !vertex_indices) then (
+        strong_connect w_name;
+        let low_v = StringMap.find v_name !vertex_lowlinks in
+        let low_w = StringMap.find w_name !vertex_lowlinks in
+        vertex_lowlinks := StringMap.add v_name (min low_v low_w) !vertex_lowlinks
+      )
+      else
+        let idx_w = StringMap.find w_name !vertex_indices in
+        if idx_w >= 0 && idx_w < Array.length in_stack && in_stack.(idx_w) then (
+        let low_v = StringMap.find v_name !vertex_lowlinks in
+        vertex_lowlinks := StringMap.add v_name (min low_v idx_w) !vertex_lowlinks
+        )
+    ) dependent_names;
+
+    (* If v is a root node, pop the stack to form an SCC *)
+    if StringMap.find v_name !vertex_lowlinks = StringMap.find v_name !vertex_indices then (
+      let rec pop_until acc =
+        match !stack with
+        | [] -> failwith "strong_connect: stack should not be empty"
+        | w :: rest ->
+            let w_name = let ((name,_,_,_,_),_,_) = w in name in
+            Error.msg_debug (str ("Popping " ^ w_name) ++ fnl ());
+            stack := rest;
+            (* Feedback.msg_notice (str ("Popping " ^ w_name) ++ fnl ()); *)
+            in_stack.(StringMap.find w_name !vertex_indices) <- false;
+            (* Feedback.msg_notice (str ("Adding " ^ w_name ^ " to component") ++ fnl ()); *)
+            let acc' = w :: acc in
+            if w_name = v_name then acc'
+            else pop_until acc'
+      in
+      let component = pop_until [] in
+      Error.msg_debug (str ("Adding component: " ^ String.concat ", " (List.map (fun ((name,_,_,_,_),_,_) -> name) component)) ++ fnl ());
+      components := component :: !components
+    )
+    end
+  in
+
+  List.iter strong_connect schedules;
+  let component_sizes = List.map List.length !components in
+  msg_debug (str "Component sizes: " ++ str (String.concat ", " (List.map string_of_int component_sizes)) ++ fnl ());
+  List.map (fun component ->
+    let names = List.map (fun ((name,_,_,_,_),_,_) -> name) component in
+    List.map (fun (schedule, ds, constrained) ->
+      insert_mutrec_calls_inductive_schedule ~within:names schedule, ds, constrained) component)
+    (let components = propagate_schedule_requirements (List.rev !components) in
+     List.iter (List.iter (fun ((name,_,_,_,_) as schedule, ds, constrained) ->
+       let ind, outputs, _, _ = parse_ind_schd_name name in
+       let entry = match InductiveScheduleKeyMap.find_opt (ind, outputs, ds, constrained) !density_inductive_memo with
+         | Some (DensityDone ((_, density), cycle_independent, budget)) ->
+           DensityDone ((schedule, density), cycle_independent, budget)
+         | Some (DensityInProgress (_, density)) ->
+           DensityInProgress (schedule, density)
+         | None -> DensityDone ((schedule, Checking), false, None) in
+       density_inductive_memo := InductiveScheduleKeyMap.add (ind, outputs, ds, constrained) entry !density_inductive_memo)) components;
+     components)
+
+let valid_schedules =
+  Proofview.Goal.enter begin fun gl ->
+    let c = Proofview.Goal.concl gl in
+    let e = Proofview.Goal.env gl in
+    let evd = Proofview.Goal.sigma gl in
+    with_schedule_context e evd (fun () -> with_fresh_density_memo (fun () ->
+    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    | Some dt -> 
+      begin
+        let schedules = UnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
+          dt None None [] [] D_Thm false in
+        let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms, (List.map check_eq eqs @ steps, sort))) schedules in
+        let schedules_w_densities = List.mapi (fun i (ms_steps, schd) -> i, schedule_density ms_steps schd) schedules' in
+        let sorted = sort_schedules_by_density_and_var_uses schedules_w_densities D_Thm in
+
+        if !GenericLib.debug_mode then begin
+          Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
+          List.iteri (fun i ((steps_ds, sort), density, num_var_uses, id) ->
+            Feedback.msg_notice (str ("sorted id: " ^ string_of_int i ^ " orig id: " ^ string_of_int id ^ ":\n" ) ++ fnl ());
+            Feedback.msg_notice (str ("# var uses: " ^ string_of_int num_var_uses ^ "; density:" ^ density_to_string density ^ "\n") ++
+                                str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") (*++  *)
+                                (* str "\nconstrexpr: \n" ++  *)
+                                (* UnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] D_Thm *)
+                                                            ++ str "\n==============================================\n")) sorted
+        end;
+        Tacticals.tclIDTAC
+      end 
+    | None -> failwith "Failed to Parse type"))
+  end
+
+let theorem_dependencies = 
+  Proofview.Goal.enter begin fun gl ->
+    
+    (* Convert goal to a constr_expr *)
+    let c = Proofview.Goal.concl gl in
+    let e = Proofview.Goal.env gl in
+    let evd = Evd.from_env e in
+
+    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    | Some dt ->
+      begin
+        msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
+        let open GenericLib in
+        let rec printlist : (var * (int * int list list) list) list -> unit = function
+          | [] -> ()
+          | (var, rels) :: rest ->
+            let path_to_string (is : int list) = "[" ^ String.concat ", " (List.map string_of_int is) ^ "]" in
+            let paths_to_string (iss : int list list) = "{" ^ String.concat "; " (List.map path_to_string iss) ^ "}" in
+            let tuple_to_string ((i : int), (j : int list list)) = "(" ^ string_of_int i ^ ", " ^ paths_to_string j ^ ")" in
+            msg_debug (str (var_to_string var) ++ str " : " ++ str (String.concat ", " (List.map (fun (i, j) -> (tuple_to_string (i, j))) rels)) ++ fnl ()); 
+            printlist rest in
+        
+        printlist (GenericLib.rocq_constr_var_relation_uses' dt);          
+        Tacticals.tclIDTAC
+      end
+    | None -> failwith "Failed to Parse type"
+  end
+
+  let schedules =
+    Proofview.Goal.enter begin fun gl ->
+    
+      (* Convert goal to a constr_expr *)
+      let c = Proofview.Goal.concl gl in
+      let e = Proofview.Goal.env gl in
+      let evd = Evd.from_env e in
+  
+      match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+      | Some dt ->
+        begin
+          density_memo := RelationInstMap.empty;
+          clear_inductive_name_cache ();
+          clear_schedule_instance_cache ();
+          msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
+          let scheds = UnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
+            dt None None [] [] D_Thm false in
+
+          List.iteri (fun i (sch,ms,eqs) -> Feedback.msg_notice (str (string_of_int i) 
+                                                          ++ str ":\n" 
+                                                          ++ str (UnifyQC.match_schedule_to_string sch ms eqs) 
+                                                          ++ str "\nconstrexpr: \n"
+                                                          ++ (UnifyQC.match_schedule_as_pp_constr_expr sch ms eqs D_Thm)
+                                                          ++ str "\n\n===================\n" 
+                                                          ++ fnl ())) scheds;
+          
+          Tacticals.tclIDTAC
+        end
+      | None -> failwith "Failed to Parse type"
+    end
+
+module VarSet = Set.Make(struct type t = var let compare = compare end)
+  
+let defined_set = ref VarSet.empty
+
+let is_defined_global (id : Names.Id.t) : bool =
+  let qualid = Libnames.qualid_of_ident id in
+  try
+    ignore (Nametab.locate qualid);
+    true
+  with Not_found ->
+    false
+
+(* Check if name is defined in local goal context *)
+let is_defined_local (id : Names.Id.t) env : bool =
+  let hyps = Environ.named_context env in
+  List.exists
+    (function
+      | Context.Named.Declaration.LocalAssum (id', _)
+      | Context.Named.Declaration.LocalDef (id', _, _) ->
+          Names.Id.equal id (Context.binder_name id'))
+    hyps
+
+(* Combined check: name is used anywhere *)
+let is_name_in_use (id : Names.Id.t) env : bool =
+  is_defined_local id env || is_defined_global id
+
+let definition_poly () = Compat.current_poly ()
+
+(* During tactic preparation, collect declarations to move into the proof's
+   local context. Explicit derivations leave this unset and remain global. *)
+let proof_definitions = ref None
+let public_declaration_names = ref None
+let public_instances = ref None
+
+let emitted_name name = match !public_declaration_names with
+  | None -> name
+  | Some names -> (try Names.Id.Map.find name !names with Not_found -> name)
+
+let define ?(implicit_binders=false) c name _env _evd =
+  let c = match !public_declaration_names with
+    | None -> c | Some names -> Constrexpr_ops.replace_vars_constr_expr !names c in
+  let name = emitted_name name in
+  let env = schedule_env () in
+  let evd = schedule_sigma env in
+  let declare name =
+    let evd, (body, impargs) = Constrintern.interp_constr_evars_impls env evd c in
+    let body = inline_schedule_definitions evd body in
+    let cinfo = Declare.CInfo.make ~name ~typ:None
+      ?impargs:(if implicit_binders then Some impargs else None) () in
+    let info = Declare.Info.make ~poly:(definition_poly ()) () in
+    let reference = Declare.declare_definition ~info ~cinfo ~opaque:false ~body evd in
+    match !proof_definitions with
+    | None -> ()
+    | Some (definitions, universes) ->
+        definitions := (name, reference) :: !definitions;
+        universes := Univ.ContextSet.union !universes (Evd.universe_context_set evd)
+  in
+  if name = var_of_string "theorem" then
+    declare (Namegen.next_ident_away_from (Names.Id.of_string "theorem")
+      (fun id -> is_name_in_use id env))
+  else if is_name_in_use name env then
+    CErrors.user_err (str ("QuickChick cannot declare " ^ var_to_string name ^ ": the name is already in use."))
+  else begin
+    declare name;
+    defined_set := VarSet.add name !defined_set
+  end
+
+let define_all schedule_pieces =
+  List.iter (function
+  | [] -> failwith "Empty piece"
+  | [(name, constr)] -> 
+    let e' = Global.env () in
+    let evd' = Evd.from_env e' in
+    Error.msg_debug (str ("Defining " ^ var_to_string name) ++ fnl ());
+    Error.msg_debug (str ("Defining " ^ constr_expr_to_string constr) ++ fnl ());
+    ignore (define constr name e' evd')
+  | pieces -> 
+    let e' = Global.env () in
+    let evd' = Evd.from_env e' in
+    List.iter (fun (name, constr) -> 
+      Error.msg_debug (str ("Defining " ^ var_to_string name) ++ fnl ());
+      Error.msg_debug (str ("Defining " ^ constr_expr_to_string constr) ++ fnl ());
+      ignore (define constr name e' evd')) pieces
+        ) schedule_pieces
+
+(* Register the class represented by each compiled schedule. The helper keeps
+   its size-first interface; the instance moves size into the class method. *)
+let register_schedule_instances ~local components =
+  let open GenericLib in
+  List.iter (List.iter (fun ((name, inputs, param_deps, _, _), ds, constrained) ->
+    if ds <> D_Thm then begin
+      let ind, output_indices, _, _ = parse_ind_schd_name name in
+      let helper_name = Names.Id.to_string (emitted_name (Names.Id.of_string name)) in
+      let dependencies = List.concat_map (fun (_, classes) ->
+        List.map (fun ty -> make_up_name_str "qc_instance_arg", ty) classes) param_deps in
+      let binders = inputs @ dependencies in
+      let method_size = make_up_name_str "qc_size" in
+      let method_body = MFun ([PVar method_size, Some (MConst "Coq.Init.Datatypes.nat")],
+        MApp (MConst helper_name, MId method_size :: List.map (fun (v, _) -> MId v) binders)) in
+      let constructor, class_args = match ds, constrained with
+      | D_Check, _ ->
+          let predicate = MTyCtr (ind, List.map (fun (v, _) -> MId v) inputs) in
+          "QuickChick.Decidability.Build_DecOpt", [predicate]
+      | (D_Gen | D_Enum), false ->
+          let ty = MTyCtr (ind, List.map (fun (v, _) -> MId v) inputs) in
+          let cls = if ds = D_Gen then "GenSized" else "EnumSized" in
+          "QuickChick.Classes.Build_" ^ cls, [ty]
+      | (D_Gen | D_Enum), true ->
+          let remaining_inputs = ref inputs in
+          let outputs = ref [] in
+          let arguments = List.init (List.length inputs + List.length output_indices) (fun i ->
+            if List.mem i output_indices then begin
+              let v = make_up_name_str "qc_output" in
+              outputs := !outputs @ [v]; MId v
+            end else match !remaining_inputs with
+            | (v, _) :: rest -> remaining_inputs := rest; MId v
+            | [] -> CErrors.anomaly (str "Missing schedule input")) in
+          let pattern, annotation = match !outputs with
+          | [] -> PWild, Some (MConst "Coq.Init.Datatypes.unit")
+          | first :: rest ->
+              List.fold_left (fun p v -> PCtr (constructor_of_string "Coq.Init.Datatypes.pair",
+                [PWild; PWild; p; PVar v])) (PVar first) rest, None in
+          let predicate = MFun ([pattern, annotation], MTyCtr (ind, arguments)) in
+          let cls = if ds = D_Gen then "GenSizedSuchThat" else "EnumSizedSuchThat" in
+          "QuickChick.DependentClasses.Build_" ^ cls, [MHole; predicate]
+      | D_Thm, _ -> assert false in
+      let binder kind (v, ty) =
+        Constrexpr.CLocalAssum ([CAst.make (Names.Name v)],
+#if COQ_VERSION >= (8, 20, 0)
+          None,
+#endif
+          kind, mexp_to_constr_expr ty ds) in
+      (* Classify inputs from the elaborated helper type, not their spelling.
+         This also handles class dictionaries that are parameters of the relation. *)
+      let env = Global.env () in
+      let sigma, helper = Evd.fresh_global env (Evd.from_env env)
+        (Nametab.locate (Libnames.qualid_of_string helper_name)) in
+      let sigma, helper_type = Typing.type_of env sigma helper in
+      let rec input_kinds count typ =
+        if count = 0 then [] else match EConstr.kind sigma typ with
+        | Constr.Prod (_, dom, body) ->
+          let kind = if Compat.is_class_type env sigma dom then
+              Constrexpr.Generalized (Glob_term.MaxImplicit, false)
+            else Constrexpr.Default
+              (if EConstr.isSort sigma dom then Glob_term.MaxImplicit else Glob_term.Explicit) in
+          kind :: input_kinds (count - 1) body
+        | _ -> CErrors.anomaly (str "Missing scheduled helper argument") in
+      let kinds = List.tl (input_kinds (1 + List.length inputs) helper_type) in
+      let class_binder = binder (Constrexpr.Generalized (Glob_term.MaxImplicit, false)) in
+      let body = mexp_to_constr_expr
+        (MApp (MConst constructor, class_args @ [method_body])) ds in
+      let binders = List.map2 binder kinds inputs @ List.map class_binder dependencies in
+      let body = if binders = [] then body else CAst.make (Constrexpr.CLambdaN (binders, body)) in
+      let instance_name = fresh_name (helper_name ^ "_instance") in
+      let env = Global.env () in
+      define ~implicit_binders:true body instance_name env (Evd.from_env env);
+      let reference = Nametab.locate (Libnames.qualid_of_ident instance_name) in
+      (match !public_instances with
+      | None -> ()
+      | Some instances -> instances := (name, reference) :: !instances);
+      Compat.existing_instance (if local then Hints.Local else Hints.SuperGlobal)
+        reference (Some { Typeclasses.hint_priority = Some 42; hint_pattern = None })
+    end)) components
+
+(* Dependencies precede their consumers. Register each SCC before elaborating
+   the next one so external calls use the ordinary class projections. *)
+let define_schedule_components ~local components pieces =
+  (match !public_declaration_names with
+  | None -> ()
+  | Some names -> List.iter (List.iter (fun (name, _) ->
+      names := Names.Id.Map.add name (fresh_name (Names.Id.to_string name)) !names)) pieces);
+  List.iter2 (fun component definitions ->
+    define_all [definitions];
+    register_schedule_instances ~local [component]) components pieces
+
+let derive_schedule ind ois ds opt =
+  match GenericLib.ind_reference_to_rocq_relations ind with
+    | Some (idx, rs) ->
+      reset_density_inductive_memo ();
+      inductive_set := inductive_set_init;
+      rocq_relation_memo := TyCtrMap.empty;
+      (* inductive_dependency_map := StringMap.empty; *)
+      let (ind_name, params, constructors, result_typ) = List.nth rs idx in
+      msg_debug (str "Deriving inductive schedule for " ++ str (ty_ctr_to_string ind_name) ++ fnl ());
+      let (inductive_schedule, density) = try
+        inductive_best_valid_schedule (ind_name, params, constructors, result_typ) ois ds opt
+      with
+      | Noninductive_dependency name ->
+        CErrors.user_err (str ("No scheduled instance can use the defined relation " ^
+          ty_ctr_to_string name ^ " in this mode."))
+      | Unavailable_mode constructor ->
+        CErrors.user_err (str ("No usable scheduled mode for constructor " ^ constructor ^
+          "; check the required dependency instances.")) in
+      Error.msg_debug (str "Inductive Schedule:\n" ++ str (inductive_schedule_to_string inductive_schedule) ++ fnl ());
+      msg_debug (str "Density: " ++ str (density_to_string density) ++ fnl ());
+      density_inductive_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !density_inductive_memo;
+
+      let ind_schd_name = match inductive_schedule with (n,_,_,_,_) -> n in
+      complete_stable_closures ();
+      let dependents, inductive_dependency_map = collect_all_used_inductive_schd_names ind_schd_name in
+
+      let components = tarjan_schedules_by_name dependents inductive_dependency_map in
+
+      let schedules_pieces = inductive_schedules_to_def_constr_exprs components ind_schd_name in
+
+      define_schedule_components ~local:false components schedules_pieces;
+      Feedback.msg_notice (int (List.length schedules_pieces) ++ str " Pieces defined" ++ fnl ())
+
+    | None -> failwith "Failed to parse inductive type "
+
+(* Public commands compile in a transaction so internal schedule names do not
+   become a second public naming scheme or collide on repeated derivations. *)
+(* Unavailable_mode and Noninductive_dependency reject one candidate inside
+   the search. One that reaches a command or the tactic means no candidate
+   was possible; report it instead of an anomaly. *)
+let with_schedule_errors f =
+  try f () with
+  | Unavailable_mode constructor -> CErrors.user_err (str (
+      "QuickChick could not schedule constructor " ^ constructor
+      ^ ": no mode of its hypotheses can be generated or checked from the given inputs."))
+  | Noninductive_dependency name -> CErrors.user_err (str (
+      "QuickChick cannot derive a dependency on " ^ ty_ctr_to_string name
+      ^ ", which is not an inductive relation; declare an instance for it."))
+
+let rec compile_public ~mode ~outputs ~constrained ~all_mutual ind =
+  with_schedule_errors (fun () -> compile_public_inner ~mode ~outputs ~constrained ~all_mutual ind)
+
+and compile_public_inner ~mode ~outputs ~constrained ~all_mutual ind =
+  let ds = match mode with
+    | "Gen" -> D_Gen | "Enum" -> D_Enum | "Check" -> D_Check
+    | _ -> invalid_arg "compile_public mode" in
+  let roots = match GenericLib.ind_reference_to_rocq_relations ind with
+    | Some (index, roots) -> if all_mutual then roots else [List.nth roots index]
+    | None -> CErrors.user_err (str "Expected an inductive datatype") in
+  let initial = Evd.from_env (Global.env ()) in
+  Vernacstate.System.protect (fun () ->
+    let definitions = ref [] and universes = ref Univ.ContextSet.empty in
+    let instances = ref [] and names = ref Names.Id.Map.empty in
+    let old_definitions = !proof_definitions in
+    let old_names = !public_declaration_names and old_instances = !public_instances in
+    Fun.protect ~finally:(fun () ->
+      proof_definitions := old_definitions;
+      public_declaration_names := old_names; public_instances := old_instances) (fun () ->
+      proof_definitions := Some (definitions, universes);
+      public_declaration_names := Some names; public_instances := Some instances;
+      let for_root root (name, _) =
+        let ind, ois, mode, is_constrained = parse_ind_schd_name name in
+        ind = root && mode = ds && is_constrained = constrained && ois = outputs in
+      List.iter (fun (root, _, _, _) ->
+        if not (List.exists (for_root root) !instances) then
+          derive_schedule (CAst.make (Constrexpr.CRef (root, None))) outputs ds constrained) roots;
+      let env = Global.env () in
+      let constants = List.filter_map (fun (_, reference) -> match reference with
+        | Names.GlobRef.ConstRef c -> Some c | _ -> None) !definitions in
+      let rec expand term = match Constr.kind term with
+        | Constr.Const (c, u) when List.exists (Names.Constant.CanOrd.equal c) constants ->
+            expand (Environ.constant_value_in env (c, u))
+        | _ -> Constr.map expand term in
+      let new_levels = Univ.Level.Set.diff
+        (Univ.ContextSet.levels !universes) (UGraph.domain (Evd.universes initial)) in
+      let context = Univ.ContextSet.add_constraints (Univ.ContextSet.constraints !universes)
+        (Univ.ContextSet.of_set new_levels) in
+      List.fold_left (fun (sigma, bodies) (root, _, _, _) ->
+        let _, reference = List.find (for_root root) !instances in
+        let sigma, term = Evd.fresh_global env sigma reference in
+        let body = EConstr.of_constr (expand (EConstr.to_constr sigma term)) in
+        sigma, bodies @ [Libnames.qualid_basename root, body])
+        (Compat.merge_context_set initial context, []) roots)) ()
+
+(* Testing needs concrete types: a goal quantified over a type, or mentioning
+   a variable whose type is a sort (such as a section variable), has no type
+   to generate values of. Say so instead of failing later in parsing. *)
+let reject_abstract_types env sigma goal =
+  let is_sort ty = EConstr.isSort sigma (Reductionops.whd_all env sigma ty) in
+  let fail kind name = CErrors.user_err (str ("QuickChick tests properties of concrete types, but the goal "
+    ^ kind ^ " the type " ^ Names.Id.to_string name
+    ^ ". State the property for a concrete type, for example by instantiating "
+    ^ Names.Id.to_string name ^ ".")) in
+  let rec binders env c = match EConstr.kind sigma c with
+    | Constr.Prod (name, ty, body) ->
+      (if is_sort ty then match Context.binder_name name with
+        | Names.Name id -> fail "quantifies over" id
+        | Names.Anonymous -> fail "quantifies over" (Names.Id.of_string "_"));
+      binders (EConstr.push_rel (Context.Rel.Declaration.LocalAssum (name, ty)) env) body
+    | _ -> () in
+  binders env goal;
+  let rec vars c = match EConstr.kind sigma c with
+    | Constr.Var id ->
+      (match Environ.lookup_named id env with
+       | Context.Named.Declaration.LocalAssum (_, ty) when is_sort (EConstr.of_constr ty) ->
+         fail "mentions" id
+       | _ -> ())
+    | _ -> EConstr.iter sigma vars c in
+  vars goal

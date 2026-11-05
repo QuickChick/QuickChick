@@ -1,0 +1,253 @@
+(* The memo of derived relation modes and their scores, with sharing of
+   stable and context-dependent entries across candidates. *)
+open GenericLib
+open RelationInfo
+module RelationInstOrd = struct
+  type t = ty_ctr * output_index list * derive_sort
+  (* Relations compare by resolved inductive, so that two names for one
+     inductive are one key. Names of one inductive share its basename, so the
+     order is by basename first, and only equal basenames under different
+     names need resolution. Resolution would otherwise run on every map step. *)
+  let compare (ty, args, ds) (ty', args', ds') =
+    let rest () = match List.compare Int.compare args args' with
+      | 0 -> compare ds ds'
+      | c -> c in
+    match Names.Id.compare (Libnames.qualid_basename ty) (Libnames.qualid_basename ty') with
+    | c when c <> 0 -> c
+    | _ when Libnames.qualid_eq ty ty' -> rest ()
+    | _ ->
+    match (get_inductive_name ty, get_inductive_name ty') with
+    | (Some ty, Some ty') ->
+      (match Names.Ind.CanOrd.compare ty ty' with
+       | 0 -> rest ()
+       | c -> c)
+    | Some _, None when ty_ctr_to_string ty' = "theorem" -> -1
+    | None, Some _ when ty_ctr_to_string ty = "theorem" -> 1
+    | None, None when ty_ctr_to_string ty = "theorem" && ty_ctr_to_string ty' = "theorem" -> compare ds ds' 
+    | _ ->  failwith ("RelationInstOrd: Inductive name not found in " ^ ty_ctr_to_string ty ^ " or " ^ ty_ctr_to_string ty')
+end
+
+module RelationInstMap = Map.Make(RelationInstOrd)
+
+let density_memo : rule_density RelationInstMap.t ref = ref RelationInstMap.empty
+
+(* Constrained and unconstrained scheduling take different construction paths.
+   They cannot share a cached inductive schedule or its density. *)
+module InductiveScheduleKeyMap = Map.Make(struct
+  type t = ty_ctr * output_index list * derive_sort * bool
+  let compare (ty, outputs, ds, constrained)
+      (ty', outputs', ds', constrained') =
+    let c = RelationInstOrd.compare (ty, outputs, ds) (ty', outputs', ds') in
+    if c = 0 then Stdlib.compare constrained constrained' else c
+end)
+
+(* A recursive lookup deliberately sees the seed score used by the existing
+   heuristic. Keep that value marked as provisional: it is not a certified
+   bound for descendants of a search node. *)
+(* A completed relation mode's score under the selected score library. *)
+type relation_score =
+  | BudgetScore of BudgetAwareScore.score
+  | PolicyScore of PolicyRegistry.score
+
+type inductive_density_entry =
+  | DensityInProgress of (inductive_schedule * rule_density)
+  | DensityDone of (inductive_schedule * rule_density) * bool * relation_score option
+
+(* A completed entry is cycle-independent only if its computation never read
+   a provisional or cycle-dependent grade. Under fixed scoring inputs, later
+   roots cannot introduce a new cycle into such a completed dependency.
+   The flag is not portable across proof contexts or scoring policies. *)
+let density_uncertainty_events = ref 0
+
+let density_inductive_memo :
+  inductive_density_entry InductiveScheduleKeyMap.t ref =
+  ref InductiveScheduleKeyMap.empty
+
+let inductive_density_value = function
+  | DensityInProgress value ->
+    incr density_uncertainty_events; value
+  | DensityDone (value, cycle_independent, _) ->
+    if not cycle_independent then incr density_uncertainty_events;
+    value
+
+(* Cycle independence is decided as in Tarjan's algorithm. Each derivation
+   records its nesting depth while in progress. A derivation is
+   cycle-independent when every provisional entry it read started at its own
+   depth or deeper: its result is then determined by its key alone. A
+   cycle-dependent entry keeps the lowest depth it read until the derivation
+   at that depth finishes; it is then permanently provisional. *)
+let density_depth = ref 0
+let density_low_read = ref max_int
+let in_progress_depth : int InductiveScheduleKeyMap.t ref =
+  ref InductiveScheduleKeyMap.empty
+let cycle_low : int InductiveScheduleKeyMap.t ref =
+  ref InductiveScheduleKeyMap.empty
+
+(* Completed, cycle-independent entries are determined by their key, so they
+   are shared by every candidate of one top-level derivation; only provisional
+   entries are isolated per candidate. Cleared with the top-level memo. *)
+let stable_density_entries : inductive_density_entry InductiveScheduleKeyMap.t ref =
+  ref InductiveScheduleKeyMap.empty
+
+(* A cycle-dependent derivation is determined by its key and by the memo
+   entries it read from outside: the in-progress ancestors it saw and the
+   completed entries it used. Keys first seen absent were derived inside it.
+   So it can be reused, with its memo additions replayed, wherever every
+   outside read observes the same entry again and no inside key is in
+   progress. Completed cycle-independent entries are determined by their key
+   and may be absent: replay adds them. *)
+type contextual_derivation = {
+  context_reads : (InductiveScheduleKeyMap.key * inductive_density_entry option) list;
+  context_delta : (InductiveScheduleKeyMap.key * inductive_density_entry) list;
+  context_value : inductive_schedule * rule_density;
+}
+
+let contextual_derivations :
+  (InductiveScheduleKeyMap.key, contextual_derivation list) Hashtbl.t = Hashtbl.create 64
+
+(* One table per active derivation: the first observation of each key read
+   while it is active, including reads made by nested derivations. *)
+let derivation_frames :
+  (InductiveScheduleKeyMap.key, inductive_density_entry option) Hashtbl.t list ref = ref []
+
+let record_density_read key observed =
+  List.iter (fun frame ->
+    if not (Hashtbl.mem frame key) then Hashtbl.add frame key observed) !derivation_frames
+
+let is_stable_entry = function
+  | DensityDone (_, true, _) -> true
+  | _ -> false
+
+let context_holds record =
+  List.for_all (fun (key, observed) ->
+    let current = InductiveScheduleKeyMap.find_opt key !density_inductive_memo in
+    match observed, current with
+    | None, None -> true
+    | None, Some now ->
+      is_stable_entry now &&
+      (match List.assoc_opt key record.context_delta with
+       | Some added -> is_stable_entry added
+       | None -> false)
+    | Some seen, Some now ->
+      (* A derivation reads only an entry's value; cycle bookkeeping is
+         recomputed on replay from the current depths. *)
+      seen == now || (is_stable_entry seen && is_stable_entry now) || seen = now
+    | Some seen, None -> is_stable_entry seen) record.context_reads
+
+(* The entries added while a shared entry was derived, such as a mutually
+   recursive relation that is cycle-dependent inside it. Sharing omits them,
+   so a later derivation rederives them on demand; code generation, which
+   finds a schedule's dependencies in the memo, restores them first. *)
+let stable_closures :
+  (InductiveScheduleKeyMap.key, (InductiveScheduleKeyMap.key * inductive_density_entry) list)
+  Hashtbl.t = Hashtbl.create 64
+
+let memo_delta memo_at_start =
+  InductiveScheduleKeyMap.fold (fun k entry acc ->
+    match InductiveScheduleKeyMap.find_opt k memo_at_start with
+    | Some before when before == entry -> acc
+    | _ -> (k, entry) :: acc) !density_inductive_memo []
+
+(* Add the shared completed entries to a memo, keeping its own bindings.
+   Candidates of one search start from the same memo, and the shared entries
+   change only when a candidate completes a new one, so the last merge is
+   reused while both are physically unchanged. *)
+let stable_merge = ref None
+
+let with_stable_entries memo =
+  let stable = !stable_density_entries in
+  match !stable_merge with
+  | Some (base, shared, merged) when base == memo && shared == stable -> merged
+  | _ ->
+    let merged = InductiveScheduleKeyMap.fold (fun key entry current ->
+      if InductiveScheduleKeyMap.mem key current then current
+      else InductiveScheduleKeyMap.add key entry current) stable memo in
+    stable_merge := Some (memo, stable, merged);
+    merged
+
+(* Before code generation: add the closure of every entry in the memo, to a
+   fixed point, since a closure can hold shared entries with closures. *)
+let complete_stable_closures () =
+  let rec complete pending =
+    match pending with
+    | [] -> ()
+    | key :: rest ->
+      let added = List.filter_map (fun (k, entry) ->
+        if InductiveScheduleKeyMap.mem k !density_inductive_memo then None
+        else begin
+          density_inductive_memo := InductiveScheduleKeyMap.add k entry !density_inductive_memo;
+          Some k
+        end) (Stdlib.Option.value ~default:[] (Hashtbl.find_opt stable_closures key)) in
+      complete (added @ rest) in
+  complete (List.map fst (InductiveScheduleKeyMap.bindings !density_inductive_memo))
+
+(* Share the completed, cycle-independent entries derived since [before]. *)
+(* A scoring run that derived nothing leaves the memo physically unchanged. *)
+let collect_stable_entries before =
+  if !density_inductive_memo != before then
+  InductiveScheduleKeyMap.iter (fun key entry -> match entry with
+    | DensityDone (_, true, _) when not (InductiveScheduleKeyMap.mem key before) ->
+      stable_density_entries := InductiveScheduleKeyMap.add key entry !stable_density_entries
+    | _ -> ()) !density_inductive_memo
+
+let read_inductive_density key entry =
+  let low = match entry with
+    | DensityInProgress _ ->
+      Some (Stdlib.Option.value ~default:min_int
+        (InductiveScheduleKeyMap.find_opt key !in_progress_depth))
+    | DensityDone (_, false, _) ->
+      Some (Stdlib.Option.value ~default:min_int
+        (InductiveScheduleKeyMap.find_opt key !cycle_low))
+    | DensityDone (_, true, _) -> None in
+  Stdlib.Option.iter (fun low -> density_low_read := min !density_low_read low) low;
+  inductive_density_value entry
+
+let enter_density_derivation key =
+  let depth = !density_depth + 1 in
+  let saved_low = !density_low_read in
+  density_depth := depth;
+  density_low_read := max_int;
+  in_progress_depth := InductiveScheduleKeyMap.add key depth !in_progress_depth;
+  depth, saved_low
+
+let remember_contextual_derivation key frame memo_at_start value =
+  let reads = Hashtbl.fold (fun k observed acc ->
+    if k = key then acc else (k, observed) :: acc) frame [] in
+  let delta = memo_delta memo_at_start in
+  let record = { context_reads = reads; context_delta = delta; context_value = value } in
+  let previous = Stdlib.Option.value ~default:[] (Hashtbl.find_opt contextual_derivations key) in
+  Hashtbl.replace contextual_derivations key
+    (record :: List.filteri (fun i _ -> i < 3) previous)
+
+let leave_density_derivation key depth saved_low =
+  in_progress_depth := InductiveScheduleKeyMap.remove key !in_progress_depth;
+  cycle_low := InductiveScheduleKeyMap.map (fun low ->
+    if low >= depth then min_int else low) !cycle_low;
+  density_depth := depth - 1;
+  density_low_read := min saved_low !density_low_read
+
+(* Reuse a recorded derivation: repeat its outside reads, so the caller's
+   cycle bookkeeping and parent frames see them, then add its memo entries. *)
+let replay_contextual_derivation key record =
+  let outer_low = !density_low_read in
+  density_low_read := max_int;
+  List.iter (fun (k, observed) ->
+    record_density_read k observed;
+    match observed with
+    | Some entry ->
+      ignore (read_inductive_density k entry);
+      if not (InductiveScheduleKeyMap.mem k !density_inductive_memo) then
+        density_inductive_memo := InductiveScheduleKeyMap.add k entry !density_inductive_memo
+    | None -> ()) record.context_reads;
+  let low = !density_low_read in
+  density_low_read := min outer_low low;
+  List.iter (fun (k, entry) ->
+    record_density_read k None;
+    if not (InductiveScheduleKeyMap.mem k !density_inductive_memo) then begin
+      density_inductive_memo := InductiveScheduleKeyMap.add k entry !density_inductive_memo;
+      match entry with
+      | DensityDone (_, false, _) ->
+        cycle_low := InductiveScheduleKeyMap.add k (if k = key then low else min_int) !cycle_low
+      | _ -> ()
+    end) record.context_delta;
+  record.context_value

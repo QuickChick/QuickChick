@@ -151,3 +151,27 @@
  (target compat.mli)
  (deps ../scripts/mycppo compat.mli.cppo)
  (action (run sh %{dep:../scripts/mycppo} %{dep:compat.mli.cppo} %{target})))
+(rule
+ (target relationInfo.ml)
+ (deps ../scripts/mycppo relationInfo.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:relationInfo.ml.cppo} %{target})))
+(rule
+ (target densityMemo.ml)
+ (deps ../scripts/mycppo densityMemo.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:densityMemo.ml.cppo} %{target})))
+(rule
+ (target scheduleScoring.ml)
+ (deps ../scripts/mycppo scheduleScoring.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:scheduleScoring.ml.cppo} %{target})))
+(rule
+ (target scheduleContext.ml)
+ (deps ../scripts/mycppo scheduleContext.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:scheduleContext.ml.cppo} %{target})))
+(rule
+ (target scheduleSelection.ml)
+ (deps ../scripts/mycppo scheduleSelection.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:scheduleSelection.ml.cppo} %{target})))
+(rule
+ (target scheduleDerivation.ml)
+ (deps ../scripts/mycppo scheduleDerivation.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:scheduleDerivation.ml.cppo} %{target})))

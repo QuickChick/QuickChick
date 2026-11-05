@@ -76,3 +76,9 @@ plugin/compat.mli
 plugin/rocqRelation.ml
 plugin/scheduleCode.ml
 plugin/scheduleSearch.ml
+plugin/relationInfo.ml
+plugin/densityMemo.ml
+plugin/scheduleScoring.ml
+plugin/scheduleContext.ml
+plugin/scheduleSelection.ml
+plugin/scheduleDerivation.ml
