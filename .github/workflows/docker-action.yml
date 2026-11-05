@@ -37,6 +37,8 @@ jobs:
           opam_file: 'coq-quickchick.opam'
           custom_image: ${{ matrix.image }}
           before_install: |
+            # The default 60-second solver limit is too short for Rocq 9.0's repository.
+            export OPAMSOLVERTIMEOUT=300
             startGroup "Setup and print opam config"
               opam config list; opam repo list; opam list
             endGroup
