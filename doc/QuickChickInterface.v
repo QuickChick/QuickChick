@@ -400,6 +400,14 @@ Parameter forAllShrink :
   forall {A prop : Type} `{Checkable prop} `{Show A}
          (gen : G A) (shrinker : A -> list A) (pf : A -> prop), Checker.
 
+(** Like [forAllShrink], for properties that discard at random: a shrink
+    candidate whose test discards is tested again, up to [n] more times,
+    before it is rejected. *)
+Parameter forAllShrinkNonDet :
+  forall {A prop : Type} `{Checkable prop} `{Show A}
+         (n : nat) (gen : G A) (shrinker : A -> list A) (pf : A -> prop),
+    Checker.
+
 (** Lift ([Show], [Gen], [Shrink]) instances for [A]
     to a [Checker] for functions [A] -> prop.  This is what makes it
     possible to write (for some example property [foo := fun x => x >?
@@ -748,10 +756,24 @@ Record Args :=
       maxSize    : nat;
       (* Verbosity. Note: Doesn't do much... *)
       (* Default true. *)
-      chatty     : bool
+      chatty     : bool;
+      (* Print results in a machine-readable format. *)
+      (* Default false. *)
+      analysis   : bool
     }.
 
-(** Instead of record updates, you should overwrite extraction constants. *)
+(** [QuickChickWith args prop] runs a test with the given arguments.
+    [stdArgs] holds the defaults, and [updMaxSuccess], [updMaxDiscard],
+    [updMaxShrinks], [updMaxSize] and [updAnalysis] change one field. *)
+(** [[
+     Definition fewTests := updMaxSuccess stdArgs 500.
+     QuickChickWith fewTests prop.
+     QuickChickWith (updMaxSize (updMaxShrinks stdArgs 10) 4) prop.
+]]
+*)
+
+(** To change a default for every test, override its extraction constant
+    instead. *)
 (** [[
    Extract Constant defNumTests    => "10000".
    Extract Constant defNumDiscards => "(2 * defNumTests)".
