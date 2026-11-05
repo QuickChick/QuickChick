@@ -171,10 +171,28 @@ Definition shrinking {prop A : Type} `{Checkable prop}
   fmap (fun x => MkProp (joinRose (fmapRose unProp x)))
        (promote (props pf shrinker x0)).
 
+(* Run [c] again, with a fresh seed, while it discards, at most [n] more
+   times. *)
+Fixpoint retryDiscards (n : nat) (c : Checker) : Checker :=
+  match n with
+  | O => c
+  | S n' => bindGen c (fun p => match unProp p with
+                               | MkRose res _ => match ok res with
+                                                 | None => retryDiscards n' c
+                                                 | Some _ => returnGen p
+                                                 end
+                               end)
+  end.
+
+(* Like [shrinking], but a shrink candidate whose test discards is tested
+   again, up to [n] more times, before it is rejected. This lets shrinking
+   make progress on properties that discard at random. *)
 Definition shrinkingNondet {prop A : Type} `{Checkable prop} (n : nat)
           (shrinker : A -> list A) (x0 : A) (pf : A -> prop) : Checker :=
-  fmap (fun x => MkProp (repeatRose n (joinRose (fmapRose unProp x))))
-       (promote (props pf shrinker x0)).
+  let retried x := retryDiscards n (checker (pf x)) in
+  fmap (fun x => MkProp (joinRose (fmapRose unProp x)))
+       (promote (MkRose (checker (pf x0))
+                        (lazy (List.map (props retried shrinker) (shrinker x0))))).
 
 Definition callback {prop : Type} `{Checkable prop}
            (cb : Callback) : prop -> Checker :=
