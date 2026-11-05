@@ -133,8 +133,14 @@ Proof.
   - lia.
 Qed.
 
+(* Stated here because the library lemma was renamed (app_length, then
+   length_app) across the supported versions. *)
+Lemma app_length_eq : forall (A : Type) (xs ys : list A),
+  length (xs ++ ys) = length xs + length ys.
+Proof. induction xs; simpl; auto. Qed.
+
 Lemma count_app : forall g xs ys, count g (xs ++ ys) = count g xs + count g ys.
-Proof. intros; unfold count; rewrite filter_app, length_app; auto. Qed.
+Proof. intros; unfold count; rewrite filter_app; apply app_length_eq. Qed.
 
 (** The bound's grades [b] are a sub-multiset of the completion's grades
     [b ++ r], up to order. *)

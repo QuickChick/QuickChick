@@ -1,6 +1,7 @@
 open Pp
 
-let get_flag_debug = ref (fun _ -> assert false)
+(* Debug output is off until the plugin registers its QuickChickDebug flag. *)
+let get_flag_debug = ref (fun _ -> false)
 
 let qcfail s = failwith (Printf.sprintf "Internal QuickChick Error : %s" s)
 

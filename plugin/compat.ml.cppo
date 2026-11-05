@@ -10,3 +10,195 @@ let unCNotation11 cs error = match cs.CAst.v with
     Some ((a, b))
   | _ -> None
 
+(* The sub-patterns of a tuple pattern notation such as [(x, y)]. *)
+let tuple_pattern_parts p = match p.CAst.v with
+#if COQ_VERSION >= (9, 4, 0)
+  | CPatNotation (_, { ntn_key = key; _ }, subst, [])
+    when key = "( _ , _ )" || key = "( _ , _ , .. , _ )" ->
+    let rec parts = function
+      | NtnTypeArg (NtnTypeArgPattern (p, _)) -> [p]
+      | NtnTypeArg (NtnTypeArgConstr c) -> [Constrexpr_ops.coerce_to_cases_pattern_expr c]
+      | NtnTypeArg (NtnTypeArgBinders _) -> []
+      | NtnTypeArgList l | NtnTypeArgTuple l -> List.concat_map parts l in
+    Some (List.concat_map parts subst)
+#elif COQ_VERSION >= (8, 19, 0)
+  | CPatNotation (_, (_, key), (patterns, repeated, []), [])
+    when key = "( _ , _ )" || key = "( _ , _ , .. , _ )" ->
+    Some (patterns @ List.concat repeated)
+#else
+  | CPatNotation (_, (_, key), (patterns, repeated), [])
+    when key = "( _ , _ )" || key = "( _ , _ , .. , _ )" ->
+    Some (patterns @ List.concat repeated)
+#endif
+  | _ -> None
+
+let regular_style =
+#if COQ_VERSION >= (9, 4, 0)
+  Constr.MatchStyle
+#else
+  Constr.RegularStyle
+#endif
+
+let universe_context_set u =
+#if COQ_VERSION >= (9, 4, 0)
+  UState.universe_context_set u
+#else
+  UState.context_set u
+#endif
+
+(* Merge a universe context set into [sigma], as rigid universes. *)
+let merge_context_set sigma ctx =
+#if COQ_VERSION >= (9, 4, 0)
+  Evd.merge_sort_context_set Evd.univ_rigid sigma
+    ((Sorts.QVar.Set.empty, Univ.ContextSet.levels ctx),
+     PConstraints.of_univs (Univ.ContextSet.constraints ctx))
+#else
+  Evd.merge_context_set Evd.univ_rigid sigma ctx
+#endif
+
+let extern_constr env sigma c =
+#if COQ_VERSION >= (9, 4, 0)
+  Constrextern.extern_constr ~flags:(PrintingFlags.current ()) env sigma c
+#else
+  Constrextern.extern_constr env sigma c
+#endif
+
+let print_universes =
+#if COQ_VERSION >= (9, 4, 0)
+  PrintingFlags.print_universes
+#else
+  Constrextern.print_universes
+#endif
+
+(* Push a local declaration of the proof context. *)
+let push_named decl env =
+#if COQ_VERSION >= (9, 4, 0)
+  Environ.push_named Environ.ProofVar decl env
+#else
+  Environ.push_named decl env
+#endif
+
+let instances env gr =
+#if COQ_VERSION >= (9, 4, 0)
+  Typeclasses.instances env gr
+#elif COQ_VERSION >= (8, 18, 0)
+  ignore env; Typeclasses.instances gr
+#else
+  try Some (Typeclasses.instances env (Evd.from_env env) gr) with Not_found -> None
+#endif
+
+let replace_vars sigma subst t =
+#if COQ_VERSION >= (8, 18, 0)
+  EConstr.Vars.replace_vars sigma subst t
+#else
+  ignore sigma; EConstr.Vars.replace_vars subst t
+#endif
+
+(* Monomorphic references to global constants, inductives and constructors. *)
+#if COQ_VERSION >= (8, 18, 0)
+let mkConst = Constr.UnsafeMonomorphic.mkConst
+let mkInd = Constr.UnsafeMonomorphic.mkInd
+let mkConstruct = Constr.UnsafeMonomorphic.mkConstruct
+#else
+let mkConst = Constr.mkConst
+let mkInd = Constr.mkInd
+let mkConstruct = Constr.mkConstruct
+#endif
+
+(* The polymorphism of a declaration, following Set Universe Polymorphism. *)
+let current_poly () =
+#if COQ_VERSION >= (9, 2, 0)
+  PolyFlags.of_univ_poly (Attributes.is_universe_polymorphism ())
+#else
+  Attributes.is_universe_polymorphism ()
+#endif
+
+(* Head and arguments of an application; Coq 8.18 made decompose_app return
+   an array and added decompose_app_list. *)
+let decompose_app c =
+#if COQ_VERSION >= (8, 18, 0)
+  Constr.decompose_app c
+#else
+  let h, args = Constr.decompose_app c in h, Array.of_list args
+#endif
+
+let decompose_app_list c =
+#if COQ_VERSION >= (8, 18, 0)
+  Constr.decompose_app_list c
+#else
+  Constr.decompose_app c
+#endif
+
+let edecompose_app sigma c =
+#if COQ_VERSION >= (8, 18, 0)
+  EConstr.decompose_app sigma c
+#else
+  let h, args = EConstr.decompose_app sigma c in h, Array.of_list args
+#endif
+
+let relevant =
+#if COQ_VERSION >= (8, 20, 0)
+  EConstr.ERelevance.relevant
+#else
+  Sorts.Relevant
+#endif
+
+(* The sort expression of an anonymous Type. *)
+let type_sort =
+#if COQ_VERSION >= (8, 20, 0)
+  Constrexpr_ops.expr_Type_sort
+#elif COQ_VERSION >= (8, 19, 0)
+  Glob_term.UAnonymous {rigid = UState.UnivRigid}
+#else
+  Glob_term.UAnonymous {rigid = true}
+#endif
+
+(* A fixpoint body without a recursion annotation; 8.20 added its relevance. *)
+let fix_expr lid binders typ body : fix_expr =
+#if COQ_VERSION >= (8, 20, 0)
+  (lid, None, None, binders, typ, body)
+#else
+  (lid, None, binders, typ, body)
+#endif
+
+(* Register a declared constant as a typeclass instance. *)
+let existing_instance locality gr info =
+#if COQ_VERSION >= (8, 18, 0)
+  Classes.existing_instance locality gr info
+#else
+  Classes.existing_instance locality (Nametab.shortest_qualid_of_global Names.Id.Set.empty gr) info
+#endif
+
+(* Whether Typeclasses Depth sets a limit; unknown before 8.18. *)
+let typeclasses_depth_bounded () =
+#if COQ_VERSION >= (8, 18, 0)
+  match Goptions.get_option_value ["Typeclasses"; "Depth"] with
+  | Some get -> (match get () with Goptions.IntValue (Some _) -> true | _ -> false)
+  | None -> false
+#else
+  false
+#endif
+
+let hole =
+#if COQ_VERSION >= (8, 19, 0)
+  CAst.make (CHole None)
+#elif COQ_VERSION >= (8, 18, 0)
+  CAst.make (CHole (None, Namegen.IntroAnonymous))
+#else
+  CAst.make (CHole (None, Namegen.IntroAnonymous, None))
+#endif
+
+let conv =
+#if COQ_VERSION >= (8, 18, 0)
+  Conversion.CONV
+#else
+  Reduction.CONV
+#endif
+
+let is_class_type env sigma t =
+#if COQ_VERSION >= (9, 4, 0)
+  Typeclasses.is_class_type env sigma t
+#else
+  ignore env; Typeclasses.is_class_type sigma t
+#endif
+

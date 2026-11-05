@@ -52,10 +52,18 @@ let set_view_extraction () =
       (Libnames.qualid_of_string rocq) ocaml constructors matcher)
     PolicyViews.extraction_table
 
+(* Ask ocamlfind rather than link findlib: Coq 8.15 does not load findlib
+   into plugins. *)
 let plugin_directory () =
-  try Findlib.package_directory "coq-quickchick.plugin"
-  with Not_found | Findlib.No_such_package _ ->
-    error (str "Cannot locate the QuickChick plugin to compile a Rocq scorer.")
+  let missing () =
+    error (str "Cannot locate the QuickChick plugin to compile a Rocq scorer.") in
+  try
+    let output = Unix.open_process_in "ocamlfind query coq-quickchick.plugin 2>/dev/null" in
+    let line = try Some (input_line output) with End_of_file -> None in
+    match Unix.close_process_in output, line with
+    | Unix.WEXITED 0, Some dir when dir <> "" -> dir
+    | _ -> missing ()
+  with Unix.Unix_error _ -> missing ()
 
 (* Extract the three entry points of [reference] to [file]. *)
 #if COQ_VERSION >= (8, 20, 0)
@@ -113,14 +121,24 @@ let warn_axioms ~opaque_access reference =
   let env = Global.env () in
   let global = Nametab.global reference in
   let sigma, term = Evd.fresh_global env (Evd.from_env env) global in
+#if COQ_VERSION >= (9, 4, 0)
+  ignore term;
+  let theory, assumptions = Assumptions.assumptions ~add_opaque:false ~add_transparent:false
+    opaque_access TransparentState.full [global] in
+#else
   let assumptions = Assumptions.assumptions ~add_opaque:false ~add_transparent:false
     opaque_access TransparentState.full global (EConstr.to_constr sigma term) in
+#endif
   let axioms = Printer.ContextObjectMap.filter (fun obj _ ->
     match obj with Printer.Axiom _ -> true | _ -> false) assumptions in
   if not (Printer.ContextObjectMap.is_empty axioms) then
     Feedback.msg_warning (str "The scorer " ++ Libnames.pr_qualid reference
       ++ str " depends on axioms; pruning trusts its bound:" ++ fnl ()
+#if COQ_VERSION >= (9, 4, 0)
+      ++ Printer.pr_assumptionset env sigma theory axioms)
+#else
       ++ Printer.pr_assumptionset env sigma axioms)
+#endif
 #endif
 
 (* Compile and load [reference] if needed, and return its registry key. *)

@@ -19,7 +19,7 @@ let publish ~mode ~constrained (sigma, bodies) =
       | _ -> false) ["GenSized", "Gen", "arbitrary"; "EnumSized", "Enum", "enum"] in
   let rec adapt term = match Constr.kind term with
     | Constr.Lambda (name, domain, body) ->
-        let head, args = Constr.decompose_app domain in
+        let head, args = Compat.decompose_app domain in
         (match class_kind head with
         | Some (sized_name, plain_name, method_name) when Array.length args = 1 ->
           let ty = args.(0) in
@@ -38,7 +38,7 @@ let publish ~mode ~constrained (sigma, bodies) =
   let rec implicits term = match Constr.kind term with
     | Constr.Lambda (name, domain, body) ->
         let implicit = Constr.isSort domain ||
-          Typeclasses.is_class_type !sigma (EConstr.of_constr domain) in
+          Compat.is_class_type env !sigma (EConstr.of_constr domain) in
         CAst.make (if implicit then Some (Context.binder_name name, true) else None)
           :: implicits body
     | _ -> [] in
@@ -48,13 +48,7 @@ let publish ~mode ~constrained (sigma, bodies) =
     sigma := next;
     let cinfo = Declare.CInfo.make ~name ~typ:None
       ~impargs:(implicits (EConstr.to_constr next body)) () in
-    let poly =
-#if COQ_VERSION >= (9, 2, 0)
-      PolyFlags.default
-#else
-      Attributes.is_universe_polymorphism ()
-#endif
-    in
+    let poly = Compat.current_poly () in
     let info = Declare.Info.make ~poly () in
     Declare.declare_definition ~info ~cinfo ~opaque:false ~body next in
   List.iter (fun (root, body) ->
@@ -64,7 +58,7 @@ let publish ~mode ~constrained (sigma, bodies) =
     let instance_name = GenericLib.fresh_name (prefix ^ Names.Id.to_string root) in
     let reference = declare instance_name body in
     (* The legacy engine's priority: user instances keep precedence. *)
-    Classes.existing_instance Hints.SuperGlobal reference
+    Compat.existing_instance Hints.SuperGlobal reference
       (Some { Typeclasses.hint_priority = Some 42; hint_pattern = None });
     if not constrained then begin
     (* Preserve the traditional implementation name and size-last interface. *)
@@ -76,7 +70,7 @@ let publish ~mode ~constrained (sigma, bodies) =
       | _ ->
           let next, ty = Typing.type_of env !sigma (EConstr.of_constr body) in
           sigma := next;
-          let _, args = Constr.decompose_app (EConstr.to_constr next ty) in
+          let _, args = Compat.decompose_app (EConstr.to_constr next ty) in
           let projection = if enumerator then "enumSized" else "arbitrarySized" in
           Constr.mkApp (global (class_prefix ^ projection), [| args.(0); body |]) in
     let helper_name = GenericLib.fresh_name (impl_prefix ^ Names.Id.to_string root) in
@@ -119,9 +113,8 @@ let dependent_target ~mode expression =
     | Names.Anonymous -> CErrors.user_err (Pp.str "Name each tuple output.")) names in
   let rec pattern_names pattern = match pattern.CAst.v with
     | CPatAtom (Some q) when Libnames.qualid_is_ident q -> [Libnames.qualid_basename q]
-    | CPatNotation (_, (_, key), (patterns, repeated, []), [])
-      when key = "( _ , _ )" || key = "( _ , _ , .. , _ )" ->
-        List.concat_map pattern_names (patterns @ List.concat repeated)
+    | _ when Compat.tuple_pattern_parts pattern <> None ->
+        List.concat_map pattern_names (Option.get (Compat.tuple_pattern_parts pattern))
     | CPatCstr (q, None, patterns) when
         Nametab.locate q = Nametab.locate (Libnames.qualid_of_string "Coq.Init.Datatypes.pair") ->
         List.concat_map pattern_names patterns
@@ -164,7 +157,7 @@ let dependent_target ~mode expression =
         strip env (Context.binder_name name :: context) rest
     | _ -> env, context, term in
   let _, context, term = strip env [] term in
-  let head, args = EConstr.decompose_app sigma term in
+  let head, args = Compat.edecompose_app sigma term in
   let relation = match EConstr.kind sigma head with
     | Constr.Ind (ind, _) -> Nametab.shortest_qualid_of_global Names.Id.Set.empty (Names.GlobRef.IndRef ind)
     | _ -> CErrors.user_err (Pp.str "Expected an inductive predicate application.") in
@@ -203,11 +196,7 @@ let publish_reordered ~mode r =
   let qualid s = Libnames.qualid_of_string (GenericLib.rocq_path s) in
   let ref_ s = CAst.make (CRef (qualid s, None)) in
   let var id = CAst.make (CRef (Libnames.qualid_of_ident id, None)) in
-  let hole = CAst.make (CHole (None
-#if COQ_VERSION < (8, 20, 0)
-    , Namegen.IntroAnonymous
-#endif
-    )) in
+  let hole = Compat.hole in
   let app f args = CAst.make (CApp (f, List.map (fun a -> a, None) args)) in
   let explicit f args = CAst.make (CAppExpl ((qualid f, None), args)) in
   let pair_pat a b = CAst.make (CPatCstr (qualid "Coq.Init.Datatypes.pair",
@@ -226,7 +215,7 @@ let publish_reordered ~mode r =
       None,
 #endif
       Default Glob_term.Explicit, hole)],
-      CAst.make (CCases (RegularStyle, None, [var p, None, None],
+      CAst.make (CCases (Compat.regular_style, None, [var p, None, None],
         [CAst.make ([[tuple_pat r.in_order]], result)])))) in
   let canonical = fun_match r.body in
   let permute = fun_match (tuple_term r.user_order) in
@@ -239,7 +228,7 @@ let publish_reordered ~mode r =
       None,
 #endif
       Default Glob_term.Explicit, hole)],
-      CAst.make (CCases (RegularStyle, None, [var p, None, None],
+      CAst.make (CCases (Compat.regular_style, None, [var p, None, None],
         [CAst.make ([[tuple_pat r.user_order]], r.body)])))) in
   let cls, build, meth, bind, ret =
     if enumerator then "QuickChick.DependentClasses.EnumSizedSuchThat",
@@ -261,10 +250,10 @@ let publish_reordered ~mode r =
      lambda o (app (ref_ ret)
        [app (ref_ "Coq.Init.Datatypes.option_map") [permute; var o]])]) in
   let instance = CAst.make (CCast (explicit build [hole; request; method_body],
-#if COQ_VERSION >= (8, 20, 0)
+#if COQ_VERSION >= (8, 18, 0)
     Some Constr.DEFAULTcast,
 #else
-    Glob_term.CastConv
+    Constr.DEFAULTcast,
 #endif
     explicit cls [hole; request])) in
   let binder id = CLocalAssum ([CAst.make (Names.Name id)],
@@ -282,7 +271,7 @@ let publish_reordered ~mode r =
   let cinfo = Declare.CInfo.make ~name ~typ:None () in
   let info = Declare.Info.make () in
   let reference = Declare.declare_definition ~info ~cinfo ~opaque:false ~body sigma in
-  Classes.existing_instance Hints.SuperGlobal reference
+  Compat.existing_instance Hints.SuperGlobal reference
     (Some { Typeclasses.hint_priority = Some 42; hint_pattern = None })
 
 let derive_dependent ~mode expression =

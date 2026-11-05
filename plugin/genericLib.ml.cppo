@@ -225,13 +225,19 @@ let rocq_relation_to_string (ty_ctr, ty_params, ctrs, rc) =
    ASSUME: all type parameters are first
    Output: all type parameters (named arguments of type : Type) in correct order 
 *)
+(* A sort other than Prop, SProp and Set. Rocq 9.4 elaborates [Type] with a
+   sort quality variable, which Constr.is_Type does not recognise. *)
+let is_type_sort c = match Constr.kind c with
+  | Constr.Sort s -> not (Sorts.is_prop s || Sorts.is_sprop s || Sorts.is_set s)
+  | _ -> false
+
 let dep_parse_type_params arity_ctxt =
   let param_names =
     foldM (fun acc decl -> 
            match Context.Rel.Declaration.get_name decl with
            | Names.Name id -> 
               (* Actual parameters are named of type Type with some universe *)
-              if Constr.is_Type (Context.Rel.Declaration.get_type decl) then Some (id :: acc) else Some acc
+              if is_type_sort (Context.Rel.Declaration.get_type decl) then Some (id :: acc) else Some acc
            | _ -> (* Ignore *) Some acc
           ) (Some []) arity_ctxt in
   param_names
@@ -278,7 +284,7 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       end
     else if Constr.isApp ty then begin
       Error.msg_debug (str "App: " ++ debug_constr ty ++ fnl ());
-      let (ctr, tms) = Constr.decompose_app_list ty in
+      let (ctr, tms) = Compat.decompose_app_list ty in
       foldM (fun acc ty -> 
              aux locals i ty >>= fun ty' -> Some (ty' :: acc)
             ) (Some []) tms >>= fun tms' ->
@@ -325,7 +331,6 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
       let qual = String.concat "." prefix in
       Error.msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (cwd_string ())) ++ fnl ());
       (* Constructor name *)
-      Error.msg_debug (int (mib.mind_ntypes) ++ fnl ());
       let cname = Names.Id.to_string (mib.mind_packets.(midx).mind_consnames.(idx - 1)) in
       let cid = Libnames.qualid_of_string (if (qual = "") || (qual = cwd_string ())
                              then cname else qual ^ "." ^ cname) in
@@ -414,7 +419,7 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
     else if Constr.isSort ty then begin
       if Constr.is_Prop ty then
         Some (DTyCtr (ty_ctr_of_string "Prop", []))
-      else if Constr.is_Type ty then
+      else if is_type_sort ty then
         Some (DTyCtr (ty_ctr_of_string "Type", []))
       else
         CErrors.user_err (str "Sort not handled: " ++ (debug_constr ty) ++ fnl ())
@@ -457,7 +462,7 @@ let dep_parse_type nparams param_names arity_ctxt oib =
            Error.msg_debug (debug_constr t ++ fnl ());
            match n with
            | Names.Name id -> (* Check if it is a parameter to add its type / name *)
-              if Constr.is_Type t then Some acc 
+              if is_type_sort t then Some acc 
               else parse_dependent_type_internal i nparams t (Some oib) arg_names >>= fun dt -> Some ((n,dt) :: acc)
            | _ ->  parse_dependent_type_internal i nparams t (Some oib) arg_names >>= fun dt -> Some ((n,dt) :: acc)
         ) (Some []) (List.mapi (fun i x -> (len - nparams - i, x)) arity_ctxt) >>= fun nts ->
@@ -504,7 +509,7 @@ let abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result =
       |> Environ.push_rel_context (decls ctr_pats) in
     let sigma = Evd.from_env env in
     let call_type t =
-      match Constr.kind (fst (Constr.decompose_app_list t)) with
+      match Constr.kind (fst (Compat.decompose_app_list t)) with
       | Constr.Const _ | Constr.Proj _ ->
         let ty = Retyping.get_type_of env sigma (EConstr.of_constr t) in
         if Reductionops.is_arity env sigma ty then None
@@ -514,7 +519,7 @@ let abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result =
       match call_type t with
       | Some ty -> (t, ty) :: acc
       | None ->
-        let (h, xs) = Constr.decompose_app_list t in
+        let (h, xs) = Compat.decompose_app_list t in
         if Constr.isConstruct h then List.fold_left collect acc xs else acc in
     let indices = Array.to_list (Array.sub args nparams (Array.length args - nparams)) in
     let calls = List.rev (List.fold_left collect [] indices) in
@@ -539,7 +544,7 @@ let abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result =
         match call_type t with
         | Some _ -> incr next; Constr.mkRel (2 * k - !next + 1)
         | None ->
-          let (h, xs) = Constr.decompose_app_list t in
+          let (h, xs) = Compat.decompose_app_list t in
           if Constr.isConstruct h && xs <> [] then
             Constr.mkApp (h, Array.of_list (List.map replace xs))
           else Vars.lift (2 * k) t in
@@ -604,7 +609,7 @@ let oib_to_unparameterized_relation ?abstract_calls (oib : Declarations.one_indu
     let oib = { oib with Declarations.mind_arity_ctxt =
       List.map (fun decl ->
         match Context.Rel.Declaration.get_name decl with
-        | Names.Anonymous when Constr.is_Type (Context.Rel.Declaration.get_type decl) ->
+        | Names.Anonymous when is_type_sort (Context.Rel.Declaration.get_type decl) ->
           Context.Rel.Declaration.set_name (Names.Name (make_up_name ())) decl
         | _ -> decl) oib.Declarations.mind_arity_ctxt } in
     let ty_ctr = oib.Declarations.mind_typename in 
@@ -695,7 +700,7 @@ let constr_of_relation_type name ty_params (rc : rocq_constr) : Constr.t =
     let rec go j = function
       | [] ->
         (match locate_constant (Libnames.qualid_of_ident x) with
-         | Some c -> Constr.UnsafeMonomorphic.mkConst c
+         | Some c -> Compat.mkConst c
          | None -> find_param x (List.length ty_params + i))
       | y :: ys -> if Names.Id.equal x y then Constr.mkRel (i - j) else go (j - 1) ys in
     go (List.length vars) vars in
@@ -713,13 +718,13 @@ let constr_of_relation_type name ty_params (rc : rocq_constr) : Constr.t =
         else if cname = "Type" then Constr.mkType Univ.Universe.type1
         else if cname = name then Constr.mkRel i
         else match locate_ind c with
-          | Some ind -> Constr.UnsafeMonomorphic.mkInd ind
+          | Some ind -> Compat.mkInd ind
           | None -> match locate_constant c with
-            | Some k -> Constr.UnsafeMonomorphic.mkConst k
+            | Some k -> Compat.mkConst k
             | None -> failwith ("Not found: " ^ cname) in
       Constr.mkApp (head, Array.of_list (List.map (aux vars i) rcs))
     | DCtr (c, rcs) ->
-      Constr.mkApp (Constr.UnsafeMonomorphic.mkConstruct (locate_constructor c),
+      Constr.mkApp (Compat.mkConstruct (locate_constructor c),
                     Array.of_list (List.map (aux vars i) rcs))
     | DTyVar x -> find_var x (i - List.length ty_params) vars
     | DApp (rc, rcs) -> Constr.mkApp (aux vars i rc, Array.of_list (List.map (aux vars i) rcs))
@@ -1103,7 +1108,7 @@ let c_app ?explicit:(expl=true) c cs : constr_expr =
     in CAst.map f c
   else mkAppC (c, cs)
 
-let c_Type = CAst.make @@ Constrexpr.CSort expr_Type_sort
+let c_Type = CAst.make @@ Constrexpr.CSort Compat.type_sort
 
 let c_pair x y = c_app (cInject "Coq.Init.Datatypes.pair") [c_hole; c_hole; x; y]
 
@@ -1324,12 +1329,12 @@ let rec mexp_to_constr_expr (me : mexp) (ds : derive_sort) : constr_expr =
   | MFix (f, vs, m, ds) ->
     let lid = CAst.make f in
     let args = List.map (fun (v,ty) -> c_assum v (mexp_to_constr_expr ty ds)) vs in
-    CAst.make @@ CFix (lid, [(lid,None,None,args,c_hole, mexp_to_constr_expr m ds)])
+    CAst.make @@ CFix (lid, [Compat.fix_expr lid args c_hole (mexp_to_constr_expr m ds)])
   | MMutFix (funs, v) ->
     let funs = List.map (fun (f, vs, m, ds) -> 
       let lid = CAst.make f in
       let args = List.map (fun (v,ty) -> c_assum v (mexp_to_constr_expr ty ds) ) vs in
-      (lid, None, None, args, c_hole, mexp_to_constr_expr m ds)) funs in
+      Compat.fix_expr lid args c_hole (mexp_to_constr_expr m ds)) funs in
     CAst.make @@ CFix (CAst.make v, funs)
 
 let rec mexp_to_string (me : mexp) : string =
@@ -2172,7 +2177,7 @@ let find_typeclass_bindings ctr =
     let env = Global.env () in
     let evd = Evd.from_env env in
     msg_debug (str "Type: " ++ Constr.debug_print typ ++ fnl ());
-    msg_debug (str "Type2: " ++ pr_constr_expr env evd (Constrextern.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
+    msg_debug (str "Type2: " ++ pr_constr_expr env evd (Compat.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
     match parse_dependent_type typ with
     | Some rocq -> 
       let rocq_str = rocq_constr_to_string rocq in
@@ -2202,7 +2207,7 @@ let find_typeclass_bindings ctr =
       let env = Global.env () in
       let evd = Evd.from_env env in
       msg_debug (str "Type: " ++ Constr.debug_print typ ++ fnl ());
-      msg_debug (str "Type2: " ++ pr_constr_expr env evd (Constrextern.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
+      msg_debug (str "Type2: " ++ pr_constr_expr env evd (Compat.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
       (match parse_dependent_type typ with
       | Some rocq -> 
         let rocq_str = rocq_constr_to_string rocq in
@@ -2218,7 +2223,7 @@ let find_typeclass_bindings ctr =
       let env = Global.env () in
       let evd = Evd.from_env env in
       msg_debug (str "Type: " ++ Constr.debug_print typ ++ fnl ());
-      msg_debug (str "Type2: " ++ pr_constr_expr env evd (Constrextern.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
+      msg_debug (str "Type2: " ++ pr_constr_expr env evd (Compat.extern_constr env evd (EConstr.of_constr typ)) ++ fnl ());
       (match parse_dependent_type typ with
       | Some rocq -> 
         let rocq_str = rocq_constr_to_string rocq in

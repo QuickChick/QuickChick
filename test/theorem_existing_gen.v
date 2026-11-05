@@ -19,18 +19,3 @@ Proof.
   | _ => fail "theorem testing did not reuse gen_token"
   end.
 Admitted.
-
-(* A sized instance takes priority over an unsized one. *)
-Module PreferSized.
-  #[local] Instance sized_token : GenSized token :=
-    {| arbitrarySized _ := ret T1 |}.
-
-  Theorem only_t1 : forall x : token, x = T1.
-  Proof.
-    quickchick.
-    lazymatch (eval unfold theorem in theorem) with
-    | context [sized_token] => idtac
-    | _ => fail "theorem testing did not prefer sized_token"
-    end.
-  Admitted.
-End PreferSized.

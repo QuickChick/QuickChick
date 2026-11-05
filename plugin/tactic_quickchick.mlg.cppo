@@ -16,7 +16,12 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
 
 }
 
+(* Coq 8.15 activates tactic grammar under the name Declare ML Module uses. *)
+#if COQ_VERSION >= (8, 16, 0)
 DECLARE PLUGIN "coq-quickchick.plugin"
+#else
+DECLARE PLUGIN "quickchick_plugin"
+#endif
 
 {
 let merge_sound =
@@ -1230,7 +1235,7 @@ let cardinality_type_cache = Hashtbl.create 64
    the first [np] are the parameters of inductive [ind], with classes
    [params]. A type of [ind]'s own mutual block is a recursive occurrence. *)
 let rec cardinality_argument ind np params depth arg =
-  let head, args = Constr.decompose_app arg in
+  let head, args = Compat.decompose_app arg in
   match Constr.kind head with
   | Constr.Ind ((m, _), _) when Names.MutInd.CanOrd.equal m (fst ind) -> `Rec
   | Constr.Ind (i, _) ->
@@ -1955,7 +1960,7 @@ let schedule_locals = ref []
 let schedule_universes = ref None
 
 let schedule_env () =
-  List.fold_right Environ.push_named !schedule_locals (Global.env ())
+  List.fold_right Compat.push_named !schedule_locals (Global.env ())
 
 (* Merging the proof's universe context costs time proportional to its size,
    which grows with every test prepared in the proof. An evar map depends only
@@ -1973,12 +1978,12 @@ let schedule_sigma env =
     match !schedule_sigma_cache with
     | Some (g, u, sigma) when g == graph && u == universes -> sigma
     | _ ->
-      let context = UState.context_set universes in
+      let context = Compat.universe_context_set universes in
       let levels = Univ.Level.Set.diff
         (Univ.ContextSet.levels context) (UGraph.domain graph) in
       let context = Univ.ContextSet.add_constraints
         (Univ.ContextSet.constraints context) (Univ.ContextSet.of_set levels) in
-      let sigma = Evd.merge_context_set Evd.univ_rigid (Evd.from_env env) context in
+      let sigma = Compat.merge_context_set (Evd.from_env env) context in
       schedule_sigma_cache := Some (graph, universes, sigma);
       sigma
 
@@ -1992,14 +1997,18 @@ let with_schedule_context env sigma f =
   let normalize c = EConstr.to_constr sigma (EConstr.of_constr c) in
   let locals = List.map (Context.Named.Declaration.map_constr normalize) locals in
   schedule_locals := locals;
+#if COQ_VERSION >= (9, 0, 0)
+  schedule_universes := Some (Evd.ustate sigma);
+#else
   schedule_universes := Some (Evd.evar_universe_context sigma);
+#endif
   Fun.protect ~finally:(fun () ->
     schedule_locals := previous; schedule_universes := previous_universes) f
 
 let inline_schedule_definitions sigma term =
   List.fold_left (fun term -> function
     | Context.Named.Declaration.LocalDef (name, body, _) ->
-        EConstr.Vars.replace_vars sigma [Context.binder_name name, EConstr.of_constr body] term
+        Compat.replace_vars sigma [Context.binder_name name, EConstr.of_constr body] term
     | Context.Named.Declaration.LocalAssum _ -> term) term !schedule_locals
 
 (* Keep lookup variables rigid after elaboration. In particular, type parameters
@@ -2068,7 +2077,7 @@ let elaborate_schedule_expression variables outputs ds expression =
         let id = if occupied then make_up_name_str "qc_bound" else original in
         let decl = Context.Named.Declaration.LocalAssum
           (Context.make_annot id Sorts.Relevant, EConstr.to_constr sigma ty) in
-        introduce (Environ.push_named decl env) ((original, id) :: names)
+        introduce (Compat.push_named decl env) ((original, id) :: names)
           (EConstr.Vars.subst1 (EConstr.mkVar id) body)
     | _ -> env, sigma, goal, names in
   introduce env [] goal
@@ -2080,9 +2089,7 @@ let elaborate_obligation relation outputs ds constrained =
 let resolve_schedule_obligation env sigma goal =
   try Some (Typeclasses.resolve_one_typeclass env sigma goal)
   with Not_found ->
-    let bounded = match Goptions.get_option_value ["Typeclasses"; "Depth"] with
-      | Some get -> (match get () with Goptions.IntValue (Some _) -> true | _ -> false)
-      | None -> false in
+    let bounded = Compat.typeclasses_depth_bounded () in
     if bounded then CErrors.user_err (str
       "QuickChick could not resolve an instance with the current Typeclasses Depth limit. Increase or unset that limit before automatic derivation.");
     None
@@ -2124,7 +2131,7 @@ let instance_requirements ?(allow_root=false) env sigma goal names =
     | None ->
       let seen = goal :: seen in
       let ((cls, _), _) = Typeclasses.dest_class_app env sigma goal in
-      let instances = Stdlib.Option.value ~default:[] (Typeclasses.instances cls.Typeclasses.cl_impl) in
+      let instances = Stdlib.Option.value ~default:[] (Compat.instances env cls.Typeclasses.cl_impl) in
       let priority i = Stdlib.Option.value ~default:1000 (Typeclasses.hint_priority i) in
       let instances = List.stable_sort (fun a b -> compare (priority a) (priority b)) instances in
       let rec candidates = function
@@ -2137,11 +2144,11 @@ let instance_requirements ?(allow_root=false) env sigma goal names =
               match EConstr.kind sigma (Reductionops.whd_all env sigma typ) with
               | Constr.Prod (_, dom, body) ->
                 let sigma, arg = Evarutil.new_evar env sigma dom in
-                let premises = if Typeclasses.is_class_type sigma dom then dom :: premises else premises in
+                let premises = if Compat.is_class_type env sigma dom then dom :: premises else premises in
                 apply sigma premises (EConstr.Vars.subst1 arg body)
               | _ -> sigma, List.rev premises, typ in
             let sigma, premises, conclusion = apply sigma [] typ in
-            let unified = try Some (Evarconv.unify env sigma Conversion.CONV conclusion goal)
+            let unified = try Some (Evarconv.unify env sigma Compat.conv conclusion goal)
               with Pretype_errors.PretypeError _ -> None in
             match unified with
             | None -> None
@@ -2160,7 +2167,7 @@ let instance_requirements ?(allow_root=false) env sigma goal names =
           | None -> candidates rest
           | Some (sigma, requirements) ->
             let candidate_env = List.fold_left (fun env ty ->
-              Environ.push_named (Context.Named.Declaration.LocalAssum
+              Compat.push_named (Context.Named.Declaration.LocalAssum
                 (Context.make_annot (make_up_name_str "qc_premise") Sorts.Relevant,
                  EConstr.to_constr sigma ty)) env) env requirements in
             (match resolve_schedule_obligation candidate_env sigma goal with
@@ -2173,14 +2180,14 @@ let instance_requirements ?(allow_root=false) env sigma goal names =
       let ty = Evarutil.nf_evar sigma ty in
       if List.exists (EConstr.eq_constr sigma ty) acc then acc else acc @ [ty]) [] requirements in
     let env' = List.fold_left (fun env ty ->
-      Environ.push_named (Context.Named.Declaration.LocalAssum
+      Compat.push_named (Context.Named.Declaration.LocalAssum
         (Context.make_annot (make_up_name_str "qc_requirement") Sorts.Relevant,
          EConstr.to_constr sigma ty)) env) env requirements in
     match resolve_schedule_obligation env' sigma goal with
     | None -> None
     | Some _ -> Some (List.map (fun ty ->
-        let expression = Flags.without_option Constrextern.print_universes
-          (Constrextern.extern_constr env sigma) ty in
+        let expression = Flags.without_option Compat.print_universes
+          (Compat.extern_constr env sigma) ty in
         let original_names = List.fold_left (fun map (original, fresh) ->
           Names.Id.Map.add fresh original map) Names.Id.Map.empty names in
         MEscape (Constrexpr_ops.replace_vars_constr_expr original_names expression)) requirements)
@@ -4527,7 +4534,7 @@ let propagate_schedule_requirements components =
     let env = schedule_env () in
     let sigma, a = Constrintern.interp_constr_evars env (schedule_sigma env) (close a) in
     let sigma, b = Constrintern.interp_constr_evars env sigma (close b) in
-    try ignore (Evarconv.unify env sigma Conversion.CONV a b); true
+    try ignore (Evarconv.unify env sigma Compat.conv a b); true
     with Pretype_errors.PretypeError _ -> false in
   let requirements_of ((name, inputs, _, base, recursive), ds, _) =
     if ds = D_Thm then [] else
@@ -4795,12 +4802,7 @@ let is_defined_local (id : Names.Id.t) env : bool =
 let is_name_in_use (id : Names.Id.t) env : bool =
   is_defined_local id env || is_defined_global id
 
-let definition_poly () =
-#if COQ_VERSION >= (9, 2, 0)
-  PolyFlags.default
-#else
-  Attributes.is_universe_polymorphism ()
-#endif
+let definition_poly () = Compat.current_poly ()
 
 (* During tactic preparation, collect declarations to move into the proof's
    local context. Explicit derivations leave this unset and remain global. *)
@@ -4915,7 +4917,7 @@ let register_schedule_instances ~local components =
       let rec input_kinds count typ =
         if count = 0 then [] else match EConstr.kind sigma typ with
         | Constr.Prod (_, dom, body) ->
-          let kind = if Typeclasses.is_class_type sigma dom then
+          let kind = if Compat.is_class_type env sigma dom then
               Constrexpr.Generalized (Glob_term.MaxImplicit, false)
             else Constrexpr.Default
               (if EConstr.isSort sigma dom then Glob_term.MaxImplicit else Glob_term.Explicit) in
@@ -4934,7 +4936,7 @@ let register_schedule_instances ~local components =
       (match !public_instances with
       | None -> ()
       | Some instances -> instances := (name, reference) :: !instances);
-      Classes.existing_instance (if local then Hints.Local else Hints.SuperGlobal)
+      Compat.existing_instance (if local then Hints.Local else Hints.SuperGlobal)
         reference (Some { Typeclasses.hint_priority = Some 42; hint_pattern = None })
     end)) components
 
@@ -5029,7 +5031,7 @@ and compile_public_inner ~mode ~outputs ~constrained ~all_mutual ind =
       let constants = List.filter_map (fun (_, reference) -> match reference with
         | Names.GlobRef.ConstRef c -> Some c | _ -> None) !definitions in
       let rec expand term = match Constr.kind term with
-        | Constr.Const (c, u) when List.exists (Names.Constant.equal c) constants ->
+        | Constr.Const (c, u) when List.exists (Names.Constant.CanOrd.equal c) constants ->
             expand (Environ.constant_value_in env (c, u))
         | _ -> Constr.map expand term in
       let new_levels = Univ.Level.Set.diff
@@ -5041,7 +5043,7 @@ and compile_public_inner ~mode ~outputs ~constrained ~all_mutual ind =
         let sigma, term = Evd.fresh_global env sigma reference in
         let body = EConstr.of_constr (expand (EConstr.to_constr sigma term)) in
         sigma, bodies @ [Libnames.qualid_basename root, body])
-        (Evd.merge_context_set Evd.univ_rigid initial context, []) roots)) ()
+        (Compat.merge_context_set initial context, []) roots)) ()
 
 (* Testing needs concrete types: a goal quantified over a type, or mentioning
    a variable whose type is a sort (such as a section variable), has no type
@@ -5179,7 +5181,7 @@ let quickchick_it size idx =
         (* Expand only this preparation's constants, including dependencies.
            Local lets then carry no references to discarded global declarations. *)
         let rec expand term = match Constr.kind term with
-          | Constr.Const (c, u) when List.exists (Names.Constant.equal c) constants ->
+          | Constr.Const (c, u) when List.exists (Names.Constant.CanOrd.equal c) constants ->
               expand (Environ.constant_value_in env (c, u))
           | _ -> Constr.map expand term in
         let new_levels = Univ.Level.Set.diff
@@ -5190,7 +5192,7 @@ let quickchick_it size idx =
           let sigma, term = Evd.fresh_global env sigma reference in
           let body = expand (EConstr.to_constr sigma term) in
           sigma, acc @ [name, EConstr.of_constr body])
-          (Evd.merge_context_set Evd.univ_rigid evd universe_context, [])
+          (Compat.merge_context_set evd universe_context, [])
           (List.rev !definitions))) () in
     Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
       (List.fold_left (fun tactic (name, body) ->

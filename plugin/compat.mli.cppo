@@ -1,0 +1,41 @@
+open Constrexpr
+val tuple_pattern_parts : cases_pattern_expr -> cases_pattern_expr list option
+val regular_style : Constr.case_style
+val universe_context_set : UState.t -> Univ.ContextSet.t
+val merge_context_set : Evd.evar_map -> Univ.ContextSet.t -> Evd.evar_map
+val extern_constr : Environ.env -> Evd.evar_map -> EConstr.constr -> constr_expr
+val print_universes : bool ref
+val push_named : Constr.named_declaration -> Environ.env -> Environ.env
+val instances : Environ.env -> Names.GlobRef.t -> Typeclasses.instance list option
+val current_poly : unit ->
+#if COQ_VERSION >= (9, 2, 0)
+  PolyFlags.t
+#else
+  bool
+#endif
+val decompose_app : Constr.t -> Constr.t * Constr.t array
+val decompose_app_list : Constr.t -> Constr.t * Constr.t list
+val edecompose_app : Evd.evar_map -> EConstr.t -> EConstr.t * EConstr.t array
+val relevant :
+#if COQ_VERSION >= (8, 20, 0)
+  EConstr.ERelevance.t
+#else
+  Sorts.relevance
+#endif
+val type_sort : sort_expr
+val fix_expr : Names.lident -> local_binder_expr list -> constr_expr -> constr_expr -> fix_expr
+val replace_vars : Evd.evar_map -> (Names.Id.t * EConstr.t) list -> EConstr.t -> EConstr.t
+val mkConst : Names.Constant.t -> Constr.t
+val mkInd : Names.inductive -> Constr.t
+val mkConstruct : Names.constructor -> Constr.t
+val existing_instance : Hints.hint_locality -> Names.GlobRef.t -> Vernacexpr.hint_info_expr option -> unit
+val typeclasses_depth_bounded : unit -> bool
+val hole : constr_expr
+val conv :
+#if COQ_VERSION >= (8, 18, 0)
+  Conversion.conv_pb
+#else
+  Reduction.conv_pb
+#endif
+val is_class_type : Environ.env -> Evd.evar_map -> EConstr.types -> bool
+val unCNotation11 : constr_expr_r CAst.t -> (unit -> constr_expr) -> (constr_expr * constr_expr list) option

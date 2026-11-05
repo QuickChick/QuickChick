@@ -176,7 +176,7 @@ let define_and_run c env evd =
      [main] would miss module qualification and extraction's own renaming. *)
   let evd, typ = Typing.type_of env evd c in
   let emit = define (EConstr.mkLambda
-    (Context.make_annot Anonymous EConstr.ERelevance.relevant, typ, EConstr.mkRel 1)) env evd in
+    (Context.make_annot Anonymous Compat.relevant, typ, EConstr.mkRel 1)) env evd in
   let print_result =
     "(fun l -> let s = Stdlib.Bytes.create (Stdlib.List.length l) in " ^
     "let rec copy i = function " ^
@@ -353,7 +353,7 @@ let runTest c env evd : unit =
   let (evd',c) = interp_constr_evars env evd c in
   let c = List.fold_left (fun term -> function
     | Context.Named.Declaration.LocalDef (name, body, _) ->
-        EConstr.Vars.replace_vars evd'
+        Compat.replace_vars evd'
           [Context.binder_name name, EConstr.of_constr body] term
     | Context.Named.Declaration.LocalAssum _ -> term)
     c (Environ.named_context env) in
