@@ -28,19 +28,30 @@ struct
 end
 #endif
 
-let mk_ref s = CAst.make @@ CRef (qualid_of_string s, None)
-
 (* Names corresponding to QuickChick's .v files *)
-let show = mk_ref "QuickChick.Show.show"
-let quickCheck = mk_ref "QuickChick.Test.quickCheck"
-let quickCheckWith = mk_ref "QuickChick.Test.quickCheckWith"
-let mutateCheck = mk_ref "QuickChick.MutateCheck.mutateCheck"
-let mutateCheckWith = mk_ref "QuickChick.MutateCheck.mutateCheckWith"
-let mutateCheckMany = mk_ref "QuickChick.MutateCheck.mutateCheckMany"
-let mutateCheckManyWith = mk_ref "QuickChick.MutateCheck.mutateCheckManyWith"
-let sample = mk_ref "QuickChick.Generators.sampleGen"
-let quickSample = mk_ref "QuickChick.Test.quickSample"
-let sample1 = mk_ref "QuickChick.Generators.sample1"
+let show = "QuickChick.Show.show"
+let quickCheck = "QuickChick.Test.quickCheck"
+let quickCheckWith = "QuickChick.Test.quickCheckWith"
+let mutateCheck = "QuickChick.MutateCheck.mutateCheck"
+let mutateCheckWith = "QuickChick.MutateCheck.mutateCheckWith"
+let mutateCheckMany = "QuickChick.MutateCheck.mutateCheckMany"
+let mutateCheckManyWith = "QuickChick.MutateCheck.mutateCheckManyWith"
+let sample = "QuickChick.Generators.sampleGen"
+let quickSample = "QuickChick.Test.quickSample"
+let sample1 = "QuickChick.Generators.sample1"
+
+(* Apply one of these constants to its last arguments, with holes for the
+   leading ones, so that the term does not depend on the implicit status of
+   the constant's arguments, which users can change with [Arguments]. *)
+let explicit_app name args =
+  let q = qualid_of_string name in
+  let ty, _ = Typeops.type_of_global_in_context (Global.env ()) (Nametab.global q) in
+  let rec arity c = match Constr.kind c with
+    | Constr.Prod (_, _, c) -> 1 + arity c
+    | Constr.LetIn (_, _, _, c) -> arity c
+    | _ -> 0 in
+  let holes = List.init (arity ty - List.length args) (fun _ -> Compat.hole) in
+  CAst.make @@ CAppExpl ((q, None), holes @ args)
 
 (* Handle extra ocaml directory to be copied *)
 let empty_slist : string list = []           
@@ -304,7 +315,7 @@ let runTest c env evd : unit =
   (* [c] is a constr_expr representing the test to run,
      so we first build a new constr_expr representing
      show c **)
-  let c = CAst.make @@ CApp (show, [(c, None)])
+  let c = explicit_app show [c]
   in
   (* Build the kernel term from the const_expr *)
 
@@ -345,8 +356,7 @@ let run ?context f args =
     Feedback.msg_notice (Pp.str msg)
   | None -> failwith "run called with no arguments"
   end;
-  let args = List.map (fun x -> (x,None)) args in
-  let c = CAst.make @@ CApp (f, args) in
+  let c = explicit_app f args in
 #if COQ_VERSION >= (8,20, 0)
   runTest ~opaque_access c env evd
 #else
@@ -478,7 +488,7 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif warnings prop fuzzLoo
   let pair_ctr =
     CAst.make @@ CRef (qualid_of_string "Coq.Init.Datatypes.pair", None) in
   let show_expr cexpr =
-    CAst.make @@ CApp (show, [(cexpr,None)]) in
+    explicit_app show [cexpr] in
   let show_and_c_fun : constr_expr =
     Constrexpr_ops.mkCLambdaN [unit_arg] 
       (let fx = fresh_name "_qc_res" in
