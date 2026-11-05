@@ -602,10 +602,7 @@ let () =
     (String.concat "," (List.map string_of_int
       (leaf_uses !reduced_observations)));
   let wanted = ["B"; "E"; "C"; "A"; "D"] in
-  let legacy = N.possible_schedules_with_legacy_pruning
-      ~max_schedules:100000 variables hypotheses [] rec_call N.D_Gen in
   assert (List.exists (fun schedule -> source_order schedule = wanted) complete);
-  assert (not (List.exists (fun schedule -> source_order schedule = wanted) legacy));
   let unique_owners schedules =
     List.map (fun schedule -> owner_key (source_order schedule)) schedules
     |> List.sort_uniq compare in
@@ -635,7 +632,6 @@ let () =
   assert (quotient_signatures complete = quotient_signatures reduced);
   assert (same_variable_uses_per_signature
     (fun schedule -> List.hd (quotient_signatures [schedule])) complete);
-  assert (List.length (unique_owners legacy) < 16);
   let distinct_orders schedules =
     List.map source_order schedules |> List.sort_uniq compare in
   let class_sizes =
@@ -923,9 +919,8 @@ let () =
   Printf.printf "sleep-set candidates=%d, distinct orders=%d\n"
     (List.length reduced)
     (List.length (distinct_orders reduced));
-  Printf.printf "typed five-hypothesis schedule retained (%d candidates, %d owner maps; legacy %d)\n"
-    (List.length complete) (List.length (unique_owners complete))
-    (List.length (unique_owners legacy));
+  Printf.printf "typed five-hypothesis schedule retained (%d candidates, %d owner maps)\n"
+    (List.length complete) (List.length (unique_owners complete));
   let fixed_prefixes = ref [] in
   let fixed_checks = N.possible_schedules_with_advanced_pruning
       ~reduce_orderings:false

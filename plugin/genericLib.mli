@@ -185,10 +185,6 @@ val possible_schedules_with_advanced_pruning : ?max_schedules:int -> ?reduce_ord
   derive_sort -> schedule_step list list
 
 (* Regression oracle for the former chunk-insertion search. *)
-val possible_schedules_with_legacy_pruning : ?max_schedules:int -> (var * rocq_type) list ->
-  rocq_type list ->
-  var list -> constructor * int list ->
-  derive_sort -> schedule_step list list
 
 val schedule_step_to_string : schedule_step -> string
 val schedule_sort_to_string : schedule_sort -> string
