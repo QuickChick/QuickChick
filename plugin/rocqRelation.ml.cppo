@@ -1,0 +1,748 @@
+(* Names, the rocq_constr view of Coq terms, and reading inductive relations
+   into it, including Merge's declaration of a relation. *)
+open Pp
+open Error
+
+(* Keep printer and module-path APIs aligned with CoqExpr. *)
+let pr_constr_expr env sigma c =
+  Ppconstr.pr_constr_expr
+#if COQ_VERSION >= (9, 2, 0)
+    ~flags:(Ppconstr.current_flags ())
+#endif
+    env sigma c
+
+let cwd_string () =
+#if COQ_VERSION >= (9, 1, 0)
+  Libnames.string_of_path (Lib.cwd ())
+#else
+  Names.DirPath.to_string (Lib.cwd ())
+#endif
+
+let cnt = ref 0 
+
+let fresh_name n : Names.Id.t =
+    let base = Names.Id.of_string n in
+
+  (* [is_visible_name id] returns [true] if [id] is already
+     used on the Coq side. *)
+    let is_visible_name id =
+      try
+        ignore (Nametab.locate (Libnames.qualid_of_ident id));
+        true
+      with Not_found -> false
+    in
+    (* Safe fresh name generation. *)
+    Namegen.next_ident_away_from base is_visible_name
+
+let make_up_name () : Names.Id.t =
+  let id = fresh_name (Printf.sprintf "mu%d_" (!cnt)) in
+  cnt := !cnt + 1;
+  id
+
+let make_up_name_str s =
+  let id = fresh_name (Printf.sprintf "%s%d_" s (!cnt)) in
+  cnt := !cnt + 1;
+  id
+
+let str_lst_to_string sep (ss : string list) = 
+  List.fold_left (fun acc s -> acc ^ sep ^ s) "" ss
+
+(* Option monad - should probably be separated out*)
+let option_map f ox =
+  match ox with
+  | Some x -> Some (f x)
+  | None -> None
+ 
+let (>>=) m f = 
+  match m with
+  | Some x -> f x 
+  | None -> None
+ 
+let isSome m = 
+  match m with 
+  | Some _ -> true
+  | None   -> false
+              
+let foldM f b l = List.fold_left (fun accm x -> 
+                                  accm >>= fun acc ->
+                                  f acc x
+                    ) b l
+ 
+let sequenceM f l = 
+  (foldM (fun acc x -> f x >>= fun x' -> Some (x' :: acc)) (Some []) l) >>= fun l -> Some (List.rev l)
+
+let debug_mode = ref false
+
+let debug_constr (c : Constr.constr) =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  Printer.safe_pr_constr_env env sigma c
+
+(* vars and type parameters will always be "local", constructors should be global *)
+type var = Names.Id.t
+type ty_param = Names.Id.t
+type ty_ctr = Libnames.qualid
+type constructor = Libnames.qualid
+
+let var_to_string x = Names.Id.to_string x
+let var_of_string x = Names.Id.of_string x
+let var_of_id x = x
+let ty_param_to_string x = Names.Id.to_string x
+let ty_ctr_to_string x = Libnames.string_of_qualid x
+let ty_ctr_basename (x : ty_ctr) = Libnames.qualid_basename x
+(* Standard library paths written with the Coq prefix. Rocq 9 names the
+   prelude Corelib and the rest of the library Stdlib, and the Coq prefix
+   no longer resolves in references. *)
+let rocq_path s =
+#if COQ_VERSION >= (9, 0, 0)
+  let starts p = String.length s >= String.length p && String.sub s 0 (String.length p) = p in
+  let swap p q = q ^ String.sub s (String.length p) (String.length s - String.length p) in
+  if starts "Coq.Init." then swap "Coq." "Corelib."
+  else if starts "Coq.Lists." || starts "Coq.Strings." then swap "Coq." "Stdlib."
+  else s
+#else
+  s
+#endif
+
+(* Whether [s] names the library object written [path] with the Coq prefix. *)
+let is_rocq_path s path = s = path || s = rocq_path path
+
+let ty_ctr_of_string x = Libnames.qualid_of_string (rocq_path x)
+let ty_ctr_to_ctr x = x
+let constructor_to_string x = Libnames.string_of_qualid x
+let constructor_of_string x = Libnames.qualid_of_string (rocq_path x)
+
+(* Patterns in language that derivations target *)
+type pat =
+  | PCtr of constructor * pat list
+  | PVar of var
+  | PParam (* Type parameter *)
+  | PWild
+
+(* Wrapper around constr that we use to represent the types of
+   inductives and theorems that we plan to derive for or quickcheck *)
+type rocq_constr = 
+  | DArrow of rocq_constr * rocq_constr (* Unnamed arrows *)
+  | DLambda of var * rocq_constr * rocq_constr (* Named arrows *)
+  | DProd  of (var * rocq_constr) * rocq_constr (* Binding arrows *)
+  | DTyParam of ty_param (* Type parameters - for simplicity *)
+  | DTyCtr of ty_ctr * rocq_constr list (* Type Constructor *)
+  | DCtr of constructor * rocq_constr list (* Type Constructor *)
+  | DTyVar of var (* Use of a previously captured type variable *)
+  | DApp of rocq_constr * rocq_constr list (* Type-level function applications *)
+  | DMatch of rocq_constr * (pat * rocq_constr) list (* Pattern matching *)
+  | DNot of rocq_constr (* Negation as a toplevel *)
+  | DHole (* For adding holes *)
+
+let pat_to_string p =
+  let rec aux p =
+    match p with
+    | PCtr (c, ps) -> Printf.sprintf "%s %s" (constructor_to_string c) (String.concat " " (List.map aux ps))
+    | PVar v -> var_to_string v
+    | PParam -> "Param"
+    | PWild -> "_"
+  in
+  aux p
+
+let rec rocq_constr_to_string (rc : rocq_constr) : string =
+  match rc with 
+  | DArrow (rc1, rc2) ->
+     Printf.sprintf "%s -> %s" (rocq_constr_to_string rc1) (rocq_constr_to_string rc2)
+  | DLambda (x, rc1, rc2) ->
+     Printf.sprintf "fun (%s : %s) => %s" (var_to_string x) (rocq_constr_to_string rc1) (rocq_constr_to_string rc2)
+  | DProd  ((x,rc1), rc2) ->
+     Printf.sprintf "(%s : %s) -> %s" (var_to_string x) (rocq_constr_to_string rc1) (rocq_constr_to_string rc2)
+  | DTyCtr (ty_ctr, []) ->
+     ty_ctr_to_string ty_ctr
+  | DTyCtr (ty_ctr, ds) ->
+     "(" ^ ty_ctr_to_string ty_ctr ^ " " ^ String.concat " " (List.map rocq_constr_to_string ds) ^ ")"
+  | DCtr (ctr, []) ->
+     constructor_to_string ctr 
+  | DCtr (ctr, ds) ->
+     "(" ^ constructor_to_string ctr ^ " " ^ String.concat " "  (List.map rocq_constr_to_string ds) ^ ")"
+  | DTyParam tp ->
+     Printf.sprintf "(Param : %s)" (ty_param_to_string tp)
+  | DTyVar tv ->
+     var_to_string tv
+  | DApp (d, ds) ->
+     Printf.sprintf "(%s $ %s)" (rocq_constr_to_string d) (String.concat " " (List.map rocq_constr_to_string ds))
+  | DMatch (rc, pats) ->
+     Printf.sprintf "match %s with %s" (rocq_constr_to_string rc) 
+                    (String.concat " | " (List.map (fun (pat, rc) -> Printf.sprintf "%s -> %s" (pat_to_string pat) (rocq_constr_to_string rc)) pats))
+  | DNot d ->
+     Printf.sprintf "~ ( %s )" (rocq_constr_to_string d)
+  | DHole -> "_"
+
+let rocq_constr_to_pat (rc : rocq_constr) : pat = 
+  let rec aux rc = 
+    match rc with
+    | DCtr (c, ds) -> PCtr (c, List.map aux ds)
+    | DTyVar v -> PVar v
+    | DTyParam _ -> PParam
+    | DTyCtr _ -> PWild
+    | _ -> failwith ("Not a valid pattern: " ^ rocq_constr_to_string rc)
+  in
+  aux rc
+
+let type_info t = 
+  let rec type_info' (vars, hyps) = function
+    | DProd (v, t) -> type_info' (v :: vars, hyps) t
+    | DArrow (h, t) -> type_info' (vars, h :: hyps) t
+    | DTyCtr _ as concl -> (List.rev vars, List.rev hyps, concl)
+    | DNot (DTyCtr _) as concl -> (List.rev vars, List.rev hyps, concl)
+    | a -> failwith ("Not a valid type: " ^ rocq_constr_to_string a) in
+  type_info' ([], []) t
+
+type rocq_ctr = constructor * rocq_constr
+let rocq_ctr_to_string (ctr,rc) =
+  Printf.sprintf "%s : %s" (constructor_to_string ctr) (rocq_constr_to_string rc)
+
+(* This represents an inductive relation in coq, e.g. "Inductive IsSorted (t : Type) : list t -> Prop := ...".
+   This tuple is a wrapper around coq internals. *)
+type rocq_relation
+  = ty_ctr        (* The name of the relation (e.g. IsSorted) *)
+  * ty_param list (* The list of type parameters (e.g. "t" in IsSorted) *)
+  * rocq_ctr list (* A list of constructors. Each constructor is a pair (name, type) *)
+  * rocq_constr   (* The type of the overall relation (e.g. "list t -> Prop") *)
+
+let rocq_relation_to_string (ty_ctr, ty_params, ctrs, rc) = 
+  Printf.sprintf "%s %s :=\n%s\n%s" (ty_ctr_to_string ty_ctr) 
+                                    (String.concat " "  (List.map ty_param_to_string ty_params))
+                                    (String.concat "\n" (List.map rocq_ctr_to_string  ctrs))
+                                    (rocq_constr_to_string rc)
+
+(* Input : arity_ctxt [Name, Body (option) {expected None}, Type] 
+   In reverse order.
+   ASSUME: all type parameters are first
+   Output: all type parameters (named arguments of type : Type) in correct order 
+*)
+(* A sort other than Prop, SProp and Set. Rocq 9.4 elaborates [Type] with a
+   sort quality variable, which Constr.is_Type does not recognise. *)
+let is_type_sort c = match Constr.kind c with
+  | Constr.Sort s -> not (Sorts.is_prop s || Sorts.is_sprop s || Sorts.is_set s)
+  | _ -> false
+
+let dep_parse_type_params arity_ctxt =
+  let param_names =
+    foldM (fun acc decl -> 
+           match Context.Rel.Declaration.get_name decl with
+           | Names.Name id -> 
+              (* Actual parameters are named of type Type with some universe *)
+              if is_type_sort (Context.Rel.Declaration.get_type decl) then Some (id :: acc) else Some acc
+           | _ -> (* Ignore *) Some acc
+          ) (Some []) arity_ctxt in
+  param_names
+
+let rec dep_arrowify terminal names types = 
+  match names, types with
+  | [], [] -> terminal
+  | (Names.Name x)::ns , t::ts -> DProd ((x,t), dep_arrowify terminal ns ts)
+  | Names.Anonymous::ns, t::ts -> DArrow (t, dep_arrowify terminal ns ts)
+  | _, _ -> failwith "Invalid argument to dep_arrowify"
+
+(* parse a type into a rocq_constr option 
+   i : index of product (for DeBruijn)
+   nparams : number of <Type> parameters in the beginning
+   arg_names : argument names (type parameters, pattern specific variables 
+ *)
+let parse_dependent_type_internal i nparams ty oibopt arg_names =
+  let rec aux locals i ty =
+    let env = Global.env () in
+    let sigma = Evd.from_env env in
+    Error.msg_debug (str "Calling aux with: " ++ int i ++ str " "
+               ++ Printer.pr_constr_env env sigma ty ++ fnl()); 
+    if Constr.isRel ty then begin
+      Error.msg_debug (str "Rel: " ++ debug_constr ty ++ fnl ());
+      let db = Constr.destRel ty in
+      let num_local = List.length locals in
+      if num_local > 0 && db <= num_local then
+        (* It's a locally bound variable. De Bruijn 1 => local_binders.(0) *)
+        (Error.msg_debug (str "db: " ++ int db ++ str " num_local: " ++ int num_local ++ fnl());
+        (match List.nth locals (db - 1) with
+        | Names.Name name -> Some (DTyVar name)
+        | _ -> CErrors.user_err (str "Anonymous Rel encountered: " ++ (debug_constr ty) ++ fnl ())))
+      else
+        let db_global = db - num_local in
+        match oibopt with
+        | Some oib when i + nparams = db_global ->
+            (* Inductive itself. *)
+            Some (DTyCtr (Libnames.qualid_of_ident (oib.Declarations.mind_typename), []))
+        | _ ->
+            try
+              Some (List.nth arg_names (i + nparams - db_global - 1))
+            with _ ->
+              CErrors.user_err (str "nth failed (Rel): " ++ (debug_constr ty) ++ fnl ())
+      end
+    else if Constr.isApp ty then begin
+      Error.msg_debug (str "App: " ++ debug_constr ty ++ fnl ());
+      let (ctr, tms) = Compat.decompose_app_list ty in
+      foldM (fun acc ty -> 
+             aux locals i ty >>= fun ty' -> Some (ty' :: acc)
+            ) (Some []) tms >>= fun tms' ->
+      match aux locals i ctr with
+      (* [not] is a constant, but must retain its logical scheduling form. *)
+      | Some (DTyCtr (c, _)) when is_rocq_path (ty_ctr_to_string c) "Coq.Init.Logic.not" ->
+          (match List.rev tms' with
+           | [predicate] -> Some (DNot predicate)
+           | _ -> failwith "Not a valid negation")
+      | Some (DTyCtr (c, _)) -> Some (DTyCtr (c, List.rev tms'))
+      | Some (DCtr (c, _)) -> Some (DCtr (c, List.rev tms'))
+      | Some (DTyVar x) -> 
+         let xs = var_to_string x in 
+         if is_rocq_path xs "Coq.Init.Logic.not" || xs = "not" then 
+           match tms' with 
+           | [c] -> Some (DNot c)
+           | _   -> failwith "Not a valid negation"
+         else Some (DApp (DTyVar x, List.rev tms'))
+      | Some head -> CErrors.user_err (str ("QuickChick cannot read an application of " ^ rocq_constr_to_string head) ++ fnl ())
+      | None -> CErrors.user_err (str "QuickChick cannot read an application head." ++ fnl ())
+    end
+    else if Constr.isInd ty then begin
+      Error.msg_debug (str "Ind: " ++ debug_constr ty ++ fnl ());
+      let ((mind, midx),_) = Constr.destInd ty in
+      let mib = Environ.lookup_mind mind env in
+      let id = mib.mind_packets.(midx).mind_typename in
+      (* msg_debug (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
+                                                            (Id.to_string (Label.to_id (MutInd.label mind)))) ++ fnl ());*)
+      Some (DTyCtr (Libnames.qualid_of_ident id, []))
+    end
+    else if Constr.isConstruct ty then begin
+      Error.msg_debug (str "Construct: " ++ debug_constr ty ++ fnl ());
+      let (((mind, midx), idx),_) = Constr.destConstruct ty in                               
+
+      (* Lookup the inductive *)
+      let env = Global.env () in
+      Error.msg_debug (str (Printf.sprintf "ACONSTR: %s" (Names.MutInd.to_string mind)) ++ fnl ());
+      let mib = Environ.lookup_mind mind env in
+
+      (* Qualify the constructor by its inductive's module path, unless that is the
+         current module. *)
+      let names = String.split_on_char '.' (Names.MutInd.to_string mind) in
+      let prefix = List.rev (List.tl (List.rev names)) in
+      let qual = String.concat "." prefix in
+      Error.msg_debug (str (Printf.sprintf "CONSTR: %s %s" qual (cwd_string ())) ++ fnl ());
+      (* Constructor name *)
+      let cname = Names.Id.to_string (mib.mind_packets.(midx).mind_consnames.(idx - 1)) in
+      let cid = Libnames.qualid_of_string (if (qual = "") || (qual = cwd_string ())
+                             then cname else qual ^ "." ^ cname) in
+      Some (DCtr (cid, []))
+    end
+    else if Constr.isProd ty then begin
+      Error.msg_debug (str "Prod: " ++ debug_constr ty ++ fnl ());
+      let (n, t1, t2) = Constr.destProd ty in
+      (* Are the 'i's correct? *)
+      aux locals i t1 >>= fun t1' -> 
+      aux (n.Context.binder_name :: locals) i t2 >>= fun t2' ->
+      (match n.Context.binder_name with
+       | Names.Name x -> Some (DProd ((x, t1'), t2'))
+       | Names.Anonymous -> let name = make_up_name () in
+                            Some (DProd ((name, t1'), t2'))
+          (* CErrors.user_err (str "Anonymous product encountered: " ++ (debug_constr ty) ++ fnl ()) *)
+      )
+    end
+    else if Constr.isLambda ty then begin
+      Error.msg_debug (str "Lambda: " ++ debug_constr ty ++ fnl ());
+      let (x, t, e) = Constr.destLambda ty in
+      aux locals i t >>= fun t' ->
+      aux (x.Context.binder_name :: locals) i e >>= fun e' ->
+      (match x.Context.binder_name with
+      | Names.Name x -> Some (DLambda (x, t', e'))
+      | Names.Anonymous ->
+          CErrors.user_err (str "Anonymous lambda encountered: " ++ (debug_constr ty) ++ fnl ())
+      )
+    end 
+    else if Constr.isCase ty then begin
+      (* Constructs a destructor of inductive type.
+
+    [mkCase us ci params p c ac] stand for match [c] as [x] in [I args] return [p] with [ac]
+    presented as describe in [ci].
+
+    [p] structure is [args x |- "return clause"]
+
+    [ac]{^ ith} element is ith constructor case presented as
+    {e construct_args |- case_term } *)
+      let (case_info, _univs, _params, _ret_clause, _iv, discriminee, branches) = Constr.destCase ty in
+      Error.msg_debug (str "Case: " ++ debug_constr discriminee ++ fnl ());
+      let inductive = case_info.Constr.ci_ind in
+      let branches_list = List.mapi (fun idx (bindings_arr, branch) ->
+        let bindings  = Array.to_list ( bindings_arr) in
+        let branch_local_bindings : ty_param list = List.map (fun decl -> match decl.Context.binder_name with 
+                                                                          | Names.Name x -> x
+                                                                          | _ -> failwith "Anonymous binding in branch") bindings in
+        let param_count = case_info.Constr.ci_npar in
+        let arg_names = List.map (fun x -> PVar x) branch_local_bindings in
+        let empty_instance =
+#if COQ_VERSION >= (8, 19, 0)
+          UVars.Instance.empty
+#else
+          Univ.Instance.empty
+#endif
+        in
+        let constructor = Constr.mkConstructU ((inductive, idx + 1), empty_instance) in
+        let constructor_name = 
+          (match aux locals i constructor with
+          | Some (DCtr (c, [])) -> c
+          | _ -> failwith "Not a constructor")
+        in 
+        let wilds = List.init param_count (fun _ -> PWild) in
+        let pattern = PCtr (constructor_name, wilds @ arg_names) in
+        let branch_local_names : Names.Name.t list = List.map (fun name -> Names.Name.mk_name  name) branch_local_bindings in
+        let branch_rocq = 
+          (match aux (List.rev branch_local_names @ locals) i branch with
+          | Some x -> x
+          | _ -> failwith "Branch not parsed")
+        in
+        (pattern, branch_rocq))
+        (Array.to_list branches)
+      in 
+      (match aux locals i discriminee with
+      | Some discriminee_rocq -> Some (DMatch (discriminee_rocq, branches_list))
+      | _ -> failwith "Discriminee not parsed")
+    end
+    (* Rel, App, Ind, Construct, Prod *)
+    else if Constr.isConst ty then begin 
+      Error.msg_debug (str "Const: " ++ debug_constr ty ++ fnl ());
+      let (x,_) = Constr.destConst ty in 
+      (* Keep the qualified reference: a bare label may be mistaken for a binder. *)
+      Some (DTyCtr (ty_ctr_of_string (Names.Constant.to_string x), []))
+    end
+    else if Constr.isSort ty then begin
+      if Constr.is_Prop ty then
+        Some (DTyCtr (ty_ctr_of_string "Prop", []))
+      else if is_type_sort ty then
+        Some (DTyCtr (ty_ctr_of_string "Type", []))
+      else
+        CErrors.user_err (str "Sort not handled: " ++ (debug_constr ty) ++ fnl ())
+      end
+    else (
+      let env = Global.env() in
+      let sigma = Evd.from_env env in
+      CErrors.user_err (str "Dep Case Not Handled: " ++ Printer.pr_constr_env env sigma ty ++ fnl())
+    ) in
+  aux [] i ty
+
+let parse_dependent_type ty =
+
+    let (ctr_pats, result) = if Constr.isConst ty then ([],ty) else Term.decompose_prod ty in
+
+    let pat_names, pat_types = List.split (List.rev ctr_pats) in
+
+    let pat_names = List.map (fun n -> n.Context.binder_name) pat_names in
+    let arg_names = 
+      List.map (fun n -> match n with
+                         | Names.Name x -> DTyVar x 
+                         | Names.Anonymous -> DTyVar (make_up_name ()) (* Make up a name, but probably can't be used *)
+               ) pat_names in 
+
+    parse_dependent_type_internal (1 + (List.length ctr_pats)) 0 result None arg_names >>= fun result_ty ->
+    sequenceM (fun x -> x) (List.mapi (fun i ty -> parse_dependent_type_internal i 0 ty None arg_names) (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
+    Some (dep_arrowify result_ty pat_names types)
+  
+let dep_parse_type nparams param_names arity_ctxt oib =
+  let len = List.length arity_ctxt in
+  (* Types of later indices can mention earlier indices as well as parameters.
+     The de Bruijn offset below indexes the complete, declaration-order context. *)
+  let arg_names = List.rev arity_ctxt |> List.map (fun decl ->
+    let id = match Context.Rel.Declaration.get_name decl with
+      | Names.Name id -> id | Names.Anonymous -> make_up_name () in
+    if List.mem id param_names then DTyParam id else DTyVar id) in
+  foldM (fun acc (i, decl) -> 
+           let n = Context.Rel.Declaration.get_name decl in
+           let t = Context.Rel.Declaration.get_type decl in
+           Error.msg_debug (debug_constr t ++ fnl ());
+           match n with
+           | Names.Name id -> (* Check if it is a parameter to add its type / name *)
+              if is_type_sort t then Some acc 
+              else parse_dependent_type_internal i nparams t (Some oib) arg_names >>= fun dt -> Some ((n,dt) :: acc)
+           | _ ->  parse_dependent_type_internal i nparams t (Some oib) arg_names >>= fun dt -> Some ((n,dt) :: acc)
+        ) (Some []) (List.mapi (fun i x -> (len - nparams - i, x)) arity_ctxt) >>= fun nts ->
+  let (names, types) = List.split nts in
+  Some (dep_arrowify (DTyCtr (constructor_of_string "Prop", [])) names types)
+
+let eq_inductive () =
+#if COQ_VERSION >= (9, 0, 0)
+  let r = Rocqlib.lib_ref "core.eq.type" in
+#else
+  let r = Coqlib.lib_ref "core.eq.type" in
+#endif
+  Constr.mkIndU (Globnames.destIndRef r,
+#if COQ_VERSION >= (8, 19, 0)
+    UVars.Instance.empty
+#else
+    Univ.Instance.empty
+#endif
+  )
+
+let max_free_rel c =
+  let rec aux n acc c = match Constr.kind c with
+    | Constr.Rel i -> if i > n then max acc (i - n) else acc
+    | _ -> Constr.fold_constr_with_binders succ aux n acc c in
+  aux 0 0 c
+
+(* A constructor conclusion such as [R n (double n)] applies a function to its
+   variables. Scheduling needs constructor patterns there, so each maximal
+   function application [t : T] outside constructors becomes a fresh variable
+   [y : T] with the premise [y = t], which the scheduler handles like any
+   equality. Type-valued applications (parameters, indices of type families)
+   are left alone. [ctr_pats] is innermost first, as Term.decompose_prod
+   returns it, [param_pats] are the stripped parameters, and [ty_ctr] is the
+   whole constructor type, whose free variables are the block's inductives. *)
+let abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result =
+  match Constr.kind result with
+  | Constr.App (head, args) when Array.length args > nparams ->
+    let decls = List.map (fun (n, t) -> Context.Rel.Declaration.LocalAssum (n, t)) in
+    let outer = max_free_rel ty_ctr in
+    let dummy = Context.Rel.Declaration.LocalAssum (Context.annotR Names.Anonymous, Constr.mkProp) in
+    let env = Global.env ()
+      |> Environ.push_rel_context (List.init outer (fun _ -> dummy))
+      |> Environ.push_rel_context (decls param_pats)
+      |> Environ.push_rel_context (decls ctr_pats) in
+    let sigma = Evd.from_env env in
+    let call_type t =
+      match Constr.kind (fst (Compat.decompose_app_list t)) with
+      | Constr.Const _ | Constr.Proj _ ->
+        let ty = Retyping.get_type_of env sigma (EConstr.of_constr t) in
+        if Reductionops.is_arity env sigma ty then None
+        else Some (EConstr.Unsafe.to_constr ty)
+      | _ -> None in
+    let rec collect acc t =
+      match call_type t with
+      | Some ty -> (t, ty) :: acc
+      | None ->
+        let (h, xs) = Compat.decompose_app_list t in
+        if Constr.isConstruct h then List.fold_left collect acc xs else acc in
+    let indices = Array.to_list (Array.sub args nparams (Array.length args - nparams)) in
+    let calls = List.rev (List.fold_left collect [] indices) in
+    let k = List.length calls in
+    if k = 0 then (ctr_pats, result) else begin
+      let taken = List.filter_map (fun (n, _) -> match n.Context.binder_name with
+        | Names.Name id -> Some id | Names.Anonymous -> None) (ctr_pats @ param_pats) in
+      let rec fresh i taken =
+        let id = Names.Id.of_string (Printf.sprintf "qc_value%d" i) in
+        if List.mem id taken then fresh (i + 1) taken else id in
+      let names = List.rev (snd (List.fold_left (fun (taken, acc) _ ->
+        let id = fresh 0 taken in (id :: taken, id :: acc)) (taken, []) calls)) in
+      (* y_1 .. y_k, then y_j = t_j for each j; y_j is Rel k under e_1 .. e_(j-1). *)
+      let ys = List.mapi (fun i (id, (_, ty)) ->
+        (Context.annotR (Names.Name id), Vars.lift i ty)) (List.combine names calls) in
+      let eqs = List.mapi (fun j (t, ty) ->
+        let lift = Vars.lift (k + j) in
+        (Context.annotR Names.Anonymous,
+         Constr.mkApp (eq_inductive (), [| lift ty; Constr.mkRel k; lift t |]))) calls in
+      let next = ref 0 in
+      let rec replace t =
+        match call_type t with
+        | Some _ -> incr next; Constr.mkRel (2 * k - !next + 1)
+        | None ->
+          let (h, xs) = Compat.decompose_app_list t in
+          if Constr.isConstruct h && xs <> [] then
+            Constr.mkApp (h, Array.of_list (List.map replace xs))
+          else Vars.lift (2 * k) t in
+      let lifted = Array.mapi (fun i a ->
+        if i < nparams then Vars.lift (2 * k) a else replace a) args in
+      (List.rev eqs @ List.rev ys @ ctr_pats,
+       Constr.mkApp (Vars.lift (2 * k) head, lifted))
+    end
+  | _ -> (ctr_pats, result)
+
+(* Dependent version:
+   nparams is numver of Type parameters
+   param_names are type parameters (length = nparams)
+
+   Returns list of constructor representations 
+ *)
+let dep_parse_constructors ?(abstract_calls=true) nparams param_names oib : rocq_ctr list option =
+  
+  let parse_constructor branch : rocq_ctr option =
+    let (ctr_id, ty_ctr) = branch in
+
+    let (param_pats, ty) = Term.decompose_prod_n nparams ty_ctr in
+
+    let (ctr_pats, result) = if Constr.isConst ty then ([],ty) else Term.decompose_prod ty in
+    let (ctr_pats, result) =
+      if abstract_calls then abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result
+      else (ctr_pats, result) in
+
+    let pat_names, pat_types = List.split (List.rev ctr_pats) in
+
+    let pat_names = List.map (fun n -> n.Context.binder_name) pat_names in
+    let arg_names =
+      List.map (fun x -> DTyParam x) param_names @
+      List.map (fun n -> match n with
+                         | Names.Name x -> DTyVar x 
+                         | Names.Anonymous -> DTyVar (make_up_name ()) (* Make up a name, but probably can't be used *)
+               ) pat_names in 
+
+(*     msgerr (str "Calculating result type" ++ fnl ()); *)
+    parse_dependent_type_internal (1 + (List.length ctr_pats)) nparams result (Some oib) arg_names >>= fun result_ty ->
+
+(*     msgerr (str "Calculating types" ++ fnl ()); *)
+    sequenceM (fun x -> x) (List.mapi (fun i ty -> parse_dependent_type_internal i nparams ty (Some oib) arg_names) (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
+    Some (ctr_id, dep_arrowify result_ty pat_names types)
+  in
+
+  let cns = List.map Libnames.qualid_of_ident (Array.to_list oib.Declarations.mind_consnames) in
+  let lc =  List.map (fun (ctx, t) -> Term.it_mkProd_or_LetIn t ctx) (Array.to_list oib.Declarations.mind_nf_lc) in
+  sequenceM parse_constructor (List.combine cns lc)
+
+(* Given a Coq constr corresponding to the type of an inductive 
+   with n arguments, convert it to our representation. *)
+let oib_to_unparameterized_relation ?abstract_calls (oib : Declarations.one_inductive_body) : rocq_relation option =
+    (* An anonymous type input (Type -> ...) still binds a parameter used by
+       constructor types. Give it a name before building the de Bruijn map. *)
+    let oib = { oib with Declarations.mind_arity_ctxt =
+      List.map (fun decl ->
+        match Context.Rel.Declaration.get_name decl with
+        | Names.Anonymous when is_type_sort (Context.Rel.Declaration.get_type decl) ->
+          Context.Rel.Declaration.set_name (Names.Name (make_up_name ())) decl
+        | _ -> decl) oib.Declarations.mind_arity_ctxt } in
+    let ty_ctr = oib.Declarations.mind_typename in 
+    dep_parse_type_params oib.Declarations.mind_arity_ctxt >>= fun ty_params ->
+    List.iter (fun tp -> msg_debug (str (ty_param_to_string tp) ++ fnl ())) ty_params;
+    dep_parse_constructors ?abstract_calls (List.length ty_params) ty_params oib >>= fun ctr_reps ->
+    dep_parse_type (List.length ty_params) ty_params oib.Declarations.mind_arity_ctxt oib >>= fun result_ty -> 
+    Some (Libnames.qualid_of_ident ty_ctr, ty_params, ctr_reps, result_ty)
+
+let oib_to_rocq_relation (oib : Declarations.one_inductive_body) : rocq_relation option =
+    let dtype = DTyCtr (ty_ctr_of_string "Type", []) in
+    oib_to_unparameterized_relation oib >>= fun (ty_ctr, ty_params, ctr_reps, result_ty) ->
+    let ctr_reps' = List.map (fun (ctr_name, ty) -> 
+      ctr_name, dep_arrowify ty (List.map (fun n -> Names.Name n) ty_params) (List.init (List.length ty_params) (fun _ -> dtype))) ctr_reps in
+    Some (ty_ctr, ty_params, ctr_reps', result_ty)
+    
+let qualid_to_rocq_relations (r : Libnames.qualid) : (int * rocq_relation list) option =
+  (* Locate all returns _all_ definitions with this suffix *)
+  let lookup_results = Nametab.locate_all r in
+  (* We look for the first one that is an inductive *)
+
+  try begin
+    let first_ind = List.find (fun x -> match x with
+                                        | Names.GlobRef.IndRef _ -> true
+                                        | _ -> false) lookup_results in
+    match first_ind with
+    | Names.GlobRef.IndRef (mind,ix) ->
+       (* Lookup the mutual inductive body in the _global_ environment. *)
+       let mib = Environ.lookup_mind mind (Global.env ()) in
+       (* Parse each `one_inductive_body` into a rocq relation. All should succeed. *)
+       let rs = sequenceM oib_to_rocq_relation (Array.to_list mib.Declarations.mind_packets) in
+       option_map (fun r -> (ix, r)) rs
+      | _ -> failwith ("No Inductives named: " ^ Libnames.string_of_qualid r)
+    end
+  with
+    Not_found -> failwith ("No Inductives named: " ^ Libnames.string_of_qualid r)
+
+let ty_ctr_to_rocq_relations (r : ty_ctr) : (int * rocq_relation list) option =
+  qualid_to_rocq_relations r
+
+let ind_reference_to_rocq_relations (c : Constrexpr.constr_expr) : (int * rocq_relation list) option =
+  let r = match c with
+    | { CAst.v = Constrexpr.CRef (r,_);_ } -> r
+    | _ -> failwith "Not a reference"
+  in
+  qualid_to_rocq_relations r
+
+(* A single inductive relation with constructor types that do not bind its
+   parameters, as Merge reads it: conclusions keep their function calls, so the
+   merged relation keeps the constructors' shapes. *)
+let ind_reference_to_unparameterized_relation (c : Constrexpr.constr_expr) : rocq_relation option =
+  let r = match c with
+    | { CAst.v = Constrexpr.CRef (r,_);_ } -> r
+    | _ -> failwith "Not a reference" in
+  let (mind, _) = Globnames.destIndRef (Nametab.global r) in
+  let mib = Environ.lookup_mind mind (Global.env ()) in
+  if Array.length mib.Declarations.mind_packets > 1 then
+    CErrors.user_err (str "Mutual inductive types are not supported here." ++ fnl ())
+  else oib_to_unparameterized_relation ~abstract_calls:false mib.Declarations.mind_packets.(0)
+
+let locate_ind c =
+  try match Nametab.locate c with
+    | Names.GlobRef.IndRef x -> Some x
+    | _ -> None
+  with Not_found -> None
+
+let locate_constructor c =
+  try match Nametab.locate c with
+    | Names.GlobRef.ConstructRef x -> x
+    | _ -> failwith ("Not a constructor: " ^ Libnames.string_of_qualid c)
+  with Not_found -> failwith ("Constructor not found: " ^ Libnames.string_of_qualid c)
+
+let locate_constant c =
+  try match Nametab.locate c with
+    | Names.GlobRef.ConstRef x -> Some x
+    | _ -> None
+  with Not_found -> None
+
+(* The kernel term of a constructor or arity type of relation [name], whose
+   parameters [ty_params] are bound outside it. *)
+let constr_of_relation_type name ty_params (rc : rocq_constr) : Constr.t =
+  let find_param x i =
+    let rec go j = function
+      | [] -> failwith ("Parameter not found: " ^ Names.Id.to_string x)
+      | p :: ps -> if Names.Id.equal p x then Constr.mkRel (i - j) else go (j + 1) ps in
+    go 1 ty_params in
+  let find_var x i vars =
+    let rec go j = function
+      | [] ->
+        (match locate_constant (Libnames.qualid_of_ident x) with
+         | Some c -> Compat.mkConst c
+         | None -> find_param x (List.length ty_params + i))
+      | y :: ys -> if Names.Id.equal x y then Constr.mkRel (i - j) else go (j - 1) ys in
+    go (List.length vars) vars in
+  let rec aux vars i rc =
+    match rc with
+    | DArrow (rc1, rc2) ->
+      Constr.mkProd (Context.anonR, aux vars i rc1, aux (make_up_name () :: vars) (i + 1) rc2)
+    | DProd ((x, rc1), rc2) ->
+      Constr.mkProd (Context.nameR x, aux vars i rc1, aux (x :: vars) (i + 1) rc2)
+    | DTyParam tp -> find_param tp i
+    | DTyCtr (c, rcs) ->
+      let cname = Libnames.string_of_qualid c in
+      let head =
+        if cname = "Prop" then Constr.mkProp
+        else if cname = "Type" then Constr.mkType Univ.Universe.type1
+        else if cname = name then Constr.mkRel i
+        else match locate_ind c with
+          | Some ind -> Compat.mkInd ind
+          | None -> match locate_constant c with
+            | Some k -> Compat.mkConst k
+            | None -> failwith ("Not found: " ^ cname) in
+      Constr.mkApp (head, Array.of_list (List.map (aux vars i) rcs))
+    | DCtr (c, rcs) ->
+      Constr.mkApp (Compat.mkConstruct (locate_constructor c),
+                    Array.of_list (List.map (aux vars i) rcs))
+    | DTyVar x -> find_var x (i - List.length ty_params) vars
+    | DApp (rc, rcs) -> Constr.mkApp (aux vars i rc, Array.of_list (List.map (aux vars i) rcs))
+    | DNot _ | DLambda _ | DMatch _ | DHole ->
+      failwith ("Unsupported in a declared relation: " ^ rocq_constr_to_string rc) in
+  List.fold_right (fun p t -> Constr.mkProd (Context.nameR p, Constr.mkType Univ.Universe.type1, t))
+    ty_params (aux [] (List.length ty_params + 1) rc)
+
+(* Declare a single, monomorphic inductive relation. *)
+let define_new_inductive ((ty_ctr, ty_params, ctrs, typ) : rocq_relation) =
+  let open Entries in
+  let name = Libnames.string_of_qualid ty_ctr in
+  let oie =
+    { mind_entry_typename = Names.Id.of_string name
+    ; mind_entry_arity = constr_of_relation_type name ty_params typ
+    ; mind_entry_consnames = List.map (fun (c, _) -> Names.Id.of_string (Libnames.string_of_qualid c)) ctrs
+    ; mind_entry_lc = List.map (fun (_, t) -> constr_of_relation_type name ty_params t) ctrs
+    } in
+  let entry =
+    { mind_entry_record = None
+    ; mind_entry_finite = Declarations.Finite
+    ; mind_entry_params = []
+    ; mind_entry_inds = [ oie ]
+    ; mind_entry_universes = Monomorphic_ind_entry
+    ; mind_entry_variance = None
+    ; mind_entry_private = None
+    } in
+  let evd = Evd.from_env (Global.env ()) in
+  let uentry = Evd.univ_entry ~poly:
+#if COQ_VERSION >= (9, 2, 0)
+    PolyFlags.default
+#else
+    false
+#endif
+    evd in
+  Flags.quiet := false;
+  ignore (DeclareInd.declare_mutual_inductive_with_eliminations entry uentry [])

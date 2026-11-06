@@ -1,4 +1,4 @@
-open GenericLib
+open CoqExpr
 
 let gExIntro_impl (witness : coq_expr) (proof : coq_expr) : coq_expr =
   gApp (gInject "ex_intro") [hole; witness; proof]
@@ -78,11 +78,9 @@ let gIsTrueTrue =
 let false_ind x1 x2 =
   gApp (gInject "False_ind") [x1; x2]
 
-(* TODO extend gMatch to write the return type? *)
 let discriminate h =
   false_ind hole
     (gMatch h [(injectCtr "Logic.eq_refl", [], fun [] -> gI)])
-
 
 let rewrite pred h hin =
   gApp ~explicit:true (gInject "eq_ind") [hole; hole; pred; hin; hole; h]
@@ -109,7 +107,6 @@ let matchDecOpt c left right =
   gMatch c [ (injectCtr "left" , ["eq" ], left)
            ; (injectCtr "right", ["neq"], right)
            ]
-
 
   
 let plus x y =
@@ -160,10 +157,3 @@ let ltnOSn =
 let ltnOSn_pair =
   gApp ~explicit:true (gInject "ltn0Sn_pair") [hole; hole; hole]
 
-  (*
-let le_S_n hleq =
-  gApp (gInject "le_S_n") [hole; hole; hleq]
-
-let nle_succ_0 hleq =
-  gApp (gInject "PeanoNat.Nat.nle_succ_0") [hole; hleq]
-   *)

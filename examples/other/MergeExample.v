@@ -39,7 +39,7 @@ Inductive bal : nat -> Tree -> Prop :=
 | bal_node : forall n t1 t2 m,
     bal n t1 -> bal n t2 -> bal (S n) (Node m t1 t2).
 
-QCDerive (Arbitrary, Show) for Tree.
+QuickChick Derive (Arbitrary, Show) for Tree.
 
 
 
@@ -62,9 +62,9 @@ Inductive bstbal : nat -> nat -> nat -> Tree -> Prop :=
     le (S lo) x -> le (S x) hi ->
     bstbal lo hi n l -> bstbal x hi n r -> bstbal lo hi (S n) (Node x l r).
 
-QCDerive ArbitrarySizedSuchThat for (fun t => bal n t).
-QCDerive DecOpt for (bal n t).
-QCDerive EnumSizedSuchThat for (fun n => bal n t).
+QuickChick Derive ArbitrarySizedSuchThat for (fun t => bal n t).
+QuickChick Derive DecOpt for (bal n t).
+QuickChick Derive EnumSizedSuchThat for (fun n => bal n t).
 
 Definition Empty {A} (e : E A) (n : nat) : bool :=
   match (Enumerators.run e n) with
@@ -72,14 +72,14 @@ Definition Empty {A} (e : E A) (n : nat) : bool :=
   | LazyList.lcons _ _ => true
   end.
 
-QCDerive DecOpt for (le x y).
+QuickChick Derive DecOpt for (le x y).
 
-QCDerive ArbitrarySizedSuchThat for (fun x => le y x).
+QuickChick Derive ArbitrarySizedSuchThat for (fun x => le y x).
 
 QuickChickWeights [ (bst_leaf, 1) ; (bst_node, size) ].
-QCDerive ArbitrarySizedSuchThat for (fun t => bst lo hi t).
+QuickChick Derive ArbitrarySizedSuchThat for (fun t => bst lo hi t).
 
-QCDerive ArbitrarySizedSuchThat for (fun t => bstbal a b c t).
+QuickChick Derive ArbitrarySizedSuchThat for (fun t => bstbal a b c t).
 
 Sample (@arbitrarySizeST _ (fun t => bst 0 10 t) _ 5).
 
@@ -87,7 +87,7 @@ Print GenSizedSuchThatbst.
 
 Sample (@arbitrarySizeST _ (fun t => bst 0 42 t) _ 10).
 
-QCDerive DecOpt for (bst lo hi t).
+QuickChick Derive DecOpt for (bst lo hi t).
 
 Check @decOpt.
 Check GenSizedSuchThatbst.

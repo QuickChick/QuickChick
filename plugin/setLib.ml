@@ -1,4 +1,4 @@
-open GenericLib
+open CoqExpr
 
 let set_singleton (c : coq_expr) : coq_expr = gApp (gInject "set1") [c]
 let set_empty : coq_expr = gInject "set0"
@@ -62,7 +62,6 @@ let set_eq_trans x1 x2 =
 let set_incl_trans x1 x2 =
   gApp (gInject "subset_trans") [x1; x2]
 
-
 let setU_set0_l x1 x2 =
   gApp (gInject "setU_set0_l") [x1; x2]
 
@@ -120,7 +119,6 @@ let setI_subset_compat p1 p2 =
   gApp ~explicit:true (gInject "setI_subset_compat")
     [hole; hole; hole; hole; hole; p1; p2]
 
-
 let nil_subset p =
   gApp (gInject "nil_subset") [p]
 
@@ -156,7 +154,6 @@ let rewrite_set_r seq p =
 
 let rewrite_set_l seq p =
   gApp ~explicit:true (gInject "rewrite_set_l") [hole; hole; hole; hole; p; seq]
-
 
 let imset_bigcup_incl_l f a g x h =
   gApp ~explicit:true
@@ -248,8 +245,6 @@ let isSome_subset p =
     ~explicit:true (gInject "isSome_subset")
     [hole; hole; hole; hole; hole; p]
 
-
-(* let bigcup_cons_setI_subset_compat a f h1 h2 = *)
 (*   gApp *)
 (*     ~explicit:true (gInject "bigcup_cons_setI_subset_compat") *)
 (*     [a; hole; f; hole; hole; hole; hole; hole; h1; h2] *)

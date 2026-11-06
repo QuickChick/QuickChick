@@ -13,9 +13,9 @@ static u8  virgin_bits[MAP_SIZE];     /* Regions yet untouched by fuzzing */
 #define MAP_SIZE            (1 << MAP_SIZE_POW2)
 
 static void remove_shm(void) {
-
-  shmctl(shm_id, IPC_RMID, NULL);
-
+  printf("Removing SHM\n");
+  printf("Return value: %d\n", shmctl(shm_id, IPC_RMID, NULL));
+  printf("Removed SHM\n");
 }
 
 
@@ -23,12 +23,12 @@ void setup_shm(void) {
 
   u8* shm_str;
 
-  
   //  memset(virgin_tmout, 255, MAP_SIZE);
   //  memset(virgin_crash, 255, MAP_SIZE);
 
   shm_id = shmget(IPC_PRIVATE, MAP_SIZE, IPC_CREAT | IPC_EXCL | 0600);
-
+  printf("|?SHM ID: %d?|", shm_id);
+  fflush(stdout);
   if (shm_id < 0) PFATAL("shmget() failed");
 
   atexit(remove_shm);
@@ -91,7 +91,7 @@ CAMLprim value setup_shm_prim(value unit)
 
 CAMLprim value setup_shm_prim_aux(value unit)
 {
-  printf ("Preparing to setup aux...\n");
+  printf ("Peparing to setup aux...\n");
   setup_shm_aux();
   printf ("SHM Setup (aux) succesful!\n");
   return Val_unit;

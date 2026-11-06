@@ -12,8 +12,8 @@ Set Warnings "-notation-overridden,-parsing".
 Inductive list (X:Type) : Type :=
   | nil : list X
   | cons : X -> list X -> list X.
-QCDerive Arbitrary for list.
-QCDerive Show for list.
+QuickChick Derive Arbitrary for list.
+QuickChick Derive Show for list.
 Instance list_eq (X : Type) (H : forall (a b : X), Dec (a = b)) (x y : list X) : Dec (x = y).
 constructor. unfold ssrbool.decidable. repeat (decide equality). apply H. Defined.
 *)

@@ -33,7 +33,7 @@ Inductive not_In : nat -> list nat -> Prop :=
 | In_cons : forall x y l,
     not_In x l -> x <> y -> not_In x (y :: l).
 
-QCDerive DecOpt for (not_In x l).
+QuickChick Derive DecOpt for (not_In x l).
 
 
 Instance not_In_SizeMonotonic x l : DecOptSizeMonotonic (not_In x l).
@@ -46,7 +46,7 @@ Instance not_In_complete x l : DecOptCompletePos (not_In x l).
 Proof. derive_complete (). Qed.
        
 
-QCDerive EnumSizedSuchThat for (fun x => eq x n).
+QuickChick Derive EnumSizedSuchThat for (fun x => eq x n).
 
 Instance EnumSizedSuchThateq_SizedMonotonic X {_ : Enum X} (n : X) :
   SizedMonotonicOpt (@enumSizeST _ _ (EnumSizedSuchThateq n)).
@@ -60,7 +60,7 @@ Instance EnumSizedSuchThateq_Correct X `{_ : EnumMonotonicCorrect X} (n : X) :
   CorrectSizedST (fun m => eq n m) (@enumSizeST _ _ (EnumSizedSuchThateq n)).
 Proof. derive_enumST_Correct (). Qed.
 
-QCDerive EnumSizedSuchThat for (fun n => not_In n l).
+QuickChick Derive EnumSizedSuchThat for (fun n => not_In n l).
 
 Instance EnumSizedSuchThatnot_In_SizedMonotonic l :
   SizedMonotonicOpt (@enumSizeST _ _ (EnumSizedSuchThatnot_In l)).

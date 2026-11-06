@@ -10,10 +10,17 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
   open Error
   open Pp
   open Stdarg
+  open Tacarg
+  open Tacinterp
 
 }
 
+(* Coq 8.15 activates tactic grammar under the name Declare ML Module uses. *)
+#if COQ_VERSION >= (8, 16, 0)
 DECLARE PLUGIN "coq-quickchick.plugin"
+#else
+DECLARE PLUGIN "quickchick_plugin"
+#endif
 
 {
 let merge_sound =
@@ -92,196 +99,502 @@ let remember_induct h =
       )
     end 
 
-let quickchick_goal =
-  Proofview.Goal.enter begin fun gl ->
+open GenericLib
+open RelationInfo
+open ModeMemo
+open ScheduleScoring
+open ScheduleContext
+open ScheduleSelection
+open ScheduleDerivation
 
-    (* Convert goal to a constr_expr *)
+let quickchick_it size idx =
+  Proofview.Goal.enter_one begin fun gl ->
     let c = Proofview.Goal.concl gl in
     let e = Proofview.Goal.env gl in
-    let evd = Evd.from_env e in
-(*
-    (* Make an evar with the goal as the type *)
-    let evd, evar = Evarutil.new_pure_evar (Environ.named_context_val e) evd c in
+    let evd = Proofview.Goal.sigma gl in
+    reject_abstract_types e evd c;
     
-    (* Externalize it *)
-#if COQ_VERSION >= (8, 17, 0)
-    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, SList.empty)) in
-#else
-    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, [])) in
-#endif
- *)  
-  match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
-    | Some dt ->
+    let definitions = ref [] in
+    let universes = ref Univ.ContextSet.empty in
+    let prepare () = with_schedule_context e evd (fun () ->
+    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+    | Some dt -> 
       begin
-        msg_debug (str (GenericLib.dep_type_to_string dt) ++ fnl ());
+        msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
         let open GenericLib in 
-        let decide prop = decOptToBool (g_decOpt prop (gInt 1000)) in
-        let rec mkProperty = function
-          | DProd ((var, _),body) -> 
-              g_forAll g_arbitrary (gFun [var_to_string var] (fun [_] ->
-                mkProperty body
-                )) 
-          | DArrow (x,y) -> GenericLib.debug_coq_expr (gType' [] x); gIf (decide (gType' [] x)) (mkProperty y) (g_checker gTT)
-          | p -> g_checker (decide (gType' [] p)) 
-              in
-          
-     (*     | DArrow (DTyCtr (tyctr, args), y) -> gIf (decide )
-          | DTyParam typaram -> gTyParam typaram
-          | DTyCtr (tyctr, args) -> gApp (gTyCtr tyctr) (List.map mkProperty args)
-          | DCtr (ctr, args) -> gApp (gCtr ctr) (List.map mkProperty args)
-          | DTyVar var -> gVar var
-          | DApp (f, args) -> gApp (mkProperty f) (List.map mkProperty args)
-          | DNot p -> *)
-(*Use decOpt, for every arrow, assume instacne exists and match on it *)
-            
-        GenericLib.debug_coq_expr (mkProperty dt);
-        (*run the generator called checker using QuickCheck.*)
-        (*failwith "OUch!";*)
-        let to_run = GenericLib.interp_open_coq_expr e evd (g_show (g_quickCheck (mkProperty dt))) in
-        (*failwith "Oucher!";*)
-#if COQ_VERSION >= (8, 20, 0)
-        (* FRAGILE probably won't be allowed in the future? *)
-        let opaque_access = Library.indirect_accessor[@@warning "-3"] in
-        QuickChick.define_and_run ~opaque_access to_run e evd;
-#else
-        QuickChick.define_and_run to_run e evd;
-#endif
+        reset_mode_memo ();
+        inductive_set := inductive_set_init;
+        rocq_relation_memo := TyCtrMap.empty;
 
+
+        (* Index 0 needs only the best schedule; other indices need the full ranking. *)
+        let theorem_schedules = all_theorem_schedules ~best_only:(idx = 0) dt in
+
+        let selected_schedule = 
+          (match List.nth_opt theorem_schedules idx with
+          | Some (schd, _, _, inductive_memo, grade_memo_after) ->
+            mode_memo := inductive_memo;
+            grade_memo := grade_memo_after;
+            schd
+          | None -> CErrors.user_err (str (Printf.sprintf
+              "quickchick: schedule index %d was requested, but only %d theorem schedule%s available."
+              idx (List.length theorem_schedules)
+              (if List.length theorem_schedules = 1 then " is" else "s are")))) in
+
+        Feedback.msg_notice (str "Theorem Schedule:\n" ++ str (schedule_to_string selected_schedule) ++ fnl ());
+
+        (* Register theorem as a phony inductive schedule *)
+        let phony_theorem_ind_schd = ("theorem", [], [],[selected_schedule,[],[],WDefault],[]) in
+        mode_memo := InductiveScheduleKeyMap.add (ty_ctr_of_string "theorem", [], D_Thm, true) (ModeDone ((phony_theorem_ind_schd, Checking), true, None)) !mode_memo;
+
+        mode_memo := InductiveScheduleKeyMap.remove (ty_ctr_of_string "eq", [], D_Check, true) !mode_memo;
+        complete_stable_closures ();
+        let dependents, inductive_dependency_map = collect_all_used_inductive_schd_names "theorem" in
+        Error.msg_debug (str "Dependents: " ++ str (String.concat ", " dependents) ++ fnl ());
+        let components = tarjan_schedules_by_name dependents inductive_dependency_map in
+
+        let ind_schd_name = "theorem" in
+
+        Error.msg_debug (str ("Components: " ^ string_of_int (List.length components)) ++ fnl ());
+        let schedules_pieces = inductive_schedules_to_def_constr_exprs components ind_schd_name in
+
+        Feedback.msg_notice (str "Pieces: " ++ fnl ());
+        List.iter (List.iter (fun (name, constr) -> Error.msg_debug (str (var_to_string name ^ ": ") ++ str (constr_expr_to_string constr) ++ fnl ()))) schedules_pieces;
+
+        let theorem_constr = 
+          begin match List.find_opt (function [(name, _)] -> name = var_of_string "theorem" | _ -> false) schedules_pieces with
+          | Some [(_, constr)] -> constr
+          | None -> failwith "quickchick_it: Could not find theorem in schedules pieces"
+          end in
+
+        define_schedule_components ~local:true components schedules_pieces;
+
+        defined_set := VarSet.empty;
+
+        let c_theorem = theorem_constr in
+        let updated_env = schedule_env () in
+        let updated_evd = schedule_sigma updated_env in
+        let rec int_to_num i = 
+          if i = 0 then c_zero
+          else c_succ (int_to_num (i - 1))
+        in
+        msg_debug (str "Running QuickCheck" ++ fnl ());
+        let size_thm =
+          begin match size with
+          | Some s -> c_app ~explicit:false c_theorem [int_to_num s]
+          | None -> c_sized c_theorem
+          end  in 
+        (* Feedback.msg_notice (str "added size" ++ fnl ()); *)
+        let (run_evd, to_run) =
+          Constrintern.interp_constr_evars updated_env updated_evd
+            (c_show (c_quickCheck size_thm)) in
+        let to_run = inline_schedule_definitions run_evd to_run in
+        #if COQ_VERSION >= (8, 20, 0)
+          (* FRAGILE probably won't be allowed in the future? *)
+          let opaque_access = Library.indirect_accessor[@@warning "-3"] in
+          QuickChick.define_and_run ~opaque_access to_run updated_env run_evd;
+  #else
+          QuickChick.define_and_run to_run updated_env run_evd;
+  #endif
         Tacticals.tclIDTAC
+        (* end  *)
       end
-    | None -> failwith "Failed to Parse type"
+    | None -> failwith "Failed to Parse type") in
+    let previous = !proof_definitions in
+    let sigma, definitions = Vernacstate.System.protect (fun () ->
+      Fun.protect ~finally:(fun () -> proof_definitions := previous) (fun () ->
+        proof_definitions := Some (definitions, universes);
+        ignore (with_schedule_errors prepare);
+        let env = Global.env () in
+        let constants = List.filter_map (fun (_, reference) -> match reference with
+          | Names.GlobRef.ConstRef c -> Some c | _ -> None) !definitions in
+        (* Expand only this preparation's constants, including dependencies.
+           Local lets then carry no references to discarded global declarations. *)
+        let rec expand term = match Constr.kind term with
+          | Constr.Const (c, u) when List.exists (Names.Constant.CanOrd.equal c) constants ->
+              expand (Environ.constant_value_in env (c, u))
+          | _ -> Constr.map expand term in
+        let new_levels = Univ.Level.Set.diff
+          (Univ.ContextSet.levels !universes) (UGraph.domain (Evd.universes evd)) in
+        let universe_context = Univ.ContextSet.add_constraints
+          (Univ.ContextSet.constraints !universes) (Univ.ContextSet.of_set new_levels) in
+        List.fold_left (fun (sigma, acc) (name, reference) ->
+          let sigma, term = Evd.fresh_global env sigma reference in
+          let body = expand (EConstr.to_constr sigma term) in
+          sigma, acc @ [name, EConstr.of_constr body])
+          (Compat.merge_context_set evd universe_context, [])
+          (List.rev !definitions))) () in
+    Proofview.tclTHEN (Proofview.Unsafe.tclEVARS sigma)
+      (List.fold_left (fun tactic (name, body) ->
+        Proofview.tclTHEN tactic (Tactics.pose_tac (Names.Name name) body))
+        Tacticals.tclIDTAC definitions)
   end
-(*Create dependency graph, anything that lacks a dependency, print becuase we need it to *)
-(*    
-    (* Make an evar with the goal as the type *)
-    let evd, evar = Evarutil.new_pure_evar (Environ.named_context_val e) evd c in
 
-    Printf.printf "So far so good\n"; flush stdout;
-    
-    (* Externalize it *)
-#if COQ_VERSION >= (8, 17, 0)
-    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, SList.empty)) in
+(*This tactic uses the quickchick_it tactic to run all possible indices with size None, capturing the Message output and putting it into a file in the 
+current directory*)
+
+(* This tactic uses the quickchick_it tactic to run all possible indices with size None,
+   capturing the Message output and putting it into a file in the current directory *)
+
+   open Proofview.Notations
+   open Proofview
+   open Feedback
+
+let capture_output tac : unit Proofview.tactic =
+  let file = open_out_gen [Open_creat; Open_text; Open_append] 0o666 "quickchick_run_output.txt" in
+
+  let feedback_hook fb =
+    match fb.contents with
+#if COQ_VERSION >= (9, 0, 0)
+    | Feedback.Message (_lvl, _, _, ppcmds) ->
 #else
-    let ct = Constrextern.extern_constr e evd (EConstr.mkEvar (evar, [])) in
+    | Feedback.Message (_lvl, _, ppcmds) ->
 #endif
+        let s = Pp.string_of_ppcmds ppcmds in
+        output_string file (s ^ "\n"); flush file
+    | _ -> () 
+    in
+  
+  let id = Feedback.add_feeder feedback_hook in
+  output_string file "OUTSTART:::\n";
+  ignore id;
+  tac >>= fun () ->
+  output_string file "OUTEND:::\n";
+  Feedback.del_feeder id;
+  close_out file;
+  Proofview.tclUNIT ()
 
-    (* Construct : show (quickCheck (_ : ct)) *)
-    let  qct = CAst.make @@ Constrexpr.CApp (QuickChick.quickCheck, [ct, None]) in
-    let sqct = CAst.make @@ Constrexpr.CApp (QuickChick.show, [(qct,None)]) in
+let try_all_quickchick_schedules : unit Proofview.tactic =
+   (* Storage for captured messages *)
+   let captured_output = ref [] in
+   
 
-    Printf.printf "So far so good2\n"; flush stdout;
+    let feedback_hook fb =
+      match fb.contents with
+  #if COQ_VERSION >= (9, 0, 0)
+    | Feedback.Message (_lvl, _, _, ppcmds) ->
+#else
+    | Feedback.Message (_lvl, _, ppcmds) ->
+#endif
+          let s = Pp.string_of_ppcmds ppcmds in
+          (*Print captured message to file*)
 
-    (* From here on I've tried a couple of things. 
-       Calling run_test directly with qct. Fails.
-       Internalize here before calling define and run, fails.
-
-       It always seems to fail in the 'interp' phase, with an 
-       unknown existential variable error. So I'm probably doing something
-       stupid with the evar maps *)
-    let evd, to_run = Constrintern.interp_open_constr e evd sqct in
-
-    Printf.printf "So far so good 2.5\n"; flush stdout;
+          captured_output := s :: !captured_output
+      | _ -> () in
     
-    QuickChick.define_and_run to_run e evd;
 
-    Printf.printf "So far so good3\n"; flush stdout;
-
-    (* TODO: This whole block doesn't look very monadic... *)
-    Tacticals.tclIDTAC
-  end
-
-    (*
-    (* Admit a constant with that type *)
-    let tmpid = QuickChick.fresh_name "temporary_constant" in
-    let _interp_st = Vernacentries.interp (CAst.make @@ Vernacexpr.VernacExpr ([],
-      (* TODO: NoDischarge or DoDischarge? *)
-      Vernacexpr.VernacAssumption ((NoDischarge, Decl_kinds.Conjectural),
-                        NoInline,
-                        [
-                          (false,
-                           (
-                             [CAst.make tmpid, None]
-                           ,
-                             ct
-                           )
-                          )
-                        ]
-                       ))) in
-
-    let s = QuickChick.runTest @@ CAst.make @@
-      Constrexpr.CApp (QuickChick.quickCheck, [CAst.make @@ CRef (Libnames.qualid_of_ident tmpid,None), None]) in
-    (* I need to create an existential of type Checkable ct, and then
-       call QuickChick.quickChick on that in the ast, before running
-       QuickChick.runTest on the constr_expr. *)
-
+    let run_all_quickchick_it (max_index : int) : unit Proofview.tactic =
+      (let id = Feedback.add_feeder feedback_hook in
     
-    (*
+      let rec loop i =
+        if i > max_index then tclUNIT ()
+        else
+          (* Call the existing tactic here *)
+          quickchick_it None i >>= fun () ->
+          (* Capture output *)
+          loop (i + 1)
+      in
+    
+      loop 0 >>= fun () ->
+      Feedback.del_feeder id; 
+      (
+        let oc = open_out "quickchick_run_output.txt" in
+        List.iter (fun s -> output_string oc (s ^ "\n")) (List.rev !captured_output);
+        close_out oc
+      ); 
+      Proofview.tclUNIT ())
+      in
 
-       HACK (there *has* to be a better way): 
-         (\x : Checkable ct -> x) _ *)
-
-    let base = Names.Id.of_string "x" in
-    let is_visible_name id =
-      try
-        ignore (Nametab.locate (Libnames.qualid_of_ident id));
-        true
-      with Not_found -> false
-    in
-    (** Safe fresh name generation. *)
-    let xid = Namegen.next_ident_away_from base is_visible_name in
-
-    let binder_list = [CLocalAssum ([CAst.make @@ Names.Name xid], Default Explicit, ct)]  in
-    let f_body = CAst.make @@ CRef (CAst.make @@ Libnames.Ident xid,None) in
-    let f = mkCLambdaN binder_list f_body in
-    let hack_value = mkAppC (f , [ CAst.make @@ CEVarHole (None, Misctypes.IntroAnonymous, None) ] ) in
-     *)
-(*
-
-    (* Refactor - needs to see internals... *)
-    let base = Names.id_of_string "x" in
-    let is_visible_name id =
-      try
-        ignore (Nametab.locate (Libnames.qualid_of_ident id));
-        true
-      with Not_found -> false
-    in
-    (** Safe fresh name generation. *)
-    let xid = Namegen.next_ident_away_from base is_visible_name in
-
-
-    let f_body = mkAppC (QuickChick.show, [mkAppC (QuickChick.quickCheck, [mkAppC (QuickChick.mk_ref "checker", [ CRef (Ident ((Loc.dummy_loc, xid)),None) ])])]) in
-    let f = mkCLambdaN Loc.dummy_loc bind_list f_body in
-
-    let env = Global.env () in
-    let evd = Evd.from_env env in
-    let (cf,evd) = Constrintern.interp_constr env evd f in
-
-    let actual_term = Constr.mkApp (cf, Array.of_list [c]) in
- *)
-
-
-
-(*
-    let concl = Proofview.Goal.concl gl in
-    let sigma = Tacmach.project gl in
-    let hyps = named_context_val (Proofview.Goal.env gl) in
-    let store = Proofview.Goal.extra gl in
-    let env = Proofview.Goal.env gl in
-    let () = if check && mem_named_context_val id hyps then
-      errorlabstrm "Tactics.introduction"
-        (str "Variable " ++ pr_id id ++ str " is already declared.")
-    in
-    match kind_of_term (whd_evar sigma concl) with
-    | Prod (_, t, b) -> unsafe_intro env store (LocalAssum (id, t)) b
-    | LetIn (_, c, t, b) -> unsafe_intro env store (LocalDef (id, c, t)) b
-    | _ -> raise (RefinerError IntroNeedsProduct)
-  end
- *)
-
-*)
+    run_all_quickchick_it 48 (* Adjust the max index as needed *)
+ 
 }
 TACTIC EXTEND quickchick
-  | ["quickchick"] -> { quickchick_goal }
+  | ["quickchick" int_list(ois)] -> { 
+    match ois with
+    | sz :: idx :: _ -> quickchick_it (Some sz) idx
+    | x :: _ -> quickchick_it (Some x) 0
+    | [] -> quickchick_it None 0}
+END
+
+TACTIC EXTEND quickchick_idx
+  | ["quickchick_idx" int(idx)] -> { quickchick_it None idx }
+END
+
+TACTIC EXTEND try_all_quickchick_schedules
+  | ["try_all_quickchick_schedules"] -> { try_all_quickchick_schedules }
+END
+
+TACTIC EXTEND capture_output 
+  | ["capture_output" tactic(tac)] -> { 
+    capture_output (Tacinterp.tactic_of_value (default_ist ()) tac) }
+END
+
+TACTIC EXTEND schedules 
+  | ["schedules"] -> { schedules }
+END
+
+TACTIC EXTEND theorem_dependencies
+  | ["theorem_dependencies"] -> { theorem_dependencies }
+END
+
+TACTIC EXTEND valid_schedules
+  | ["valid_schedules"] -> { valid_schedules }
+END
+
+VERNAC COMMAND EXTEND Print CLASSIFIED AS SIDEFF
+ | ["Print" "Typeclasses" "for" ident(ind)] ->
+    { let ind' = Libnames.qualid_of_ident ind in 
+      ignore (GenericLib.find_typeclass_bindings ind') }
+END
+
+(*type rocq_relation
+  = ty_ctr        (* The name of the relation (e.g. IsSorted) *)
+  * ty_param list (* The list of type parameters (e.g. "t" in IsSorted) *)
+  * rocq_ctr list (* A list of constructors. Each constructor is a pair (name, type) *)
+  * rocq_constr   (* The type of the overall relation (e.g. "list t -> Prop") *)*)
+
+VERNAC COMMAND EXTEND DeriveSchedules CLASSIFIED AS SIDEFF
+   | ["Derive" "Schedules" constr(ind) int_list(ois) "consnum" int(ctr_idx) "derive" string(ds)] ->
+    { match GenericLib.ind_reference_to_rocq_relations ind with
+    | Some (idx, rs) -> 
+      let open GenericLib in
+      let (ind_name, params, constructors, result_typ) = List.nth rs idx in
+
+      (* Feedback.msg_notice (str "Inductive name: " 
+                        ++ str (ty_ctr_to_string ind_name)
+                        ++ str "\n Parameters: "
+                        ++ str (String.concat ", " (List.map ty_param_to_string params)) 
+                        ++ str "\n Result Type: "
+                        ++ str (rocq_constr_to_string result_typ) 
+                        ++ str "\n Output indices: "
+                        ++ str (String.concat ", " (List.map string_of_int ois)) 
+                        ++ str ("\n Derive Sort: " ^ ds) 
+                        ++ str "\n\n"); *)
+      let ds_string = ds in 
+      let ds = (match ds with
+      | "Check" -> D_Check
+      | "Gen" -> D_Gen
+      | "Thm" -> D_Thm
+      | "Enum" -> D_Enum
+      | _ -> failwith ("Invalid derive sort " ^ ds)) in
+
+      let rec get_result_vars = function
+      | DProd ((v,t), b) ->
+        let v = make_up_name_str ("v_" ^ var_to_string v) in
+        (v,t) :: get_result_vars b
+      | DArrow (t1, t2) ->
+        let v = make_up_name_str "v" in
+        (v,t1) :: get_result_vars t2
+      | _ -> [] in
+
+      let dtype = DTyCtr (ty_ctr_of_string "Type", []) in
+
+      let result_vars = List.map (fun p -> (p, dtype)) params @ get_result_vars result_typ in
+
+      let rec remake_result vars result = 
+        match vars, result with
+        | [], _ -> result
+        | (v,t) :: rest, DProd  (_, t') 
+        | (v,t) :: rest, DArrow (_, t') -> DProd ((v,t), remake_result rest t')
+        | _ -> failwith "remake_result failed" in
+
+      let (ctr, constructor) = List.nth constructors ctr_idx in
+
+      let output_vars = List.map fst (List.filteri (fun i _ -> List.mem i ois) result_vars) in
+
+      let scheds = UnifyQC.type_to_schedules ?select_groups:(grouped_selector ds) constructor (Some ind_name) (Some ctr) result_vars output_vars ds true in
+      
+      let rec take n l =
+        if n <= 0 then [] else
+        match l with
+        | [] -> []
+        | x :: xs -> x :: take (n - 1) xs in
+
+      let rec drop n l =
+        if n <= 0 then l else
+        match l with
+        | [] -> []
+        | x :: xs -> drop (n - 1) xs in
+
+      Feedback.msg_notice (str "Inductive name: " 
+                        ++ str (ty_ctr_to_string ind_name) 
+                        ++ str "\n Constructor Name: " 
+                        ++ str (ty_ctr_to_string ctr)
+                        ++ str "\n Parameters: "
+                        ++ str (String.concat ", " (List.map ty_param_to_string params))
+                        ++ str "\n Constructor Type: "
+                        ++ str (GenericLib.rocq_constr_to_string constructor)
+                        ++ str "\n Result Type: "
+                        ++ str (GenericLib.rocq_constr_to_string (remake_result (drop (List.length params) result_vars) result_typ))
+                        ++ str "\n Output indices: "
+                        ++ str (String.concat ", " (List.map string_of_int ois)) 
+                        ++ str ("\n Derive Sort: " ^ ds_string) 
+                        ++ str "\n\n");
+
+      List.iteri (fun i (sch,ms,eqs) -> Feedback.msg_notice (str (string_of_int i) 
+                                                          ++ str ":\n" 
+                                                          ++ str (UnifyQC.match_schedule_to_string sch ms eqs) 
+                                                          ++ str "\nconstrexpr: \n"
+                                                          ++ (UnifyQC.match_schedule_as_pp_constr_expr sch ms eqs ds)
+                                                          ++ str "\n\n===================\n" 
+                                                          ++ fnl ())) (take 300 scheds) 
+    | None -> failwith "Failed to parse inductive type" 
+    }
+END
+
+VERNAC COMMAND EXTEND DeriveValidSchedules CLASSIFIED AS SIDEFF
+   | ["Derive" "Valid" "Schedules" constr(ind) int_list(ois) "consnum" int(ctr_idx) "derive" string(ds)] ->
+    { match GenericLib.ind_reference_to_rocq_relations ind with
+    | Some (idx, rs) -> 
+      let open GenericLib in
+      let (ind_name, params, constructors, result_typ) = List.nth rs idx in
+      reset_mode_memo ();
+      Feedback.msg_notice (str "Inductive name: " 
+                        ++ str (ty_ctr_to_string ind_name)
+                        ++ str "\n Parameters: "
+                        ++ str (String.concat ", " (List.map ty_param_to_string params)) 
+                        ++ str "\n Result Type: "
+                        ++ str (rocq_constr_to_string result_typ) 
+                        ++ str "\n Output indices: "
+                        ++ str (String.concat ", " (List.map string_of_int ois))
+                        ++ str ("\n Derive Sort: " ^ ds) 
+                        ++ str "\n\n");
+
+      let ds = (match ds with
+      | "Check" -> D_Check
+      | "Gen" -> D_Gen
+      | "Thm" -> D_Thm
+      | "Enum" -> D_Enum
+      | _ -> failwith ("Invalid derive sort " ^ ds)) in
+
+      let rec get_result_vars = function
+      | DProd ((v,t), b) ->
+        let v = make_up_name_str ("v_" ^ var_to_string v) in
+        (v,t) :: get_result_vars b
+      | DArrow (t1, t2) ->
+        let v = make_up_name_str "v" in
+        (v,t1) :: get_result_vars t2
+      | _ -> [] in
+
+      let result_vars = List.map (fun v -> (v,DHole)) params @ get_result_vars result_typ in
+
+      let rec remake_result vars result = 
+        match vars, result with
+        | [], _ -> result
+        | (v,t) :: rest, DProd  (_, t') 
+        | (v,t) :: rest, DArrow (_, t') -> DProd ((v,t), remake_result rest t')
+        | _ -> failwith ("remake_result failed on: " ^ rocq_constr_to_string result) in
+
+      let (ctr, constructor) = List.nth constructors ctr_idx in
+
+      let output_vars = List.map fst (List.filteri (fun i _ -> List.mem i ois) result_vars) in
+
+      let rec take n l =
+        if n <= 0 then [] else
+        match l with
+        | [] -> []
+        | x :: xs -> x :: take (n - 1) xs in
+
+      let rec drop n l =
+        if n <= 0 then l else
+        match l with
+        | [] -> []
+        | x :: xs -> drop (n - 1) xs in
+
+      Feedback.msg_notice (str "Inductive name: " 
+                        ++ str (ty_ctr_to_string ind_name) 
+                        ++ str "\n Constructor Name: " 
+                        ++ str (ty_ctr_to_string ctr)
+                        ++ str "\n Parameters: "
+                        ++ str (String.concat ", " (List.map ty_param_to_string params))
+                        ++ str "\n Constructor Type: "
+                        ++ str (GenericLib.rocq_constr_to_string constructor)
+                        ++ str "\n Result Type: "
+                        ++ str (GenericLib.rocq_constr_to_string (remake_result (drop (List.length params) result_vars) result_typ))
+                        ++ str "\n Output indices: "
+                        ++ str (String.concat ", " (List.map string_of_int ois)) 
+                        ++ str "\n\n");
+
+      grade_memo := RelationInstMap.empty;
+      clear_inductive_name_cache ();
+      clear_schedule_instance_cache ();
+      Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
+      let schedules_w_densities =
+        match Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" with
+        | Some ("1" | "true" | "yes" | "verify" | "baseline") ->
+          (fun (_, scored, _) -> scored) (constructor_valid_schedules ind_name (ctr, constructor)
+            result_vars output_vars ds true)
+          |> List.map (fun (i, scored, _, _) -> i, scored)
+          |> take 300
+        | _ ->
+          let scheds = UnifyQC.type_to_schedules ?select_groups:(grouped_selector ds)
+            constructor (Some ind_name) (Some ctr) result_vars output_vars ds true in
+          let schedules = take 300 scheds in
+          let schedules' = List.map (fun ((steps, sort), ms, eqs) ->
+            (List.map (fun (v,p) -> S_Match (v,p)) ms,
+             (List.map check_eq eqs @ steps, sort))) schedules in
+          List.mapi (fun i (ms_steps, schd) ->
+            i, grade_schedule ms_steps schd) schedules' in
+      let sorted = sort_schedules_by_density_and_var_uses schedules_w_densities ds in
+
+      List.iter (fun ((steps_ds, sort), density, num_var_uses, id) ->
+
+        Feedback.msg_notice (str (string_of_int id ^ ":\n" ) ++ fnl ());
+        Feedback.msg_notice (str ("# var uses: " ^ string_of_int num_var_uses ^ "density:" ^ density_to_string density ^ "\n") ++
+                            str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") ++                                           
+                            str "\nconstrexpr: \n" ++ 
+                            UnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] ds
+                                                        ++ str "\n==============================================\n")) sorted
+
+    | None -> failwith "Failed to parse inductive type" 
+    }
+END
+
+      
+
+VERNAC COMMAND EXTEND DeriveUsedInds CLASSIFIED AS SIDEFF
+   | ["Derive" "Used" "Inds" constr(ind)] ->
+    { match GenericLib.ind_reference_to_rocq_relations ind with
+    | Some (idx, rs) ->
+        let (ind_name, params, constructors, result_typ) = List.nth rs idx in
+        (match get_inductive_name ind_name with
+        | Some i -> print_type_names (List.map (fun (n,_,_,_) -> n) (seek_rocq_relations i))
+        | None -> failwith "Failed to get inductive name")
+    | None -> failwith "Failed to parse inductive type"  
+    }
+END
+
+VERNAC COMMAND EXTEND DeriveDensity CLASSIFIED AS SIDEFF
+   | ["Derive" "Density" constr(ind) int_list(ois) "derive" string(ds)] ->
+    { match GenericLib.ind_reference_to_rocq_relations ind with
+    | Some (idx, rs) ->
+      reset_mode_memo ();
+      inductive_set := inductive_set_init;
+      rocq_relation_memo := TyCtrMap.empty;
+      (* inductive_dependency_map := StringMap.empty; *)
+      let (ind_name, params, constructors, result_typ) = List.nth rs idx in
+      let ds = (match ds with
+      | "Check" -> D_Check
+      | "Gen" -> D_Gen
+      | "Enum" -> D_Enum
+      | _ -> failwith "Can only derive inductive schedules for Check, Gen, or Enum") in
+      let (inductive_schedule, density) = inductive_best_valid_schedule (ind_name, params, constructors, result_typ) ois ds true in
+      (* Feedback.msg_notice (str "Inductive Schedule:\n" ++ str (inductive_schedule_to_string inductive_schedule) ++ fnl ()); *)
+      Feedback.msg_notice (str "Density: " ++ str (density_to_string density) ++ fnl ())
+
+    | None -> failwith "Failed to parse inductive type" 
+    }
+END
+
+VERNAC COMMAND EXTEND DeriveInductiveSchedule CLASSIFIED AS SIDEFF
+   | ["Derive" "Inductive" "Schedule" constr(ind) int_list(ois) "derive" string(ds) "opt" string(opt)] ->
+    { let ds = match ds with
+      | "Check" -> D_Check | "Gen" -> D_Gen | "Enum" -> D_Enum
+      | _ -> CErrors.user_err (str "Expected Check, Gen, or Enum") in
+      let opt = match opt with
+      | "true" -> true | "false" -> false
+      | _ -> CErrors.user_err (str "Opt must be true or false") in
+      derive_schedule ind ois ds opt }
 END
 
 TACTIC EXTEND merge_sound_core

@@ -16,36 +16,36 @@ Inductive Zoo (A : Type) {B : Type}: Type :=
 | Zoo4 : Zoo A.
 
 (** Generators for type  *)
-QCDerive Arbitrary for Zoo.
+QuickChick Derive Arbitrary for Zoo.
 (* 
 genSZoo is defined
 shrZoo is defined
 *)
 
 (** Size of type *)
-QCDerive Sized for Zoo.
+QuickChick Derive Sized for Zoo.
 (*
 SizedZoo is defined
 *)
 
 (** Size equations *)
-QCDerive CanonicalSized for Zoo.
+QuickChick Derive CanonicalSized for Zoo.
 (*
 CanonicalSizedZoo is defined
  *)
 
-QCDerive SizeMonotonic for Zoo using genSZoo.
+QuickChick Derive SizeMonotonic for Zoo using genSZoo.
 (*
 SizeMonotonicZoo is defined
  *)
 
-QCDerive SizedMonotonic for Zoo.
+QuickChick Derive SizedMonotonic for Zoo.
 
 (*
 SizedMonotonicZoo is defined
 *)
 
-QCDerive SizedCorrect for Zoo using genSZoo and SizeMonotonicZoo.
+QuickChick Derive SizedCorrect for Zoo using genSZoo and SizeMonotonicZoo.
 (*
 SizedCorrectZoo is defined
 *)

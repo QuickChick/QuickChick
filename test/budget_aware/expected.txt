@@ -1,0 +1,15 @@
+pinned-positions: [0]
+unpinned-positions: []
+mixed-check: 0,3,0,1,1,2
+type-parameter: 0,3,0,1,1,1
+checker-arbitrary: 0,0,1,1,0,0
+checker-dependency: 0,3,5,1,0,0
+generator-dependency: 0,1,0,1,0,0
+recursive: 0,1,0,0,0,0
+same-relation: 0,1,0,2,0,0
+loose-pinned: 1,3,0,1,0,1
+loose-two-pins: 1,3,0,1,0,2
+finite-producer: 0,1,0,1,0,0
+best-leaf: 0,1,0,1,0,0
+uncovered: 0,1,0,0,0,0
+inductive: 0,1,0,1,0,0

@@ -1,6 +1,6 @@
 open Pp
 open Util
-open GenericLib
+open CoqExpr
 open SetLib
 open CoqLib
 open Feedback

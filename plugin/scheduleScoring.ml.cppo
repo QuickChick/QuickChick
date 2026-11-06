@@ -1,0 +1,751 @@
+(* Schedule rankings: density, BudgetAware, compiled Rocq policies and
+   cardinality, and ordering candidates by them. *)
+open Error
+open Pp
+open GenericLib
+open RelationInfo
+open ModeMemo
+(* A step grade as a scoring policy sees it. *)
+let policy_grade = function
+  | Checking -> PolicyViews.Checking
+  | Backtracking -> PolicyViews.Backtracking
+  | Neutral -> PolicyViews.Neutral
+  | Partial -> PolicyViews.Partial
+  | Total -> PolicyViews.Total
+
+(* [QuickChick Scorer budget_aware] ranks constructor schedules by Specimen's
+   completed BudgetAware score instead of the density ranking. *)
+let budget_aware_ranking () =
+  ScheduleRanking.current_scorer () = ScheduleRanking.BudgetAware
+
+(* A dependency's completed BudgetAware score in the current memo. Only a
+   completed, cycle-independent entry counts. Recursive, in-progress and
+   cycle-dependent calls, and existing instances with no measured schedule,
+   are unknown; the scorer then uses Specimen's Partial token. *)
+let budget_dependency_score (request : BudgetAwareScore.dependency_request) =
+  let key = request.BudgetAwareScore.key in
+  let find constrained =
+    let memo_key = (key.BudgetAwareScore.relation, key.BudgetAwareScore.output_indices,
+      key.BudgetAwareScore.derive_sort, constrained) in
+    let entry = InductiveScheduleKeyMap.find_opt memo_key !mode_memo in
+    record_mode_read memo_key entry;
+    entry in
+  match find true, find false with
+  | Some (ModeDone (_, true, Some (BudgetScore score))), _ -> Some score
+  | _, Some (ModeDone (_, true, Some (BudgetScore score))) -> Some score
+  | _ -> None
+
+(* [QuickChick Scorer <policy>] ranks constructor schedules by a compiled
+   Rocq policy. *)
+let compiled_ranking () =
+  match ScheduleRanking.current_scorer () with
+  | ScheduleRanking.Compiled key ->
+    (match PolicyRegistry.find key with
+     | Some policy -> Some policy
+     | None -> CErrors.user_err (str "The selected Rocq scorer is not loaded."))
+  | _ -> None
+
+(* A compiled policy's declared grouping, as the grouped search uses it. *)
+let compiled_group_policy (g : PolicyRegistry.score PolicyViews.grouping) =
+  { GroupedScore.unit = g.PolicyViews.group_unit;
+    combine = g.PolicyViews.group_combine;
+    fields = List.map (fun (kind, compare) ->
+      (match kind with
+       | PolicyViews.Additive -> GroupedScore.Additive
+       | PolicyViews.Extremal -> GroupedScore.Extremal),
+      (fun a b -> match compare a b with
+       | PolicyViews.Lt -> -1 | PolicyViews.Eq -> 0 | PolicyViews.Gt -> 1))
+      g.PolicyViews.group_fields }
+
+(* [QuickChick Scorer cardinality] ranks constructor schedules by
+   CardinalityScore: filters counted by acceptance class. *)
+let cardinality_ranking () =
+  ScheduleRanking.current_scorer () = ScheduleRanking.Cardinality
+
+(* Growth class of an inductive type, given its parameters' classes. A
+   constructor argument of the same mutual block is a recursive occurrence;
+   any other argument contributes its own class. Without recursive
+   constructors the type is a finite sum of products; one recursive
+   constructor with one recursive argument and constant other arguments is
+   linear (POLY); any other recursion branches (EXP). *)
+let cardinality_type_cache = Hashtbl.create 64
+
+(* Class of a constructor argument type [arg], under [depth] binders of which
+   the first [np] are the parameters of inductive [ind], with classes
+   [params]. A type of [ind]'s own mutual block is a recursive occurrence. *)
+let rec cardinality_argument ind np params depth arg =
+  let head, args = Compat.decompose_app arg in
+  match Constr.kind head with
+  | Constr.Ind ((m, _), _) when Names.MutInd.CanOrd.equal m (fst ind) -> `Rec
+  | Constr.Ind (i, _) ->
+    let np' = (Environ.lookup_mind (fst i) (Global.env ())).Declarations.mind_nparams in
+    let ps = List.filteri (fun k _ -> k < np') (Array.to_list args) in
+    `Cls (cardinality_inductive_class i (List.map (fun a ->
+      match cardinality_argument ind np params depth a with
+      | `Cls c -> c | `Rec -> None) ps))
+  | Constr.Rel k ->
+    let binder = depth - k in
+    `Cls (if binder >= 0 && binder < np
+          then Stdlib.Option.join (List.nth_opt params binder) else None)
+  | _ -> `Cls None
+
+(* The argument classes of each constructor of [ind] given [params]: a list
+   of `Rec or `Cls per non-parameter argument. *)
+and cardinality_constructor_arguments ind params =
+  let mib = Environ.lookup_mind (fst ind) (Global.env ()) in
+  let np = mib.Declarations.mind_nparams in
+  let oib = mib.Declarations.mind_packets.(snd ind) in
+  let rec walk depth ty = match Constr.kind ty with
+    | Constr.Prod (_, _, body) when depth < np -> walk (depth + 1) body
+    | Constr.Prod (_, arg, body) ->
+      cardinality_argument ind np params depth arg :: walk (depth + 1) body
+    | Constr.LetIn (_, _, _, body) -> walk (depth + 1) body
+    | _ -> [] in
+  Array.to_list (Array.map (walk 0) oib.Declarations.mind_user_lc)
+
+and cardinality_inductive_class (ind : Names.inductive) params =
+  let open CardinalityScore in
+  let key = (Names.MutInd.to_string (fst ind), snd ind, params) in
+  match Hashtbl.find_opt cardinality_type_cache key with
+  | Some c -> c
+  | None ->
+    (* A nested occurrence under classification is unknown, not a loop. *)
+    Hashtbl.replace cardinality_type_cache key None;
+    let ctors = List.map (fun args ->
+      List.fold_left (fun (recs, rest) -> function
+        | `Rec -> recs + 1, rest
+        | `Cls c -> recs, times_opt rest c) (0, Some One) args)
+      (cardinality_constructor_arguments ind params) in
+    let result =
+      if List.exists (fun (_, rest) -> rest = None) ctors then None else
+      let rests = List.map (fun (_, rest) -> Stdlib.Option.get rest) ctors in
+      let recursive = List.filter (fun (recs, _) -> recs > 0) ctors in
+      if recursive = [] then
+        Some (match rests with [] -> One | r :: rs -> List.fold_left plus r rs)
+      else if List.length recursive >= 2 ||
+              List.exists (fun (recs, rest) -> recs >= 2 || rest <> Some One) recursive
+      then Some Exp else Some Poly in
+    Hashtbl.replace cardinality_type_cache key result;
+    result
+
+let rec cardinality_type_class (ty : rocq_constr) = match ty with
+  | DTyCtr (name, args) when is_inductive' name ->
+    (match get_inductive_name name with
+     | Some ind ->
+       let np = (Environ.lookup_mind (fst ind) (Global.env ())).Declarations.mind_nparams in
+       cardinality_inductive_class ind
+         (List.map cardinality_type_class (List.filteri (fun k _ -> k < np) args))
+     | None -> None)
+  | _ -> None
+
+(* A pattern does not record its type's parameters, so arguments whose type
+   mentions a parameter have unknown class. *)
+let cardinality_constructor c =
+  match Nametab.locate (Libnames.qualid_of_string (constructor_to_string c)) with
+  | Names.GlobRef.ConstructRef (ind, j) ->
+    let mib = Environ.lookup_mind (fst ind) (Global.env ()) in
+    let np = mib.Declarations.mind_nparams in
+    let oib = mib.Declarations.mind_packets.(snd ind) in
+    let args = List.nth (cardinality_constructor_arguments ind (List.init np (fun _ -> None))) (j - 1) in
+    let own = cardinality_inductive_class ind (List.init np (fun _ -> None)) in
+    Some { CardinalityScore.params = np;
+           arg_classes = List.map (function `Cls c -> c | `Rec -> own) args;
+           single = Array.length oib.Declarations.mind_consnames = 1 }
+  | _ -> None
+  | exception Not_found -> None
+
+(* How many values the subterm at argument [i] and constructor [path] of a
+   relation can take when everything else in the relation is fixed, from the
+   relation's definition. Per constructor: a conclusion whose structure
+   disagrees with the path cannot match; variables of the target subterm that
+   also occur elsewhere in the conclusion are fixed; a variable that a
+   positive hypothesis pins down from fixed variables takes that hypothesis's
+   conditional count (a recursive call to the same slot recurses on a smaller
+   structure and counts one); any other variable is free and takes its type's
+   class. Constructors are alternatives. *)
+let cardinality_conditional_memo = Hashtbl.create 64
+
+let rec cardinality_conditional rel i path =
+  let open CardinalityScore in
+  let key = (ty_ctr_to_string rel, i,
+             List.map (fun (c, k) -> constructor_to_string c, k) path) in
+  match Hashtbl.find_opt cardinality_conditional_memo key with
+  | Some c -> c
+  | None ->
+    Hashtbl.replace cardinality_conditional_memo key (Some One);
+    let result = try
+      let (_, _, ctrs, _) = ty_ctr_to_rocq_relation rel in
+      let counts = List.filter_map (fun (_, ty) -> cardinality_conditional_constructor ty i path) ctrs in
+      (match counts with
+       | [] -> Some One
+       | c :: cs -> List.fold_left (fun acc c -> match acc, c with
+           | Some a, Some b -> Some (plus a b) | _ -> None) c cs)
+    with Noninductive_dependency _ | Failure _ | Not_found -> None in
+    Hashtbl.replace cardinality_conditional_memo key result;
+    result
+
+(* None when the constructor cannot match the path; Some count otherwise. *)
+and cardinality_conditional_constructor ty i path =
+  let open CardinalityScore in
+  let rec parts = function
+    | DProd ((v, t), body) -> let bs, hs, c = parts body in (v, t) :: bs, hs, c
+    | DArrow (h, body) -> let bs, hs, c = parts body in bs, h :: hs, c
+    | DTyCtr (_, args) -> [], [], Some args
+    | _ -> [], [], None in
+  let binders, hyps, conclusion = parts ty in
+  match conclusion with
+  | None -> Some None
+  | Some args ->
+    let rec follow term path = match path, term with
+      | [], t -> `Term t
+      | (c, k) :: rest, DCtr (c', sub) ->
+        if constructor_to_string c = constructor_to_string c' then
+          (match List.nth_opt sub k with Some t -> follow t rest | None -> `Mismatch)
+        else `Mismatch
+      | _ :: _, DTyVar w -> `Term (DTyVar w)
+      | _ -> `Mismatch in
+    let rec replace term path = match path, term with
+      | [], _ -> DHole
+      | (_, k) :: rest, DCtr (c', sub) ->
+        DCtr (c', List.mapi (fun j t -> if j = k then replace t rest else t) sub)
+      | _, t -> if path = [] then DHole else (match t with DTyVar _ -> DHole | t -> t) in
+    match List.nth_opt args i with
+    | None -> Some None
+    | Some arg ->
+      match follow arg path with
+      | `Mismatch -> None
+      | `Term target ->
+        let others = List.mapi (fun j a -> if j = i then replace a path else a) args in
+        let known = ref (List.concat_map CardinalityScore.term_vars others) in
+        let target_vars = List.sort_uniq Stdlib.compare (CardinalityScore.term_vars target) in
+        let unknown = List.filter (fun v -> not (List.mem v !known)) target_vars in
+        let counts = Hashtbl.create 8 in
+        let positive = List.filter_map (function
+          | DTyCtr (r, a) -> Some (r, a) | _ -> None) hyps in
+        let progress = ref true in
+        while !progress do
+          progress := false;
+          List.iter (fun (r, a) ->
+            let vars = List.sort_uniq Stdlib.compare (List.concat_map CardinalityScore.term_vars a) in
+            match List.filter (fun v -> not (List.mem v !known)) vars with
+            | [u] ->
+              let occurrence = List.concat (List.mapi (fun j t ->
+                List.map (fun p -> j, p) (CardinalityScore.occurrences u t)) a) in
+              (match occurrence with
+               | (j, p) :: _ ->
+                 Hashtbl.replace counts u (cardinality_conditional r j p);
+                 known := u :: !known;
+                 progress := true
+               | [] -> ())
+            | _ -> ()) positive
+        done;
+        let count = List.fold_left (fun acc v ->
+          let c = match Hashtbl.find_opt counts v with
+            | Some c -> c
+            | None -> (match List.assoc_opt v binders with
+                | Some t -> cardinality_type_class t
+                | None -> None) in
+          match acc, c with
+          | Some a, Some b -> Some (times a b) | _ -> None) (Some One) unknown in
+        Some count
+
+(* Solution counts of completed modes, by relation, output positions and sort. *)
+let cardinality_counts : (string * int list * derive_sort, CardinalityScore.cls) Hashtbl.t =
+  Hashtbl.create 64
+
+let cardinality_shapes :
+  (string * int list * derive_sort, (rocq_constr list * CardinalityScore.cls) list) Hashtbl.t =
+  Hashtbl.create 64
+
+let cardinality_count_key rel outputs ds =
+  match get_inductive_name rel with
+  | Some ind -> Some (Names.MutInd.to_string (fst ind) ^ "#" ^ string_of_int (snd ind),
+                      List.sort_uniq Stdlib.compare outputs, ds)
+  | None -> None
+
+let cardinality_mode_count rel outputs ds =
+  if GenericLib.is_rocq_path (ty_ctr_to_string rel) "Coq.Init.Logic.eq" || ty_ctr_to_string rel = "eq" then
+    (if List.length outputs <= 1 then Some CardinalityScore.One else None)
+  else if ds = D_Check then Some CardinalityScore.One
+  else match cardinality_count_key rel outputs ds with
+    | Some key -> Hashtbl.find_opt cardinality_counts key
+    | None -> None
+
+let cardinality_mode_shapes rel outputs ds =
+  match cardinality_count_key rel outputs ds with
+  | Some key -> Hashtbl.find_opt cardinality_shapes key
+  | None -> None
+
+let cardinality_context recursive_count = {
+  CardinalityScore.type_class = cardinality_type_class;
+  mode_count = cardinality_mode_count;
+  recursive_count;
+  constructor = cardinality_constructor;
+  mode_shapes = cardinality_mode_shapes;
+  conditional = cardinality_conditional }
+
+let rec conclusion_arguments = function
+  | DProd (_, body) | DArrow (_, body) -> conclusion_arguments body
+  | DTyCtr (_, args) -> args
+  | _ -> []
+
+(* A self-recursive producer's fan-out is bounded by its output types. *)
+let cardinality_recursive_count result_vars output_vars =
+  List.fold_left (fun acc (v, ty) ->
+    if List.mem v output_vars then CardinalityScore.times_opt acc (cardinality_type_class ty)
+    else acc) (Some CardinalityScore.One) result_vars
+
+(*Three heuristics detecting difficult to generate rules*)
+let rec is_output_constrained_in_hypothesis ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
+  let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
+  let output_index_hyps = List.concat_map (fun (ind, args) -> fst (split_indices args ois)) recursive_hyps in
+  if List.exists (fun arg -> match arg with
+    | Constrained _ -> true
+    | Unconstrained _ -> false) output_index_hyps
+    then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": output constrained in hypothesis") ++ fnl ()); true) else false
+
+and is_output_hyps_require_unification ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
+  let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
+  let collect_vars = function
+    | Constrained (args,_) -> args
+    | Unconstrained arg -> [arg] in
+  let output_index_hyps : ty_param list list = List.map (fun (ind,args) -> List.concat_map collect_vars (fst (split_indices args ois))) recursive_hyps in
+  Feedback.msg_notice (str (String.concat ", " (List.map string_of_int ois)) ++ fnl ());
+  if not_pairwise_disjoint output_index_hyps then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": output hyps require unification") ++ fnl ()); true) else false
+
+and is_input_conclusion_require_unification ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
+  let conclusion_args = snd conc in
+  let (_,input_conc_args) = split_indices conclusion_args ois in
+  let collect_vars = function
+    | Constrained (args,_) -> args
+    | Unconstrained arg -> [arg] in
+  let all_input_conc_vars = List.concat_map collect_vars input_conc_args in
+  if has_duplicates all_input_conc_vars then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": input conc requires unification") ++ fnl ()); true) else false
+
+and are_functions_constraining_conclusion_inputs_or_hyp_outputs ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
+  let conclusion_args = snd conc in
+  let (_,input_conc_args) = split_indices conclusion_args ois in
+  let fun_constrained = function
+    | Constrained (args, FunConstraint) | Constrained (args, FunConConstraint) -> true
+    | _ -> false in
+  if List.exists fun_constrained input_conc_args then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": functions constrain conclusion inputs") ++ fnl ()); true) else
+  let recursive_hyps = List.filter (fun (ind, args) -> ind = ind_name) hyps in
+  let output_index_hyps : constrained_arg list list = List.map (fun (ind, args) -> fst (split_indices args ois)) recursive_hyps in
+  if List.exists (fun args -> List.exists fun_constrained args) output_index_hyps then (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": functions constrain hypothesis outputs") ++ fnl ()); true) else false
+
+and nonrecursive_disjoint_strictly_output_vars ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : (ty_ctr * (output_index * ty_param) list) list =
+  let (conclusion_output_args,conclusion_input_args) = split_indices (snd conc) ois in
+  let args_to_vars arg_list = List.concat_map (function Constrained (args,_) -> args | Unconstrained arg -> [arg]) arg_list in
+  let conclusion_output_vars = args_to_vars conclusion_output_args in
+  let conclusion_input_vars = args_to_vars conclusion_input_args in
+  let (nonrecursive_hyps, recursive_hyps) = List.partition (fun (ind, args) -> ind <> ind_name) hyps in
+  let recursive_output_vars = List.concat_map (fun (ind, args) -> args_to_vars (fst (split_indices args ois))) recursive_hyps in
+  let nonrecursive_output_vars = List.map (fun (ind, args) -> 
+    let numbered_args = List.mapi (fun i arg -> (i, arg)) args in
+    let unconstrained_vars = List.concat_map (function (n,Unconstrained arg) -> [(n,arg)] | _ -> []) numbered_args in
+    let unconstrained_output_vars = List.filter (fun (_,v) -> List.mem v conclusion_output_vars) unconstrained_vars in
+    let unconstrained_output_noninput_vars = List.filter (fun (_,v) -> not (List.mem v conclusion_input_vars)) unconstrained_output_vars in
+    let unconstrained_disjoint_output_noninput_vars = List.filter (fun (_,v) -> not (List.mem v recursive_output_vars)) unconstrained_output_noninput_vars in
+    ind,unconstrained_disjoint_output_noninput_vars) nonrecursive_hyps in
+  nonrecursive_output_vars
+  
+and filter_nonrecursive_empty_densities (nonrecurse : (ty_ctr * (output_index * ty_param) list)) =
+  let (ind, output_vars) = nonrecurse in
+  let rocq_relation = ty_ctr_to_rocq_relation ind in
+  let output_subsets = subsets output_vars in
+  let filtered_ovars = List.filter_map (fun ois_vars ->
+    let density = final_density rocq_relation (List.map fst ois_vars) false D_Gen in
+    match density with
+    | Checking -> None
+    | Backtracking | Partial | Neutral | Total -> Some (ois_vars, density)) output_subsets in
+  ind,filtered_ovars
+
+and nonrecursive_binding (nonrecursives : (ty_ctr * ((output_index * ty_param) list * rule_density) list) list) : ((ty_ctr * (output_index * ty_param) list * rule_density) list) option =
+  match nonrecursives with
+  | [] -> Some []
+  | (ind, []) :: rest -> None
+  | (ind, (oi_vs,Partial) :: ovars) :: rest ->
+    let updated_rest = List.map (fun (ind, ovars) -> (ind, List.filter (fun (oi_vs',_) -> not (has_intersection oi_vs oi_vs')) ovars)) rest in
+    (match nonrecursive_binding updated_rest with
+    | None -> nonrecursive_binding ((ind, ovars) :: rest)
+    | Some bindings -> Some ((ind, oi_vs, Partial) :: bindings))
+  | (ind, (oi_vs,Backtracking) :: ovars) :: rest -> 
+    let updated_rest = List.map (fun (ind, ovars) -> (ind, List.filter (fun (oi_vs',_) -> not (has_intersection oi_vs oi_vs')) ovars)) rest in
+    (match nonrecursive_binding ((ind,ovars) :: rest) with
+     | Some ((ind',oi_vs',Partial) :: bindings) -> Some ((ind', oi_vs', Partial) :: bindings)
+     | _ -> (match nonrecursive_binding updated_rest with | None -> None | Some bindings -> Some ((ind, oi_vs, Backtracking) :: bindings)) 
+    )
+    
+and is_nonrecursive_checked_or_overlapping_or_empty ((ind_name, ctr_name, arity, hyps, conc) : rule) (ois : output_index list) : bool =
+  let nonrecursive_output_vars = nonrecursive_disjoint_strictly_output_vars (ind_name, ctr_name, arity, hyps, conc) ois in
+  let filtered_nonrecursive_output_vars = List.map filter_nonrecursive_empty_densities nonrecursive_output_vars in
+  match nonrecursive_binding filtered_nonrecursive_output_vars with
+  | None -> (Feedback.msg_notice (str (constructor_to_string ctr_name ^ ": >= 1 nonrecursive bindings must be checked") ++ fnl ()) ; true)
+  | Some [] -> false
+  | Some bindings -> 
+    Feedback.msg_notice (str "Printing nonrecursive bindings for: " ++ str (constructor_to_string ctr_name) ++ fnl ()); 
+    List.iter (fun (ind, oi_vs, density) -> Feedback.msg_notice (str (ty_ctr_to_string ind ^ " argument #s: " ^ String.concat "," (List.map (fun (o,_) -> string_of_int o) oi_vs) ^ "; var names: " ^ String.concat "," (List.map (fun (_,v) -> ty_param_to_string v) oi_vs) ^ "; density: " ^ density_to_string density) ++ fnl ())) bindings;
+    false (*In the future these bindings should be output and prederived.*)
+
+and analyze_rule (r : rule) (ois : output_index list) : rule_density =
+  msg_debug (str (List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois) ++ fnl ());
+  if is_output_hyps_require_unification r ois 
+    || is_input_conclusion_require_unification r ois
+    || are_functions_constraining_conclusion_inputs_or_hyp_outputs r ois
+    || is_nonrecursive_checked_or_overlapping_or_empty r ois 
+  then 
+    Checking 
+  else if is_output_constrained_in_hypothesis r ois then
+    Backtracking
+  else 
+    Partial
+
+and analyze_rules (rs : rule list) ois : (constructor * rule_density) list =
+  List.map (fun (ind, cons, arity, hyps, conc) -> (cons, analyze_rule (ind, cons, arity, hyps, conc) ois)) rs
+
+and final_density (dt : rocq_relation) ois (should_print : bool) (ds : derive_sort) : rule_density =
+  let (ind_name, _, _, _) = dt in
+  if RelationInstMap.mem (ind_name, ois, ds) !grade_memo then RelationInstMap.find (ind_name, ois, ds) !grade_memo
+  else
+  let inductive = (match get_inductive_name ind_name with | Some i -> i | None -> failwith "final_density: not an inductive type") in
+  let tree = cover_tuple_patterns (input_patterns_of_rocq_relation dt ois) (rocq_relation_arity dt) (types_to_constructor_lookup (seek_rocq_relations inductive)) in
+  let covered_patterns = collect_leaves tree in
+  let densities = analyze_rules (rocq_relation_rules dt) ois in
+  if should_print then (Feedback.msg_notice (str ("Rule densities for: " ^ ty_ctr_to_string ind_name ^ " with output indices: " ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois) ++ fnl ());
+  print_rule_densities densities);
+  let filter_uncovered_patterns = List.filter (fun (p, cs) -> match cs with | [] -> false | _ -> true) covered_patterns in
+  let all_covered_has_nonempty = List.for_all (fun (p,cs) -> List.exists (fun c -> List.assoc c densities <> Checking) cs) filter_uncovered_patterns in
+  let result = if not all_covered_has_nonempty then 
+                Checking 
+               else if List.for_all (fun (p,cs) -> List.exists (fun c -> List.assoc c densities = Partial) cs) filter_uncovered_patterns 
+               then 
+                Partial 
+               else 
+                Backtracking in
+  grade_memo := RelationInstMap.add (ind_name, ois, ds) result !grade_memo;
+  if should_print then (Feedback.msg_notice (str "Rule pattern coverage tree:" ++ fnl ());
+                        print_coverage_tree ind_name tree ois; Feedback.msg_notice (fnl ());
+                        Feedback.msg_notice (str "Set of patterns and densities of their covering rules:" ++ fnl ());
+                        print_pattern_leaves ind_name tree ois densities; 
+                        Feedback.msg_notice (str ("Inductive relation " ^ ty_ctr_to_string ind_name ^ " with output indices:"
+                                                  ^ List.fold_left (fun acc oi -> acc ^ " " ^ string_of_int oi) "" ois 
+                                                  ^ " has overall density: " 
+                                                  ^ (density_to_string result)) ++ fnl ()));
+  result
+
+let rec traverse (f : 'a -> 'b option) (l : 'a list) : 'b list option =
+  match l with
+  | [] -> Some []
+  | x :: xs -> 
+    match f x with
+    | None -> None
+    | Some y -> 
+      match traverse f xs with
+      | None -> None
+      | Some ys -> Some (y :: ys)
+
+type schedule_with_density = (schedule_step * rule_density) list * schedule_sort
+
+let are_schedule_steps_valid i ((steps, sort) : schedule_with_density) : bool = true
+
+let num_source_variables (s : source) : int =
+  match s with
+  | SrcNonrec (hyp) -> List.length (variables_in_hypothesis hyp)
+  | SrcRec (_, args) -> List.length (List.concat_map variables_in_hypothesis args)
+  | SrcMutrec (_, args) -> List.length (List.concat_map variables_in_hypothesis args)
+  | SrcDef (_, args) -> List.length (List.concat_map variables_in_hypothesis args)
+
+let density_score density ds =
+  let how_sparse = 
+  match density with
+  | Checking -> 1
+  | Backtracking -> 2
+  | Neutral -> 3
+  | Partial -> 4
+  | Total -> 5
+  in
+  match ds with
+  | D_Gen | D_Thm -> how_sparse
+  | D_Check | D_Enum -> 5 - how_sparse
+
+let num_source_bound_vars env (s : source) ds : int =
+  let variables =
+    match s with
+    | SrcNonrec (hyp) -> variables_in_hypothesis hyp
+    | SrcRec (_, args) -> List.concat_map variables_in_hypothesis args
+    | SrcMutrec (_, args) -> List.concat_map variables_in_hypothesis args
+    | SrcDef (_, args) -> List.concat_map variables_in_hypothesis args in
+  List.fold_right (fun v acc ->
+    match List.assoc_opt v env with
+    | Some density -> (*density_score density ds*) 1 + acc
+    | None -> acc) variables 0
+
+let add_bound_vars env step density = 
+  match step with
+  | S_UC (v, _, _) -> (v,density) :: env
+  | S_Check _ -> env
+  | S_ST (vs,_,_) -> (List.map (fun (v,_) -> v,density) vs) @ env
+  | S_Match (_, pat) -> (List.map (fun v -> v,density) (pat_vars pat)) @ env
+  | S_Let (v, _) -> (v, density) :: env
+
+let get_num_var_uses ((steps, sort) : schedule_with_density) ds : int =
+  let get_step_score env (step, density) =
+    match step with
+    | S_UC (_,s,_) -> num_source_bound_vars env s ds
+    | S_Check (s,_) -> num_source_bound_vars env s ds
+    | S_ST (_, s, _) -> num_source_bound_vars env s ds
+    | S_Match (v, _) -> 0
+(*       
+      (if List.mem v env then 1 else 0) *)
+    | S_Let (_, c) -> num_source_bound_vars env (SrcNonrec c) ds (*Using srcnonrec because equivalent behavior, and it is always nonrecursive source.*)
+  in
+  
+  let rec aux env = function
+    | [] -> 0
+    | (step,density) :: rest -> get_step_score env (step, density) + aux (add_bound_vars env step density) rest in
+
+  aux [] steps
+
+let schedule_with_densities_to_string (s : schedule_with_density) =
+  let (steps, sort) = s in
+  Printf.sprintf "do %s \n=> %s\n" (String.concat " ;\n " (List.map (fun (step, density) -> schedule_step_to_string step ^ " " ^ density_to_string density) steps)) (schedule_sort_to_string sort)
+
+let producer_sort_to_derive_sort (ps : producer_sort) : derive_sort =
+  match ps with
+  | PS_E -> D_Enum
+  | PS_G -> D_Gen
+
+let check_eq (u1,u2) = S_Check (SrcNonrec (DTyCtr (ty_ctr_of_string "Coq.Init.Logic.eq", [DHole; DTyVar u1; DTyVar u2])), true)
+
+let rec arrows_to_products typ =
+  match typ with
+  | DArrow (t1, t2) -> 
+    let name = make_up_name () in
+    DProd ((name, t1), arrows_to_products t2)
+  | DProd ((name, t1), t2) -> DProd ((name, t1), arrows_to_products t2)
+  | _ -> typ
+
+type schedule_ranking_policy = ScheduleRanking.policy =
+  | RankDensityThenVars
+  | RankDensityCountsThenVars
+  | RankDensityOnly
+  | RankVarsThenDensity
+  | RankVarsOnly
+
+let schedule_ranking_policy = ScheduleRanking.current
+let schedule_ranking_policy_to_string = ScheduleRanking.to_string
+
+let schedule_rank_derive_sort_to_string = function
+  | D_Gen -> "Gen"
+  | D_Enum -> "Enum"
+  | D_Check -> "Check"
+  | D_Thm -> "Thm"
+
+let schedule_tie_report_enabled () =
+  match Sys.getenv_opt "QC_SCHEDULE_TIE_REPORT" with
+  | Some "1" | Some "true" | Some "yes" -> true
+  | _ -> false
+
+let schedule_trace_enabled () =
+  match Sys.getenv_opt "QC_SCHEDULE_TRACE" with
+  | Some "1" | Some "true" | Some "yes" -> true
+  | _ -> false
+
+let schedule_tie_report_limit () =
+  match Sys.getenv_opt "QC_SCHEDULE_TIE_LIMIT" with
+  | Some s -> (try max 0 (int_of_string s) with Failure _ -> 3)
+  | None -> 3
+
+let density_rank = function
+  | Checking -> 0
+  | Backtracking -> 1
+  | Neutral -> 2
+  | Partial -> 3
+  | Total -> 4
+
+let scored_schedule_features ds candidate_id ((steps, _) as scored) =
+  let prefer_dense = ds = D_Gen || ds = D_Thm in
+  let ranks = List.map (fun (_, grade) -> density_rank grade) steps in
+  let density_rank = List.fold_left
+    (if prefer_dense then min else max)
+    (if prefer_dense then 4 else 0) ranks in
+  { ScheduleRanking.density_rank;
+    density_counts = ScheduleRanking.histogram_of_ranks ranks;
+    variable_uses = get_num_var_uses scored ds;
+    candidate_id }
+
+(* The worst step density for the derivation direction. *)
+let representative_density ds ((schd_steps, _) : schedule_with_density) =
+  match ds with
+  | D_Gen | D_Thm ->
+    (match List.sort (fun (_,d) (_,d') -> compare d d') schd_steps with
+     | (_,x) :: _ -> x
+     | [] -> Total)
+  | D_Enum | D_Check ->
+    (match List.sort (fun (_,d) (_,d') -> - (compare d d')) schd_steps with
+     | (_,x) :: _ -> x
+     | [] -> Checking)
+
+let sort_schedules_by_density_and_var_uses (schedules : (int * schedule_with_density) list) (ds : derive_sort) : (schedule_with_density * rule_density * int * int) list =
+  let rec take_local n l =
+    if n <= 0 then [] else
+    match l with
+    | [] -> []
+    | x :: xs -> x :: take_local (n - 1) xs
+  in
+  let density_compare =
+    match ds with
+    | D_Gen | D_Thm -> fun d d' -> - (compare d d')
+    | D_Enum | D_Check -> fun d d' -> compare d d'
+  in
+  let representative_density = representative_density ds in
+  let entries = List.map (fun (i, (schd_steps,schd_sort)) ->
+    let density = representative_density (schd_steps,schd_sort) in
+    let num_var_uses = get_num_var_uses (schd_steps,schd_sort) ds in
+    ((schd_steps,schd_sort), density, num_var_uses, i)) schedules
+  in
+  let policy = schedule_ranking_policy () in
+  let count_by_id = Hashtbl.create (List.length entries) in
+  if policy = RankDensityCountsThenVars then
+    List.iter (fun ((steps, _), _, _, id) ->
+      Hashtbl.add count_by_id id
+        (ScheduleRanking.histogram_of_ranks
+           (List.map (fun (_, density) -> density_rank density) steps))) entries;
+  let counts id =
+    if policy = RankDensityCountsThenVars then Hashtbl.find count_by_id id
+    else ScheduleRanking.histogram_of_ranks [] in
+  let features (_, density, variable_uses, candidate_id) =
+    { ScheduleRanking.density_rank = density_rank density;
+      density_counts = counts candidate_id; variable_uses; candidate_id } in
+  let prefer_dense = ds = D_Gen || ds = D_Thm in
+  let compare_entry a b =
+    ScheduleRanking.compare ~prefer_dense policy (features a) (features b) in
+  let sorted = List.sort compare_entry entries in
+  if schedule_trace_enabled () then begin
+    match sorted with
+    | [] ->
+      Feedback.msg_notice
+        (str (Printf.sprintf
+          "[schedule-ranking] policy=%s derive=%s candidates=0 selected=none\n"
+          (schedule_ranking_policy_to_string policy)
+          (schedule_rank_derive_sort_to_string ds)))
+    | ((steps_ds, sort), density, num_var_uses, id) :: _ ->
+      Feedback.msg_notice
+        (str (Printf.sprintf
+          "[schedule-ranking] policy=%s derive=%s candidates=%d selected-id=%d selected-density=%s selected-var-uses=%d%s\n"
+          (schedule_ranking_policy_to_string policy)
+          (schedule_rank_derive_sort_to_string ds)
+          (List.length entries)
+          id
+          (density_to_string density)
+          num_var_uses
+          (if policy = RankDensityCountsThenVars then
+             " selected-counts=" ^ ScheduleRanking.histogram_to_string (counts id)
+           else ""))
+         ++ str (schedule_with_densities_to_string (steps_ds, sort)))
+  end;
+  if schedule_tie_report_enabled () && List.length entries > 1 then begin
+    let primary_key =
+      match policy with
+      | RankDensityThenVars | RankDensityCountsThenVars | RankDensityOnly -> fun (_,d,_,_) -> density_to_string d
+      | RankVarsThenDensity | RankVarsOnly -> fun (_,_,v,_) -> string_of_int v
+    in
+    let secondary_report es =
+      match policy with
+      | RankDensityCountsThenVars ->
+        let histograms = List.map (fun (_,_,_,id) -> counts id) es in
+        let distinct = List.sort_uniq Stdlib.compare histograms in
+        (List.length distinct > 1,
+         List.length distinct - 1,
+         Printf.sprintf "secondary=density_counts distinct=%d" (List.length distinct))
+      | RankDensityThenVars ->
+        let vars = List.map (fun (_,_,v,_) -> v) es in
+        let min_v = List.fold_left min max_int vars in
+        let max_v = List.fold_left max min_int vars in
+        let delta = max_v - min_v in
+        (delta > 0,
+         delta,
+         Printf.sprintf "secondary=var_uses min=%d max=%d delta=%d" min_v max_v delta)
+      | RankVarsThenDensity ->
+        let densities = List.map (fun (_,d,_,_) -> d) es in
+        let sorted_densities = List.sort_uniq density_compare densities in
+        let ranks = List.map density_rank densities in
+        let min_r = List.fold_left min max_int ranks in
+        let max_r = List.fold_left max min_int ranks in
+        let delta = max_r - min_r in
+        let best =
+          match sorted_densities with
+          | d :: _ -> density_to_string d
+          | [] -> "none"
+        in
+        let worst =
+          match List.rev sorted_densities with
+          | d :: _ -> density_to_string d
+          | [] -> "none"
+        in
+        (List.length sorted_densities > 1,
+         delta,
+         Printf.sprintf "secondary=density best=%s worst=%s distinct=%d rank_delta=%d"
+           best worst (List.length sorted_densities) delta)
+      | RankDensityOnly ->
+        (false, 0, "secondary=none")
+      | RankVarsOnly ->
+        (false, 0, "secondary=none")
+    in
+    let groups =
+      List.fold_left (fun acc e ->
+        let k = primary_key e in
+        match acc with
+        | (k', es) :: rest when k = k' -> (k', e :: es) :: rest
+        | _ -> (k, [e]) :: acc
+      ) [] (List.sort (fun e e' -> compare (primary_key e) (primary_key e')) entries)
+    in
+    let tie_groups = List.filter (fun (_, es) -> List.length es > 1) groups in
+    let choose2 n = n * (n - 1) / 2 in
+    let tie_pairs = List.fold_left (fun acc (_, es) -> acc + choose2 (List.length es)) 0 tie_groups in
+    let secondary_deciding_groups = List.filter (fun (_, es) -> let broken, _, _ = secondary_report es in broken) tie_groups in
+    let unresolved_tie_groups = List.length tie_groups - List.length secondary_deciding_groups in
+    let max_secondary_delta =
+      List.fold_left (fun acc (_, es) ->
+        let _, delta, _ = secondary_report es in
+        max acc delta) 0 tie_groups
+    in
+    if tie_groups <> [] then begin
+      Feedback.msg_notice
+        (str (Printf.sprintf
+          "[schedule-ranking] policy=%s derive=%s candidates=%d primary-tie-groups=%d primary-tie-pairs=%d secondary-deciding-groups=%d unresolved-tie-groups=%d max-secondary-delta=%d\n"
+          (schedule_ranking_policy_to_string policy)
+          (schedule_rank_derive_sort_to_string ds)
+          (List.length entries)
+          (List.length tie_groups)
+          tie_pairs
+          (List.length secondary_deciding_groups)
+          unresolved_tie_groups
+          max_secondary_delta));
+      let limit = schedule_tie_report_limit () in
+      let show_group (k, es) =
+        let broken, _, secondary_summary = secondary_report es in
+        let es = List.sort compare_entry es in
+        let es = if limit = 0 then es else take_local limit es in
+        Feedback.msg_notice (str (Printf.sprintf "[schedule-ranking] tied derive=%s primary=%s broken=%s %s showing=%d contender(s)\n"
+          (schedule_rank_derive_sort_to_string ds)
+          k (if broken then "yes" else "no") secondary_summary (List.length es)));
+        List.iter (fun ((steps_ds, sort), density, num_var_uses, id) ->
+          Feedback.msg_notice
+            (str (Printf.sprintf "  id=%d density=%s var_uses=%d%s\n"
+               id (density_to_string density) num_var_uses
+               (if policy = RankDensityCountsThenVars then
+                  " counts=" ^ ScheduleRanking.histogram_to_string (counts id)
+                else ""))
+             ++ str (schedule_with_densities_to_string (steps_ds, sort)))) es
+      in
+      List.iter show_group (if limit = 0 then tie_groups else take_local limit tie_groups)
+    end
+  end;
+  sorted
+
+let rec take n l =
+  if n <= 0 then [] else
+  match l with
+  | [] -> []
+  | x :: xs -> x :: take (n - 1) xs
