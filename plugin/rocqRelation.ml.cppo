@@ -245,7 +245,13 @@ let rec dep_arrowify terminal names types =
    nparams : number of <Type> parameters in the beginning
    arg_names : argument names (type parameters, pattern specific variables 
  *)
-let parse_dependent_type_internal i nparams ty oibopt arg_names =
+(* The name an inductive is referred to by: the shortest name that denotes it
+   in the current scope, so that inductives of the same base name in different
+   modules stay distinct. *)
+let ind_name ind =
+  Nametab.shortest_qualid_of_global Names.Id.Set.empty (Names.GlobRef.IndRef ind)
+
+let parse_dependent_type_internal i nparams ty self arg_names =
   let rec aux locals i ty =
     let env = Global.env () in
     let sigma = Evd.from_env env in
@@ -263,10 +269,10 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
         | _ -> CErrors.user_err (str "Anonymous Rel encountered: " ++ (debug_constr ty) ++ fnl ())))
       else
         let db_global = db - num_local in
-        match oibopt with
-        | Some oib when i + nparams = db_global ->
+        match self with
+        | Some name when i + nparams = db_global ->
             (* Inductive itself. *)
-            Some (DTyCtr (Libnames.qualid_of_ident (oib.Declarations.mind_typename), []))
+            Some (DTyCtr (name, []))
         | _ ->
             try
               Some (List.nth arg_names (i + nparams - db_global - 1))
@@ -299,12 +305,8 @@ let parse_dependent_type_internal i nparams ty oibopt arg_names =
     end
     else if Constr.isInd ty then begin
       Error.msg_debug (str "Ind: " ++ debug_constr ty ++ fnl ());
-      let ((mind, midx),_) = Constr.destInd ty in
-      let mib = Environ.lookup_mind mind env in
-      let id = mib.mind_packets.(midx).mind_typename in
-      (* msg_debug (str (Printf.sprintf "LOOK HERE: %s - %s - %s" (MutInd.to_string mind) (Label.to_string (MutInd.label mind)) 
-                                                            (Id.to_string (Label.to_id (MutInd.label mind)))) ++ fnl ());*)
-      Some (DTyCtr (Libnames.qualid_of_ident id, []))
+      let (ind, _) = Constr.destInd ty in
+      Some (DTyCtr (ind_name ind, []))
     end
     else if Constr.isConstruct ty then begin
       Error.msg_debug (str "Construct: " ++ debug_constr ty ++ fnl ());
@@ -438,7 +440,7 @@ let parse_dependent_type ty =
     sequenceM (fun x -> x) (List.mapi (fun i ty -> parse_dependent_type_internal i 0 ty None arg_names) (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
     Some (dep_arrowify result_ty pat_names types)
   
-let dep_parse_type nparams param_names arity_ctxt oib =
+let dep_parse_type nparams param_names arity_ctxt self =
   let len = List.length arity_ctxt in
   (* Types of later indices can mention earlier indices as well as parameters.
      The de Bruijn offset below indexes the complete, declaration-order context. *)
@@ -453,8 +455,8 @@ let dep_parse_type nparams param_names arity_ctxt oib =
            match n with
            | Names.Name id -> (* Check if it is a parameter to add its type / name *)
               if is_type_sort t then Some acc 
-              else parse_dependent_type_internal i nparams t (Some oib) arg_names >>= fun dt -> Some ((n,dt) :: acc)
-           | _ ->  parse_dependent_type_internal i nparams t (Some oib) arg_names >>= fun dt -> Some ((n,dt) :: acc)
+              else parse_dependent_type_internal i nparams t (Some self) arg_names >>= fun dt -> Some ((n,dt) :: acc)
+           | _ ->  parse_dependent_type_internal i nparams t (Some self) arg_names >>= fun dt -> Some ((n,dt) :: acc)
         ) (Some []) (List.mapi (fun i x -> (len - nparams - i, x)) arity_ctxt) >>= fun nts ->
   let (names, types) = List.split nts in
   Some (dep_arrowify (DTyCtr (constructor_of_string "Prop", [])) names types)
@@ -551,7 +553,7 @@ let abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result =
 
    Returns list of constructor representations 
  *)
-let dep_parse_constructors ?(abstract_calls=true) nparams param_names oib : rocq_ctr list option =
+let dep_parse_constructors ?(abstract_calls=true) nparams param_names self oib : rocq_ctr list option =
   
   let parse_constructor branch : rocq_ctr option =
     let (ctr_id, ty_ctr) = branch in
@@ -574,10 +576,10 @@ let dep_parse_constructors ?(abstract_calls=true) nparams param_names oib : rocq
                ) pat_names in 
 
 (*     msgerr (str "Calculating result type" ++ fnl ()); *)
-    parse_dependent_type_internal (1 + (List.length ctr_pats)) nparams result (Some oib) arg_names >>= fun result_ty ->
+    parse_dependent_type_internal (1 + (List.length ctr_pats)) nparams result (Some self) arg_names >>= fun result_ty ->
 
 (*     msgerr (str "Calculating types" ++ fnl ()); *)
-    sequenceM (fun x -> x) (List.mapi (fun i ty -> parse_dependent_type_internal i nparams ty (Some oib) arg_names) (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
+    sequenceM (fun x -> x) (List.mapi (fun i ty -> parse_dependent_type_internal i nparams ty (Some self) arg_names) (List.map (Vars.lift (-1)) pat_types)) >>= fun types ->
     Some (ctr_id, dep_arrowify result_ty pat_names types)
   in
 
@@ -587,7 +589,7 @@ let dep_parse_constructors ?(abstract_calls=true) nparams param_names oib : rocq
 
 (* Given a Coq constr corresponding to the type of an inductive 
    with n arguments, convert it to our representation. *)
-let oib_to_unparameterized_relation ?abstract_calls (oib : Declarations.one_inductive_body) : rocq_relation option =
+let oib_to_unparameterized_relation ?abstract_calls ind (oib : Declarations.one_inductive_body) : rocq_relation option =
     (* An anonymous type input (Type -> ...) still binds a parameter used by
        constructor types. Give it a name before building the de Bruijn map. *)
     let oib = { oib with Declarations.mind_arity_ctxt =
@@ -596,16 +598,16 @@ let oib_to_unparameterized_relation ?abstract_calls (oib : Declarations.one_indu
         | Names.Anonymous when is_type_sort (Context.Rel.Declaration.get_type decl) ->
           Context.Rel.Declaration.set_name (Names.Name (make_up_name ())) decl
         | _ -> decl) oib.Declarations.mind_arity_ctxt } in
-    let ty_ctr = oib.Declarations.mind_typename in 
+    let ty_ctr = ind_name ind in
     dep_parse_type_params oib.Declarations.mind_arity_ctxt >>= fun ty_params ->
     List.iter (fun tp -> msg_debug (str (ty_param_to_string tp) ++ fnl ())) ty_params;
-    dep_parse_constructors ?abstract_calls (List.length ty_params) ty_params oib >>= fun ctr_reps ->
-    dep_parse_type (List.length ty_params) ty_params oib.Declarations.mind_arity_ctxt oib >>= fun result_ty -> 
-    Some (Libnames.qualid_of_ident ty_ctr, ty_params, ctr_reps, result_ty)
+    dep_parse_constructors ?abstract_calls (List.length ty_params) ty_params ty_ctr oib >>= fun ctr_reps ->
+    dep_parse_type (List.length ty_params) ty_params oib.Declarations.mind_arity_ctxt ty_ctr >>= fun result_ty -> 
+    Some (ty_ctr, ty_params, ctr_reps, result_ty)
 
-let oib_to_rocq_relation (oib : Declarations.one_inductive_body) : rocq_relation option =
+let oib_to_rocq_relation ind (oib : Declarations.one_inductive_body) : rocq_relation option =
     let dtype = DTyCtr (ty_ctr_of_string "Type", []) in
-    oib_to_unparameterized_relation oib >>= fun (ty_ctr, ty_params, ctr_reps, result_ty) ->
+    oib_to_unparameterized_relation ind oib >>= fun (ty_ctr, ty_params, ctr_reps, result_ty) ->
     let ctr_reps' = List.map (fun (ctr_name, ty) -> 
       ctr_name, dep_arrowify ty (List.map (fun n -> Names.Name n) ty_params) (List.init (List.length ty_params) (fun _ -> dtype))) ctr_reps in
     Some (ty_ctr, ty_params, ctr_reps', result_ty)
@@ -624,7 +626,7 @@ let qualid_to_rocq_relations (r : Libnames.qualid) : (int * rocq_relation list) 
        (* Lookup the mutual inductive body in the _global_ environment. *)
        let mib = Environ.lookup_mind mind (Global.env ()) in
        (* Parse each `one_inductive_body` into a rocq relation. All should succeed. *)
-       let rs = sequenceM oib_to_rocq_relation (Array.to_list mib.Declarations.mind_packets) in
+       let rs = sequenceM (fun x -> x) (List.mapi (fun i -> oib_to_rocq_relation (mind, i)) (Array.to_list mib.Declarations.mind_packets)) in
        option_map (fun r -> (ix, r)) rs
       | _ -> failwith ("No Inductives named: " ^ Libnames.string_of_qualid r)
     end
@@ -652,7 +654,7 @@ let ind_reference_to_unparameterized_relation (c : Constrexpr.constr_expr) : roc
   let mib = Environ.lookup_mind mind (Global.env ()) in
   if Array.length mib.Declarations.mind_packets > 1 then
     CErrors.user_err (str "Mutual inductive types are not supported here." ++ fnl ())
-  else oib_to_unparameterized_relation ~abstract_calls:false mib.Declarations.mind_packets.(0)
+  else oib_to_unparameterized_relation ~abstract_calls:false (mind, 0) mib.Declarations.mind_packets.(0)
 
 let locate_ind c =
   try match Nametab.locate c with

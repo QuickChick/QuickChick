@@ -35,6 +35,17 @@ let result_binders params result_typ =
   let result_vars = List.map (fun p -> (p, dtype)) params @ get_result_vars [] result_typ in
   result_vars
 
+(* Helper names are identifiers, so a relation named M.R from another module
+   appears in them as M_R. That is not reversible, so the relation of each
+   name is recorded. *)
+let schedule_relations : (string, ty_ctr) Hashtbl.t = Hashtbl.create 17
+
+let schedule_name class_name ind_name mode =
+  let relation = String.map (fun c -> if c = '.' then '_' else c) (ty_ctr_to_string ind_name) in
+  let name = Printf.sprintf "%s_%s_%s" class_name relation mode in
+  Hashtbl.replace schedule_relations name ind_name;
+  name
+
 (* The name of a mode's helper, such as GenSizedSuchThat_R_IO. *)
 let mode_schedule_name ind_name result_vars output_idxs ds opt =
   let modestring = String.init (List.length result_vars)
@@ -46,7 +57,7 @@ let mode_schedule_name ind_name result_vars output_idxs ds opt =
     | D_Gen, true -> "GenSizedSuchThat"
     | D_Enum, false -> "EnumSized"
     | D_Enum, true -> "EnumSizedSuchThat" in
-  Printf.sprintf "%s_%s_%s" typeclass_name (ty_ctr_to_string ind_name) modestring
+  schedule_name typeclass_name ind_name modestring
 
 (* The grade a mode has while it is being derived. *)
 let initial_mode_grade ds opt = match ds with

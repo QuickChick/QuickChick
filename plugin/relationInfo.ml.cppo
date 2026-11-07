@@ -123,7 +123,7 @@ let inductive_to_rocq_relation ((mind,ix) : Names.inductive) : rocq_relation =
       (* Lookup the mutual inductive body in the _global_ environment. *)
       let mib = Environ.lookup_mind mind env in
       (* Parse each `one_inductive_body` into a rocq relation. All should succeed. *)
-      match sequenceM oib_to_rocq_relation (Array.to_list mib.Declarations.mind_packets) with
+      match sequenceM (fun x -> x) (List.mapi (fun i -> oib_to_rocq_relation (mind, i)) (Array.to_list mib.Declarations.mind_packets)) with
       | None -> failwith ("Inductive not found: " ^ Names.MutInd.to_string mind)
       | Some rs -> cached := Names.Mindmap.add mind rs !cached; rs in
   List.nth rs ix

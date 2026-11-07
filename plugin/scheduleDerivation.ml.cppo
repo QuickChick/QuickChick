@@ -317,7 +317,9 @@ let parse_ind_schd_name (ind_schd_name : string) : ty_ctr * int list * derive_so
 
   let class_name, ind_name_segments, mode = grab_first_middle_and_last parts in
 
-  let ind_name = ty_ctr_of_string (String.concat "_" ind_name_segments) in
+  let ind_name = match Hashtbl.find_opt schedule_relations ind_schd_name with
+    | Some relation -> relation
+    | None -> ty_ctr_of_string (String.concat "_" ind_name_segments) in
 
   let ds, opt = parse_class_name class_name in
 
@@ -331,7 +333,7 @@ let construct_ind_schd_name ((ind_name, argc, ois, ds, opt) : ty_ctr * int * int
     | D_Enum -> if opt then "EnumSizedSuchThat" else "EnumSized"
     | D_Thm -> "Theorem" in
   let mode = String.init argc (fun i -> if List.mem i ois then 'O' else 'I') in
-  Printf.sprintf "%s_%s_%s" class_name (ty_ctr_to_string ind_name) mode
+  schedule_name class_name ind_name mode
 
 let collect_all_used_inductive_schd_names ind_schd_name : string list * (((inductive_schedule * derive_sort * bool) * string list) StringMap.t ref)  = 
   let inductive_dependency_map : ((inductive_schedule * derive_sort * bool) * string list) StringMap.t ref = ref StringMap.empty in
