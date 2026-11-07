@@ -174,6 +174,9 @@ Module ConsistencyCheck : QuickChickSig.
   Definition Dec_neg := @Dec_neg  .
   Definition Dec_conj := @Dec_conj .
   Definition Dec_disj := @Dec_disj .
+  Definition Dec_iff := @Dec_iff .
+  Definition Dec_True := Dec_True .
+  Definition Dec_False := Dec_False .
 
   (* Convenient notation. *)
   Notation "P '?'" := (match (@dec P _) with

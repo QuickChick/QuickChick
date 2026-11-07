@@ -120,6 +120,19 @@ Proof.
       right; intro; destruct H; contradiction.
 Defined.
 
+#[global] Instance Dec_iff {P Q} {H : Dec P} {I : Dec Q} : Dec (P <-> Q).
+Proof.
+  constructor. unfold decidable.
+  destruct H as [D]; destruct D;
+    destruct I as [D]; destruct D; tauto.
+Defined.
+
+#[global] Instance Dec_True : Dec True.
+Proof. constructor. left. exact I. Defined.
+
+#[global] Instance Dec_False : Dec False.
+Proof. constructor. right. auto. Defined.
+
 (* BCP: Not clear this is a good idea, but... *)
 (* Leo: Should be ok with really low priority *)
 #[global] Instance Dec_impl {P Q} {H : Dec P} {I : Dec Q} : Dec (P -> Q) | 100.

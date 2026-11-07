@@ -521,6 +521,12 @@ Declare Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
 Declare Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
 #[global]
 Declare Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
+#[global]
+Declare Instance Dec_iff {P Q} {H : Dec P} {I : Dec Q} : Dec (P <-> Q).
+#[global]
+Declare Instance Dec_True : Dec True.
+#[global]
+Declare Instance Dec_False : Dec False.
 
 (* SOONER: We had discussed changing this to the partial decision procedure at some point. *)
 (** A convenient notation for coercing a decidable proposition to a [bool]. *)
