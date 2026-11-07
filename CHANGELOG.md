@@ -74,6 +74,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   defined by a function is checked once its variables are generated. After
   `intros`, it tests the goal with the variables it mentions, and the
   hypotheses about them, quantified again.
+- `Show`, `Shrink` and `Arbitrary` derive for records and `Variant`s.
+- Shrinking stops after `maxShrinks` successful shrinks, as documented.
+- `forAllShrinkNonDet n` retests a shrink candidate whose test discards, up
+  to `n` more times, instead of behaving like `forAllShrink`.
+- `Sample`, `QuickChick` and the other commands keep working when the
+  implicit arguments of `sampleGen`, `show` or `quickCheck` are changed.
 - Tested with Coq 8.15, 8.16 and 8.20, Rocq 9.0 and 9.1, and Rocq's development
   version (9.4). During large derivations `coqc` has
   occasionally aborted with "stack smashing detected" on OCaml 5.2 and, more
