@@ -912,14 +912,14 @@ and compile_public_inner ~mode ~outputs ~constrained ~all_mutual ind =
    a variable whose type is a sort (such as a section variable), has no type
    to generate values of. Say so instead of failing later in parsing. *)
 let reject_abstract_types env sigma goal =
-  let is_sort ty = EConstr.isSort sigma (Reductionops.whd_all env sigma ty) in
+  let is_sort env ty = EConstr.isSort sigma (Reductionops.whd_all env sigma ty) in
   let fail kind name = CErrors.user_err (str ("QuickChick tests properties of concrete types, but the goal "
     ^ kind ^ " the type " ^ Names.Id.to_string name
     ^ ". State the property for a concrete type, for example by instantiating "
     ^ Names.Id.to_string name ^ ".")) in
   let rec binders env c = match EConstr.kind sigma c with
     | Constr.Prod (name, ty, body) ->
-      (if is_sort ty then match Context.binder_name name with
+      (if is_sort env ty then match Context.binder_name name with
         | Names.Name id -> fail "quantifies over" id
         | Names.Anonymous -> fail "quantifies over" (Names.Id.of_string "_"));
       binders (EConstr.push_rel (Context.Rel.Declaration.LocalAssum (name, ty)) env) body
@@ -928,7 +928,7 @@ let reject_abstract_types env sigma goal =
   let rec vars c = match EConstr.kind sigma c with
     | Constr.Var id ->
       (match Environ.lookup_named id env with
-       | Context.Named.Declaration.LocalAssum (_, ty) when is_sort (EConstr.of_constr ty) ->
+       | Context.Named.Declaration.LocalAssum (_, ty) when is_sort env (EConstr.of_constr ty) ->
          fail "mentions" id
        | _ -> ())
     | _ -> EConstr.iter sigma vars c in

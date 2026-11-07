@@ -107,11 +107,36 @@ open ScheduleContext
 open ScheduleSelection
 open ScheduleDerivation
 
+(* The goal as a closed property: quantify the local variables it mentions,
+   and the hypotheses about them, as [revert] would. Local definitions it
+   mentions, such as earlier tests' helpers, are unfolded. *)
+let close_over_context env sigma goal =
+  let open Context.Named.Declaration in
+  let mentions needed t = not (Names.Id.Set.is_empty
+    (Names.Id.Set.inter needed (Termops.collect_vars sigma t))) in
+  (* A hypothesis the rest does not mention becomes an implication. *)
+  let quantify na ty c =
+    let id = Context.binder_name na in
+    let name = if Termops.occur_var env sigma id c then Names.Name id else Names.Anonymous in
+    let body = Compat.replace_vars sigma [(id, EConstr.mkRel 1)] (EConstr.Vars.lift 1 c) in
+    EConstr.mkProd (Context.map_annot (fun _ -> name) na, ty, body) in
+  let close (c, needed) decl =
+    let id = get_id decl in
+    match decl with
+    | LocalAssum (na, ty) when Names.Id.Set.mem id needed || mentions needed ty ->
+      quantify na ty c, Names.Id.Set.union needed (Termops.collect_vars sigma ty)
+    | LocalDef (_, body, _) when Names.Id.Set.mem id needed ->
+      Compat.replace_vars sigma [(id, body)] c,
+      Names.Id.Set.union needed (Termops.collect_vars sigma body)
+    | _ -> c, needed in
+  fst (List.fold_left close (goal, Termops.collect_vars sigma goal)
+         (EConstr.named_context env))
+
 let quickchick_it size idx =
   Proofview.Goal.enter_one begin fun gl ->
-    let c = Proofview.Goal.concl gl in
     let e = Proofview.Goal.env gl in
     let evd = Proofview.Goal.sigma gl in
+    let c = close_over_context e evd (Proofview.Goal.concl gl) in
     reject_abstract_types e evd c;
     
     let definitions = ref [] in

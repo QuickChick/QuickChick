@@ -70,6 +70,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   premise about `M1.R` in a relation `M2.R` is no longer taken for a
   recursive call.
 - `Dec` instances for `P <-> Q`, `True` and `False`.
+- `quickchick` tests goals about functions such as `List.In`: a premise
+  defined by a function is checked once its variables are generated. After
+  `intros`, it tests the goal with the variables it mentions, and the
+  hypotheses about them, quantified again.
 - Tested with Coq 8.15, 8.16 and 8.20, Rocq 9.0 and 9.1, and Rocq's development
   version (9.4). During large derivations `coqc` has
   occasionally aborted with "stack smashing detected" on OCaml 5.2 and, more

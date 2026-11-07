@@ -105,6 +105,12 @@ type hypothesis_classification = {
   always_bound : var list;  (* Variables that must be bound before using this hyp *)
 }
 
+let is_defined_function head =
+  match Nametab.locate head with
+  | Names.GlobRef.ConstRef _ -> true
+  | _ -> false
+  | exception Not_found -> false
+
 let rec construct_hypothesis (type_vars : var list) (hyp : rocq_constr) (hyp_vars : var list list) (polarity : bool) : hypothesis_classification =
   let collect_repeated_names lists =
     let all_names = List.concat lists in
@@ -120,6 +126,11 @@ let rec construct_hypothesis (type_vars : var list) (hyp : rocq_constr) (hyp_var
   let repeated_names = collect_repeated_names hyp_vars in
   
   match hyp with
+  (* A premise defined by a function, such as [List.In x l], has no derived
+     producer: its variables are bound first and it is checked. *)
+  | DTyCtr (head, _) when is_defined_function head ->
+    { hyp = (hyp, polarity); potential_indices = [];
+      always_bound = List.concat hyp_vars |> List.sort_uniq compare }
   | DTyCtr (_, args) ->
     let hyp_indices = List.combine args hyp_vars in
     let (must_bind, all_safe) = List.partition (fun (ctr_expr, vars) ->
