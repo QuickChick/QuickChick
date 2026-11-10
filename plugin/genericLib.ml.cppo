@@ -1294,6 +1294,9 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   msg_debug (str "Calculated instance_record_vars" ++ fnl ());
   let cid =
     Classes.new_instance
+#if COQ_VERSION >= (9, 4, 0)
+    ~sealed:false
+#endif
 #if COQ_VERSION >= (8, 15, 0)
       ~locality:(if global then Hints.SuperGlobal else Hints.Local)
 #elif COQ_VERSION >= (8, 14, 0)
@@ -1376,6 +1379,9 @@ let define_new_fixpoint (functions : (var * arg list * var * coq_expr * coq_expr
     functions in
   let kind = Decls.(IsDefinition Fixpoint) in
   ignore (ComFixpoint.do_mutually_recursive
+#if COQ_VERSION >= (9, 4, 0)
+  ~sealed:false
+#endif
 #if COQ_VERSION >= (9, 1, 0)
   ~refine:false
 #endif
