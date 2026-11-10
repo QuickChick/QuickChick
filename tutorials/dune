@@ -9,4 +9,5 @@
     BasicUsage
     Automation
     ProofScopedTests
+    DerivingProofs
   ))

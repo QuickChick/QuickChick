@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - The old derivation engine is removed, with `DeriveLegacy` and the `using`
   clauses of derivation commands. Correctness proofs for derived instances
   are no longer generated: the proof tactics recognized only the old
-  engine's terms, and the `DerivingProofs` tutorial is removed.
+  engine's terms. Semantic definitions, proof classes, combinators, and
+  reusable lemmas remain available; `DerivingProofs` teaches manual proofs.
 - Bare `Derive` is available through `QuickChick.LegacyDerive`; the normal
   import leaves Stdlib's `Derive` syntax alone.
 - The `quickchick` proof tactic keeps its generated test and helpers local to
