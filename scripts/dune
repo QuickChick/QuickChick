@@ -1,3 +1,4 @@
 (rule
+ (deps (universe))
  (target mycppo)
  (action (run sh %{dep:mk-mycppo})))
