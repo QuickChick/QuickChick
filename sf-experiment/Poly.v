@@ -5,7 +5,7 @@ Import QcDefaultNotation. Open Scope qc_scope.
 Import GenLow GenHigh.
 Require Import List ZArith.
 Import ListNotations.
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 (* Require Export Lists. *)
 
 (*

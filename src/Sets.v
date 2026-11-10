@@ -1,4 +1,4 @@
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 
 From Coq Require Import Classes.RelationClasses Classes.Morphisms List.
 From mathcomp Require Import ssreflect ssrfun ssrbool seq.
@@ -117,14 +117,14 @@ Notation "\bigcup_ i F" := (bigcup setT (fun i => F))
   (at level 41, F at level 41, i at level 0,
            format "'[' \bigcup_ i '/  '  F ']'") : set_scope.
 Notation "\bigcup_ ( i : t ) F" := (bigcup (@setT t) (fun i => F))
-  (at level 41, F at level 41, i at level 50,
+  (at level 41, F at level 41, i at level 60,
            format "'[' \bigcup_ ( i   :  t ) '/  '  F ']'", only parsing) : set_scope.
 Notation "\bigcup_ ( i 'in' A ) F" := (bigcup A (fun i => F))
-  (at level 41, F at level 41, i, A at level 50,
+  (at level 41, F at level 41, i, A at level 60,
            format "'[' \bigcup_ ( i  'in'  A ) '/  '  F ']'") : set_scope.
 
 Notation "\bigcap_ ( i 'in' A ) F" := (bigcap A (fun i => F))
-  (at level 41, F at level 41, i, A at level 50,
+  (at level 41, F at level 41, i, A at level 60,
            format "'[' \bigcap_ ( i  'in'  A ) '/  '  F ']'") : set_scope.
 
 Definition lift {T} (S : set T) : set (option T) :=
@@ -378,7 +378,7 @@ by apply: eq_bigcupr => x; rewrite imsetT.
 Qed.
 
 Lemma imset_bigcup T U V (f : U -> V) A (F : T -> set U) :
-  (f @: \bigcup_(x in A) (F x)) <--> \bigcup_(x in A) f @: F x.
+  (f @: (\bigcup_(x in A) (F x))) <--> \bigcup_(x in A) f @: F x.
 Proof. by rewrite /imset bigcup_flatten. Qed.
 
 Lemma bigcup_imset T U V (f : T -> U) A (F : U -> set V) :
@@ -1210,4 +1210,3 @@ Proof.
   - rewrite Hs1. eapply subset_refl.
   - rewrite Hs2. eapply subset_refl.
 Qed.
-

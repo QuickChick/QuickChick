@@ -1,4 +1,4 @@
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 Require Export Poly.
 
 (* BCP: Some more properties we might check earlier... *)

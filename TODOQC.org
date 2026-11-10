@@ -36,7 +36,7 @@ MINOR:
   - Figure out how to check different mutants in parallel 
   - Catch C-c and terminate QC tool 
   - Add
-       Set Warnings "-notation-overridden,-parsing".
+       Set Warnings "-notation-overridden".
     to all .v files to get rid of compilation warnings.
   - eliminate the rest of the compilation warnings (including nonexhaustive
     patterns!) 

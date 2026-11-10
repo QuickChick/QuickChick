@@ -1,4 +1,4 @@
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 
 From mathcomp Require Import ssreflect ssrfun ssrbool.
 From Coq Require Import Relations ZArith Strings.Ascii Strings.String.

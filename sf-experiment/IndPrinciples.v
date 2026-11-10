@@ -3,7 +3,7 @@
 (** With the Curry-Howard correspondence and its realization in Coq in
     mind, we can now take a deeper look at induction principles. *)
 
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 Require Export ProofObjects.
 
 (* ################################################################# *)

@@ -1,6 +1,6 @@
 (** * Auto: More Automation *)
 
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 Require Import Coq.omega.Omega.
 Require Import Maps.
 Require Import Imp.
