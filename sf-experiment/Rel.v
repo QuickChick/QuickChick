@@ -10,7 +10,7 @@
     reasoning facilities, so it may be useful to look at this material
     just after the [IndProp] chapter. *)
 
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 Require Export IndProp.
 
 (** A binary _relation_ on a set [X] is a family of propositions

@@ -1,4 +1,4 @@
-Set Warnings "-notation-overridden, -parsing".
+Set Warnings "-notation-overridden".
 
 From mathcomp Require Import ssreflect ssrbool eqtype.
 Require Import Arith List String Lia.

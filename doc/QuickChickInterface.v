@@ -674,7 +674,7 @@ Record Args :=
 
 (* To reason about generators, we need to import the Proofs module 
 from QuickChick. *)
-Set Warnings "-notation-overwritten, -parsing".
+Set Warnings "-notation-overwritten".
 Set Warnings "-require-in-module, -fragile]".
 
 From QuickChick Require Import Proofs.
