@@ -85,9 +85,9 @@
 (rule (action (write-file void_for_linking-plugin-ltac.empty "")))
 
 (rule
- (target coqExpr.ml)
- (deps ../scripts/mycppo coqExpr.ml.cppo)
- (action (run sh %{dep:../scripts/mycppo} %{dep:coqExpr.ml.cppo} %{target})))
+ (target rocqExpr.ml)
+ (deps ../scripts/mycppo rocqExpr.ml.cppo)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:rocqExpr.ml.cppo} %{target})))
 (rule
  (target mergeTypes.ml)
  (deps ../scripts/mycppo mergeTypes.ml.cppo)

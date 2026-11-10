@@ -8,7 +8,7 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
 
 *)
 
-open CoqExpr
+open RocqExpr
 open Stdarg
 open Error
 open Pp

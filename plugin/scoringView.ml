@@ -295,6 +295,6 @@ let quote_context ~global scope relation result_vars local_types
    Constructor applications are elaborated and checked in the current proof
    environment by the caller. *)
 let constructor name args =
-  CoqExpr.gApp
-    (CoqExpr.gInject ("QuickChick.SchedulingPolicy." ^ name)) args
+  RocqExpr.gApp
+    (RocqExpr.gInject ("QuickChick.SchedulingPolicy." ^ name)) args
 

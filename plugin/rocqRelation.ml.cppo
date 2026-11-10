@@ -3,7 +3,7 @@
 open Pp
 open Error
 
-(* Keep printer and module-path APIs aligned with CoqExpr. *)
+(* Keep printer and module-path APIs aligned with RocqExpr. *)
 let pr_constr_expr env sigma c =
   Ppconstr.pr_constr_expr
 #if COQ_VERSION >= (9, 2, 0)
