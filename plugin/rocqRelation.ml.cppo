@@ -370,7 +370,8 @@ let parse_dependent_type_internal i nparams ty self arg_names =
         let bindings  = Array.to_list ( bindings_arr) in
         let branch_local_bindings : ty_param list = List.map (fun decl -> match decl.Context.binder_name with 
                                                                           | Names.Name x -> x
-                                                                          | _ -> failwith "Anonymous binding in branch") bindings in
+                                                                          (* [if] over a sumbool binds its proofs anonymously. *)
+                                                                          | Names.Anonymous -> make_up_name ()) bindings in
         let param_count = case_info.Constr.ci_npar in
         let arg_names = List.map (fun x -> PVar x) branch_local_bindings in
         let empty_instance =
@@ -505,11 +506,12 @@ let abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result =
       |> Environ.push_rel_context (decls ctr_pats) in
     let sigma = Evd.from_env env in
     (* A call is a defined function, or a function-valued constructor
-       argument such as a context [G] in [G x], applied to arguments. *)
+       argument such as a context [G] in [G x], applied to arguments; or a
+       computation such as [if b then x else y]. *)
     let call_type t =
       let (h, xs) = Compat.decompose_app_list t in
       let is_call = match Constr.kind h with
-        | Constr.Const _ | Constr.Proj _ -> true
+        | Constr.Const _ | Constr.Proj _ | Constr.Case _ -> true
         | Constr.Rel i -> xs <> [] && i <= List.length ctr_pats
         | _ -> false in
       if not is_call then None else

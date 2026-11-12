@@ -88,6 +88,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   constructor `Z.Bool`.
 - A definition whose body is an inductive relation, such as
   `Definition Step := R`, is read as that relation.
+- A constructor conclusion may compute an index with a `match`, such as
+  `if Nat.eq_dec x y then true else false`.
 - Tested with Coq 8.15, 8.16 and 8.20, Rocq 9.0 and 9.1, and Rocq's development
   version (9.4). During large derivations `coqc` has
   occasionally aborted with "stack smashing detected" on OCaml 5.2 and, more
