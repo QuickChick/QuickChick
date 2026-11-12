@@ -499,6 +499,12 @@ Fixpoint lazylist_backtrack {A} (l : LazyList A) (f : A -> option bool) (anyNone
 Definition enumerating {A} (g : E A) (f : A -> option bool) (n : nat) : option bool :=
   lazylist_backtrack (run g n) f false.
 
+(* The values of an enumeration that a size bound may cut short, such as the
+   lists up to some length: each is [Some], and a final [None] says that more
+   may exist, so that exhausting it gives [None] rather than a negative answer. *)
+Definition enumIncomplete {A} (e : E A) : E (option A) :=
+  enumerate (cons (bindEnum e (fun x => returnEnum (Some x))) (cons (returnEnum None) nil)).
+
 Fixpoint lazylist_backtrack_opt {A} (l : LazyList (option A)) (f : A -> option bool) (anyNone : bool) : option bool :=
   match l with
   | lnil  => if anyNone then None else Some false

@@ -400,6 +400,14 @@ Parameter forAllShrink :
   forall {A prop : Type} `{Checkable prop} `{Show A}
          (gen : G A) (shrinker : A -> list A) (pf : A -> prop), Checker.
 
+(** Like [forAllShrink], for properties that discard at random: a shrink
+    candidate whose test discards is tested again, up to [n] more times,
+    before it is rejected. *)
+Parameter forAllShrinkNonDet :
+  forall {A prop : Type} `{Checkable prop} `{Show A}
+         (n : nat) (gen : G A) (shrinker : A -> list A) (pf : A -> prop),
+    Checker.
+
 (** Lift ([Show], [Gen], [Shrink]) instances for [A]
     to a [Checker] for functions [A] -> prop.  This is what makes it
     possible to write (for some example property [foo := fun x => x >?
@@ -513,6 +521,12 @@ Declare Instance Dec_neg {P} {H : Dec P} : Dec (~ P).
 Declare Instance Dec_conj {P Q} {H : Dec P} {I : Dec Q} : Dec (P /\ Q).
 #[global]
 Declare Instance Dec_disj {P Q} {H : Dec P} {I : Dec Q} : Dec (P \/ Q).
+#[global]
+Declare Instance Dec_iff {P Q} {H : Dec P} {I : Dec Q} : Dec (P <-> Q).
+#[global]
+Declare Instance Dec_True : Dec True.
+#[global]
+Declare Instance Dec_False : Dec False.
 
 (* SOONER: We had discussed changing this to the partial decision procedure at some point. *)
 (** A convenient notation for coercing a decidable proposition to a [bool]. *)
@@ -579,26 +593,116 @@ Declare Instance Dec_eq_list (A : Type)
 (** QuickChick allows the automatic derivation of typeclass instances
     for simple types:
 [[
-       QCDerive <class> for T.
+       QuickChick Derive <class> for T.
 ]]
-    Here [<class>] must be one of [GenSized], [Shrink], [Arbitrary],
+    Here [<class>] must be one of [GenSized], [EnumSized], [Sized], [Shrink], [Arbitrary],
     or [Show], and [T] must be an inductive defined datatype (think
     Haskell/OCaml).
 
     To derive multiple classes at once, write:
 [[
-       QCDerive (<class>,...,<class>) for T.
+       QuickChick Derive (<class>,...,<class>) for T.
 ]]
+
+   Older files using bare [Derive] must import
+   [From QuickChick Require Import LegacyDerive.]
+   This enables a compatibility spelling for the same engine. It can conflict with Stdlib and other plugins' [Derive] commands.
+   Prefer [QuickChick Derive] with the normal [QuickChick] import.
+   The schedule-specific [Derive] commands do not require the compatibility import.
+
+   [QuickChick Derive] uses the scheduled engine for generation, enumeration, and
+   checking, including [DecOpt] and its [Checker] alias. The old engines and
+   their [QuickChick Derive Legacy] and [DeriveLegacy] commands have been
+   removed, and correctness proofs for derived instances are no longer
+   generated.
+
+   Public wrappers preserve [Gen A] and [Enum A] prerequisites and default
+   instance names. Repeated explicit commands create fresh names. Type and
+   class arguments are implicit, and requirements reflect actual dependencies;
+   old explicit helper applications may need adjustment. These wrappers add
+   no global reverse conversion to the sized classes.
 *)
 
 (** QuickChick also allows for the automatic derivation of generators
     satisfying preconditions in the form of inductive relations:
 [[
-     QCDerive ArbitrarySizedSuchThat for (fun x => P x1 ... x .... xn).
+     QuickChick Derive ArbitrarySizedSuchThat for (fun x => P x1 ... x .... xn).
 ]]
     <P> must be an inductively defined relation.
-    <x> is the function to be generated.
+    <x> is the value to be generated.
     <x1...xn> are (implicitly universally quantified) variable names.
+    Implicit type arguments are elaborated before outputs are selected.
+    Inputs may be fixed terms or repeated variables. Outputs must each occur
+    once as a whole argument, in any order; an output that occurs more than
+    once or inside a term is unsupported and reported. See doc/DerivationDispatch.md for
+    examples and compatibility details.
+*)
+
+(** ** Scheduled instances
+
+   The schedule engine registers the class represented by each generated helper:
+   [DecOpt], [GenSized], [EnumSized], [GenSizedSuchThat], or
+   [EnumSizedSuchThat], according to the selected mode. For example:
+[[
+   Inductive accepted : bool -> Prop := Accepted : accepted true.
+   Derive Inductive Schedule accepted derive "Check" opt "true".
+   Example accepts_true : decOpt (P := accepted true) 3 = Some true.
+   Proof. reflexivity. Qed.
+]]
+
+   Automatic testing resolves existing instances before deriving dependencies.
+   It respects local instances and their priorities. Explicit schedule commands
+   create persistent declarations; a repeated command with the same generated
+   name reports a name collision.
+
+   A polymorphic helper receives the class arguments required by its selected
+   schedule and dependencies. For example, a supplied checker requiring
+   [C (list B)] passes that requirement to its caller, with the actual type
+   arguments substituted. It does not impose [C A] on an unrelated parameter
+   [A]. Requirements propagate through mutually recursive groups as well.
+   Generated helper signatures no longer include unconditional [GenSized] and
+   [Dec_Eq] arguments for every type parameter. Prefer the class methods when
+   calling a derived generator, enumerator, or checker.
+
+   Instance wrappers make type parameters and class arguments implicit; ordinary
+   value inputs remain explicit. Use [@] to supply dictionaries explicitly.
+   Helpers retain their explicit, size-first arguments. Requirements cross mode
+   boundaries: if a generator calls a checker whose dependency needs [EnumSized A],
+   the generator also requires [EnumSized A]. A [GenSized A] instance cannot
+   satisfy that requirement.
+
+   Calls within a recursive group use the group's helper functions. Other
+   dependency calls use class methods, with instance selection performed when
+   the helper is elaborated. Registering another instance later does not change
+   an already compiled helper.
+
+   Helpers and instances created by [quickchick] remain available for reuse
+   as local definitions in the current proof context. They follow undo and
+   backtracking and are removed when that context ends. The prepared test is
+   named [theorem], or a fresh variant if that name is taken:
+[[
+   Goal forall n : nat, n = n.
+     quickchick 2.
+     pose (saved_test := theorem).
+     QuickChick (saved_test 4).
+     QuickChickWith (updMaxSuccess stdArgs 10) (saved_test 3).
+     intros; reflexivity.
+   Qed.
+]]
+   Rerunning a saved test performs no derivation. It retains the original
+   property, schedule, and selected instances even if the goal or context
+   changes. Run [quickchick] again to prepare a new test. Local computational
+   assumptions need concrete values for extraction. Testing does not prove
+   the goal. If lookup fails with a finite [Typeclasses Depth] limit, increase
+   or unset the limit before requesting automatic derivation.
+
+   A failing test shrinks its counterexample. A variable that no hypothesis
+   produces shrinks with its type's [Shrink] instance; a shrunk value that
+   breaks a later hypothesis is discarded. The outputs of a producing
+   hypothesis shrink only when a checker for that hypothesis already exists,
+   for example from [QuickChick Derive Checker], and each shrunk value must pass it.
+   Without a [Shrink] instance or such a checker, the value is reported
+   unshrunk.
 *)
 
 (** QuickChick also allows automatic derivations of proofs of
@@ -658,15 +762,39 @@ Record Args :=
       maxSize    : nat;
       (* Verbosity. Note: Doesn't do much... *)
       (* Default true. *)
-      chatty     : bool
+      chatty     : bool;
+      (* Print results in a machine-readable format. *)
+      (* Default false. *)
+      analysis   : bool
     }.
 
-(** Instead of record updates, you should overwrite extraction constants. *)
+(** [QuickChickWith args prop] runs a test with the given arguments.
+    [stdArgs] holds the defaults, and [updMaxSuccess], [updMaxDiscard],
+    [updMaxShrinks], [updMaxSize] and [updAnalysis] change one field. *)
+(** [[
+     Definition fewTests := updMaxSuccess stdArgs 500.
+     QuickChickWith fewTests prop.
+     QuickChickWith (updMaxSize (updMaxShrinks stdArgs 10) 4) prop.
+]]
+*)
+
+(** To change a default for every test, override its extraction constant
+    instead. *)
 (** [[
    Extract Constant defNumTests    => "10000".
    Extract Constant defNumDiscards => "(2 * defNumTests)".
    Extract Constant defNumShrinks  => "1000".
    Extract Constant defSize        => "7".
+]]
+*)
+
+(** Tests are extracted to OCaml and compiled in a fresh subdirectory of
+    [QuickChick] in the system temporary directory ([TMPDIR], or [/tmp]).
+    [QuickChick Extract Dir] (or [QC Extract Dir]) sets another parent
+    directory, for instance to keep the generated sources for coverage
+    tools. A relative path is resolved where the command is run. *)
+(** [[
+   QuickChick Extract Dir "path/to/dir".
 ]]
 *)
 

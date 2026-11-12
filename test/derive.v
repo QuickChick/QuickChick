@@ -7,8 +7,8 @@ with b :=
   | B1 : b
   | B2 : a -> b.
 
-QCDerive GenSized for a.
-QCDerive EnumSized for a.
-QCDerive Shrink for a.
-QCDerive Arbitrary for a.
-QCDerive Show for a.
+QuickChick Derive GenSized for a.
+QuickChick Derive EnumSized for a.
+QuickChick Derive Shrink for a.
+QuickChick Derive Arbitrary for a.
+QuickChick Derive Show for a.

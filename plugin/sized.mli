@@ -1,30 +1,30 @@
-val sizeM : GenericLib.coq_expr
-val succ_zero : GenericLib.coq_expr -> GenericLib.coq_expr
+val sizeM : RocqExpr.coq_expr
+val succ_zero : RocqExpr.coq_expr -> RocqExpr.coq_expr
 val base_ctrs :
-  GenericLib.ty_ctr ->
-  ('a * GenericLib.coq_type) list -> ('a * GenericLib.coq_type) list
+  RocqExpr.ty_ctr ->
+  ('a * RocqExpr.coq_type) list -> ('a * RocqExpr.coq_type) list
 val sized_decl :
-  (GenericLib.ty_ctr * GenericLib.ty_param list * GenericLib.ctr_rep list) list ->
-  (GenericLib.ty_ctr -> GenericLib.var list -> GenericLib.coq_expr) * ((GenericLib.var * GenericLib.arg list * GenericLib.var * GenericLib.coq_expr * GenericLib.coq_expr) list)
+  (RocqExpr.ty_ctr * RocqExpr.ty_param list * RocqExpr.ctr_rep list) list ->
+  (RocqExpr.ty_ctr -> RocqExpr.var list -> RocqExpr.coq_expr) * ((RocqExpr.var * RocqExpr.arg list * RocqExpr.var * RocqExpr.coq_expr * RocqExpr.coq_expr) list)
 val gen_args :
-  GenericLib.coq_type ->
-  GenericLib.ty_ctr -> int -> string list * string list
+  RocqExpr.coq_type ->
+  RocqExpr.ty_ctr -> int -> string list * string list
 val dropIH :
-  GenericLib.coq_type -> GenericLib.ty_ctr -> 'a list -> 'a list * 'a list
+  RocqExpr.coq_type -> RocqExpr.ty_ctr -> 'a list -> 'a list * 'a list
 val zeroEqProof :
-  GenericLib.ty_ctr ->
-  (GenericLib.constructor * GenericLib.coq_type) list ->
-  GenericLib.coq_expr ->
-  GenericLib.coq_expr ->
-  GenericLib.coq_expr ->
-  GenericLib.coq_expr -> GenericLib.var list -> GenericLib.coq_expr
+  RocqExpr.ty_ctr ->
+  (RocqExpr.constructor * RocqExpr.coq_type) list ->
+  RocqExpr.coq_expr ->
+  RocqExpr.coq_expr ->
+  RocqExpr.coq_expr ->
+  RocqExpr.coq_expr -> RocqExpr.var list -> RocqExpr.coq_expr
 val succEqProof :
-  GenericLib.ty_ctr ->
-  (GenericLib.constructor * GenericLib.coq_type) list ->
-  GenericLib.coq_expr ->
-  (GenericLib.var -> GenericLib.coq_expr) ->
-  GenericLib.coq_expr -> GenericLib.var list -> GenericLib.coq_expr
+  RocqExpr.ty_ctr ->
+  (RocqExpr.constructor * RocqExpr.coq_type) list ->
+  RocqExpr.coq_expr ->
+  (RocqExpr.var -> RocqExpr.coq_expr) ->
+  RocqExpr.coq_expr -> RocqExpr.var list -> RocqExpr.coq_expr
 val sizeEqType :
-  GenericLib.ty_ctr ->
-  (GenericLib.constructor * GenericLib.coq_type) list ->
-  GenericLib.coq_expr -> GenericLib.var list -> GenericLib.coq_expr
+  RocqExpr.ty_ctr ->
+  (RocqExpr.constructor * RocqExpr.coq_type) list ->
+  RocqExpr.coq_expr -> RocqExpr.var list -> RocqExpr.coq_expr

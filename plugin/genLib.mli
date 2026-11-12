@@ -1,43 +1,43 @@
-val gGen : GenericLib.coq_expr -> GenericLib.coq_expr
-val returnGen : GenericLib.coq_expr -> GenericLib.coq_expr
+val gGen : RocqExpr.coq_expr -> RocqExpr.coq_expr
+val returnGen : RocqExpr.coq_expr -> RocqExpr.coq_expr
 val bindGen :
-  GenericLib.coq_expr ->
-  string -> (GenericLib.var -> GenericLib.coq_expr) -> GenericLib.coq_expr
+  RocqExpr.coq_expr ->
+  string -> (RocqExpr.var -> RocqExpr.coq_expr) -> RocqExpr.coq_expr
 val bindGenOpt :
-  GenericLib.coq_expr ->
-  string -> (GenericLib.var -> GenericLib.coq_expr) -> GenericLib.coq_expr
+  RocqExpr.coq_expr ->
+  string -> (RocqExpr.var -> RocqExpr.coq_expr) -> RocqExpr.coq_expr
 
-val gEnum : GenericLib.coq_expr -> GenericLib.coq_expr
-val returnEnum : GenericLib.coq_expr -> GenericLib.coq_expr  
+val gEnum : RocqExpr.coq_expr -> RocqExpr.coq_expr
+val returnEnum : RocqExpr.coq_expr -> RocqExpr.coq_expr
 val bindEnum : 
-  GenericLib.coq_expr ->
-  string -> (GenericLib.var -> GenericLib.coq_expr) -> GenericLib.coq_expr
+  RocqExpr.coq_expr ->
+  string -> (RocqExpr.var -> RocqExpr.coq_expr) -> RocqExpr.coq_expr
 val bindEnumOpt :
-  GenericLib.coq_expr ->
-  string -> (GenericLib.var -> GenericLib.coq_expr) -> GenericLib.coq_expr
-val failEnum : GenericLib.coq_expr -> GenericLib.coq_expr
+  RocqExpr.coq_expr ->
+  string -> (RocqExpr.var -> RocqExpr.coq_expr) -> RocqExpr.coq_expr
+val failEnum : RocqExpr.coq_expr -> RocqExpr.coq_expr
 
 val enumChecker :
-  GenericLib.coq_expr ->
-  string -> (GenericLib.var -> GenericLib.coq_expr) ->
-  GenericLib.coq_expr -> GenericLib.coq_expr
+  RocqExpr.coq_expr ->
+  string -> (RocqExpr.var -> RocqExpr.coq_expr) ->
+  RocqExpr.coq_expr -> RocqExpr.coq_expr
 val enumCheckerOpt :
-  GenericLib.coq_expr ->
-  string -> (GenericLib.var -> GenericLib.coq_expr) ->
-  GenericLib.coq_expr -> GenericLib.coq_expr
+  RocqExpr.coq_expr ->
+  string -> (RocqExpr.var -> RocqExpr.coq_expr) ->
+  RocqExpr.coq_expr -> RocqExpr.coq_expr
 
-val thunkify : GenericLib.coq_expr -> GenericLib.coq_expr
-val oneof : GenericLib.coq_expr list -> GenericLib.coq_expr
-val oneofThunked : GenericLib.coq_expr list -> GenericLib.coq_expr
+val thunkify : RocqExpr.coq_expr -> RocqExpr.coq_expr
+val oneof : RocqExpr.coq_expr list -> RocqExpr.coq_expr
+val oneofThunked : RocqExpr.coq_expr list -> RocqExpr.coq_expr
 val frequency :
-  (GenericLib.coq_expr * GenericLib.coq_expr) list -> GenericLib.coq_expr
+  (RocqExpr.coq_expr * RocqExpr.coq_expr) list -> RocqExpr.coq_expr
 val frequencyThunked :
-  (GenericLib.coq_expr * GenericLib.coq_expr) list -> GenericLib.coq_expr
+  (RocqExpr.coq_expr * RocqExpr.coq_expr) list -> RocqExpr.coq_expr
 val backtracking :
-  (GenericLib.coq_expr * GenericLib.coq_expr) list -> GenericLib.coq_expr
+  (RocqExpr.coq_expr * RocqExpr.coq_expr) list -> RocqExpr.coq_expr
 val enumerating :
-  (GenericLib.coq_expr) list -> GenericLib.coq_expr
-val uniform_backtracking : GenericLib.coq_expr list -> GenericLib.coq_expr
-val checker_backtracking : GenericLib.coq_expr list -> GenericLib.coq_expr
-module TyCtrMap : CMap.ExtS with type key = GenericLib.Ord_ty_ctr.t and module Set := Set.Make(GenericLib.Ord_ty_ctr)
-module CtrMap : CMap.ExtS with type key = GenericLib.Ord_ctr.t and module Set := Set.Make(GenericLib.Ord_ctr)
+  (RocqExpr.coq_expr) list -> RocqExpr.coq_expr
+val uniform_backtracking : RocqExpr.coq_expr list -> RocqExpr.coq_expr
+val checker_backtracking : RocqExpr.coq_expr list -> RocqExpr.coq_expr
+module TyCtrMap : CMap.ExtS with type key = RocqExpr.Ord_ty_ctr.t and module Set := Set.Make(RocqExpr.Ord_ty_ctr)
+module CtrMap : CMap.ExtS with type key = RocqExpr.Ord_ctr.t and module Set := Set.Make(RocqExpr.Ord_ctr)

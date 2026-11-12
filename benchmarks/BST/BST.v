@@ -11,18 +11,18 @@ Inductive Tree :=
 | Leaf : Tree
 | Node : nat -> Tree -> Tree -> Tree.
 
-QCDerive (Arbitrary, Show) for Tree.
+QuickChick Derive (Arbitrary, Show) for Tree.
 
 Inductive between : nat -> nat -> nat -> Prop :=
 | between_n : forall n m, le n m -> between n (S n) (S (S m))
 | between_S : forall n m o, between n m o -> between n (S m) (S o).
 
-QCDerive DecOpt for (le x y).
-QCDerive ArbitrarySizedSuchThat for (fun x => le y x).
+QuickChick Derive DecOpt for (le x y).
+QuickChick Derive ArbitrarySizedSuchThat for (fun x => le y x).
 
 QuickChickWeights [(between_n, 1); (between_S, 7)].
-QCDerive ArbitrarySizedSuchThat for (fun x => between lo x hi).
-QCDerive DecOpt for (between lo x hi).
+QuickChick Derive ArbitrarySizedSuchThat for (fun x => between lo x hi).
+QuickChick Derive DecOpt for (between lo x hi).
 
 Inductive bst : nat -> nat -> Tree -> Prop :=
 | bst_leaf : forall lo hi, bst lo hi Leaf
@@ -31,8 +31,8 @@ Inductive bst : nat -> nat -> Tree -> Prop :=
     bst lo x l -> bst x hi r ->
     bst lo hi (Node x l r).
 
-QCDerive ArbitrarySizedSuchThat for (fun t => bst lo hi t).
-QCDerive DecOpt for (bst lo hi t).
+QuickChick Derive ArbitrarySizedSuchThat for (fun t => bst lo hi t).
+QuickChick Derive DecOpt for (bst lo hi t).
 
 Fixpoint gen_bst (s : nat) (lo hi : nat) : G Tree :=
   match s with

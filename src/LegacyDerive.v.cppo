@@ -1,0 +1,10 @@
+(** Compatibility spelling for source files written before QuickChick Derive.
+    This enables a grammar that can conflict with Stdlib and other plugins.
+    Prefer QuickChick Derive in new code. *)
+From QuickChick Require Export QuickChick.
+
+#if COQ_VERSION >= (8, 16, 0)
+Declare ML Module "coq-quickchick.legacy".
+#else
+Declare ML Module "quickchick_legacy_plugin".
+#endif

@@ -1,0 +1,667 @@
+(* The proof context a derivation runs in, instance obligations and their
+   caches, and per-candidate scoring state. *)
+open Pp
+open GenericLib
+open RelationInfo
+open ModeMemo
+open ScheduleScoring
+(* The proof context is borrowed only while preparing one test. Global
+   declarations may grow during that preparation, so refresh the base environment. *)
+let schedule_locals = ref []
+let schedule_universes = ref None
+
+let schedule_env () =
+  List.fold_right Compat.push_named !schedule_locals (Global.env ())
+
+(* Merging the proof's universe context costs time proportional to its size,
+   which grows with every test prepared in the proof. An evar map depends only
+   on the environment's universe graph and that context, so reuse the merge
+   until either changes. Helpers declared during preparation can already have
+   added some of the proof's levels to the global graph; declare only the
+   others, with all constraints. *)
+let schedule_sigma_cache = ref None
+
+let schedule_sigma env =
+  match !schedule_universes with
+  | None -> Evd.from_env env
+  | Some universes ->
+    let graph = Environ.universes env in
+    match !schedule_sigma_cache with
+    | Some (g, u, sigma) when g == graph && u == universes -> sigma
+    | _ ->
+      let context = Compat.universe_context_set universes in
+      let levels = Univ.Level.Set.diff
+        (Univ.ContextSet.levels context) (UGraph.domain graph) in
+      let context = Univ.ContextSet.add_constraints
+        (Univ.ContextSet.constraints context) (Univ.ContextSet.of_set levels) in
+      let sigma = Compat.merge_context_set (Evd.from_env env) context in
+      schedule_sigma_cache := Some (graph, universes, sigma);
+      sigma
+
+let with_schedule_context env sigma f =
+  let global_ids = List.map Context.Named.Declaration.get_id
+    (Environ.named_context (Global.env ())) in
+  let previous = !schedule_locals in
+  let previous_universes = !schedule_universes in
+  let locals = List.filter (fun d ->
+    not (List.mem (Context.Named.Declaration.get_id d) global_ids)) (Environ.named_context env) in
+  let normalize c = EConstr.to_constr sigma (EConstr.of_constr c) in
+  let locals = List.map (Context.Named.Declaration.map_constr normalize) locals in
+  schedule_locals := locals;
+#if COQ_VERSION >= (9, 0, 0)
+  schedule_universes := Some (Evd.ustate sigma);
+#else
+  schedule_universes := Some (Evd.evar_universe_context sigma);
+#endif
+  Fun.protect ~finally:(fun () ->
+    schedule_locals := previous; schedule_universes := previous_universes) f
+
+let inline_schedule_definitions sigma term =
+  List.fold_left (fun term -> function
+    | Context.Named.Declaration.LocalDef (name, body, _) ->
+        Compat.replace_vars sigma [Context.binder_name name, EConstr.of_constr body] term
+    | Context.Named.Declaration.LocalAssum _ -> term) term !schedule_locals
+
+(* Keep lookup variables rigid after elaboration. In particular, type parameters
+   are bindings, not unification holes that a concrete instance may specialize. *)
+let schedule_inputs = ref []
+
+let with_schedule_inputs inputs f =
+  let previous = !schedule_inputs in
+  schedule_inputs := inputs;
+  Fun.protect ~finally:(fun () -> schedule_inputs := previous) f
+
+let rec obligation_variables = function
+  | DTyVar v | DTyParam v -> [v]
+  | DTyCtr (_, args) | DCtr (_, args) -> List.concat_map obligation_variables args
+  | DApp (head, args) -> List.concat_map obligation_variables (head :: args)
+  | DNot p -> obligation_variables p
+  | DHole -> []
+  (* The free variables of a computed argument such as [fun k => match k ...]. *)
+  | DLambda (v, _, body) -> List.filter (fun u -> u <> v) (obligation_variables body)
+  | DMatch (scrutinee, branches) ->
+    let rec bound = function
+      | PVar v -> [v]
+      | PCtr (_, ps) -> List.concat_map bound ps
+      | PParam | PWild -> [] in
+    obligation_variables scrutinee @ List.concat_map (fun (p, body) ->
+      let vs = bound p in
+      List.filter (fun u -> not (List.mem u vs)) (obligation_variables body)) branches
+  | _ -> CErrors.user_err (str "QuickChick cannot infer a dependency containing a binder.")
+
+let distinct_variables xs =
+  List.fold_left (fun acc v -> if List.mem v acc then acc else acc @ [v]) [] xs
+
+let schedule_obligation relation outputs ds constrained =
+  let open GenericLib in
+  let relation = match relation with DNot p when ds = D_Check -> p | p -> p in
+  let term = product_free_rocq_type_to_mexp relation in
+  let class_name, args = match ds, constrained with
+  | D_Check, _ -> "QuickChick.Decidability.DecOpt", [term]
+  | D_Gen, false -> "QuickChick.Classes.GenSized", [term]
+  | D_Enum, false -> "QuickChick.Classes.EnumSized", [term]
+  | (D_Gen | D_Enum), true ->
+      let pattern, annotation = match outputs with
+      | [] -> PWild, Some (MConst "Coq.Init.Datatypes.unit")
+      | v :: vs -> List.fold_left (fun p v ->
+          PCtr (constructor_of_string "Coq.Init.Datatypes.pair", [PWild; PWild; p; PVar v])) (PVar v) vs, None in
+      (if ds = D_Gen then "QuickChick.DependentClasses.GenSizedSuchThat"
+       else "QuickChick.DependentClasses.EnumSizedSuchThat"),
+      [MHole; MFun ([pattern, annotation], term)]
+  | D_Thm, _ -> assert false in
+  MTyCtr (ty_ctr_of_string class_name, args)
+
+let elaborate_schedule_expression variables outputs ds expression =
+  let env = schedule_env () in
+  let in_env v = List.exists (fun d -> Names.Id.equal v
+    (Context.Named.Declaration.get_id d)) (Environ.named_context env) in
+  let inputs = List.filter (fun (v, _) -> not (List.mem v outputs)) !schedule_inputs in
+  let bound = List.map fst inputs in
+  let vars = distinct_variables variables |> List.filter (fun v ->
+    not (in_env v || List.mem v outputs || List.mem v bound)) in
+  let binders = inputs @ List.map (fun v -> v, MHole) vars in
+  let expression = mexp_to_constr_expr
+    (MFun (List.map (fun (v,t) -> GenericLib.PVar v, Some t) binders, expression)) ds in
+  let expression = match expression.CAst.v with
+    | Constrexpr.CLambdaN (binders, body) -> CAst.make (Constrexpr.CProdN (binders, body))
+    | _ -> expression in
+  Error.msg_debug (str "Instance obligation: " ++ str (constr_expr_to_string expression));
+  let sigma, goal = Constrintern.interp_constr_evars env (schedule_sigma env) expression in
+  let rec introduce env names goal =
+    match EConstr.kind sigma goal with
+    | Constr.Prod (name, ty, body) ->
+        if Evarutil.has_undefined_evars sigma ty then
+          CErrors.user_err (str "QuickChick could not determine a dependency argument's type.");
+        let original = match Context.binder_name name with Names.Name id -> id | _ -> make_up_name_str "qc_arg" in
+        let occupied = List.exists (fun d -> Names.Id.equal original
+          (Context.Named.Declaration.get_id d)) (Environ.named_context env) in
+        let id = if occupied then make_up_name_str "qc_bound" else original in
+        let decl = Context.Named.Declaration.LocalAssum
+          (Context.make_annot id Sorts.Relevant, EConstr.to_constr sigma ty) in
+        introduce (Compat.push_named decl env) ((original, id) :: names)
+          (EConstr.Vars.subst1 (EConstr.mkVar id) body)
+    | _ -> env, sigma, goal, names in
+  introduce env [] goal
+
+let elaborate_obligation relation outputs ds constrained =
+  elaborate_schedule_expression (obligation_variables relation) outputs ds
+    (schedule_obligation relation outputs ds constrained)
+
+let resolve_schedule_obligation env sigma goal =
+  try Some (Typeclasses.resolve_one_typeclass env sigma goal)
+  with Not_found ->
+    let bounded = Compat.typeclasses_depth_bounded () in
+    if bounded then CErrors.user_err (str
+      "QuickChick could not resolve an instance with the current Typeclasses Depth limit. Increase or unset that limit before automatic derivation.");
+    None
+
+(* Find premises of applicable registered instances, preserving complete class
+   applications. This is requirement discovery, not a replacement resolver:
+   the resulting context is checked by Coq's resolver and used again at emission.
+   Concrete missing instances are never turned into generic assumptions. *)
+let instance_requirements ?(allow_root=false) env sigma goal names =
+  let goal = Reductionops.nf_betaiotazeta env sigma goal in
+  let allowed = List.map (fun (v,_) ->
+    try List.assoc v names with Not_found -> v) !schedule_inputs in
+  let abstract_types = List.filter_map (fun d ->
+    let id = Context.Named.Declaration.get_id d in
+    if List.mem id allowed && Constr.isSort (Context.Named.Declaration.get_type d)
+    then Some id else None) (Environ.named_context env) in
+  let variables sigma term =
+    let ids = ref Names.Id.Set.empty in
+    let rec visit t =
+      (match EConstr.kind sigma t with Constr.Var id -> ids := Names.Id.Set.add id !ids | _ -> ());
+      EConstr.iter sigma visit t in
+    visit term; Names.Id.Set.elements !ids in
+  let can_abstract sigma ty =
+    not (Evarutil.has_undefined_evars sigma ty) &&
+    let vars = variables sigma ty in
+    List.exists (fun v -> List.mem v abstract_types) vars &&
+    List.for_all (fun v -> List.mem v allowed) vars &&
+    (* Missing checkers are derivation work, not assumptions about propositions.
+       Type requirements may still contain fixed term indices, e.g. C (vec A n). *)
+    let (_, args) = Typeclasses.dest_class_app env sigma ty in
+    List.for_all (fun arg ->
+      let sigma, arg_type = Typing.type_of env sigma (EConstr.of_constr arg) in
+      not (Constr.is_Prop (EConstr.to_constr sigma
+        (Reductionops.whd_all env sigma arg_type)))) args in
+  let rec discover allow_abstract seen sigma goal =
+    match resolve_schedule_obligation env sigma goal with
+    | Some (sigma, _) -> Some (sigma, [])
+    | None when List.exists (EConstr.eq_constr sigma goal) seen -> None
+    | None ->
+      let seen = goal :: seen in
+      let ((cls, _), _) = Typeclasses.dest_class_app env sigma goal in
+      let instances = Stdlib.Option.value ~default:[] (Compat.instances env cls.Typeclasses.cl_impl) in
+      let priority i = Stdlib.Option.value ~default:1000 (Typeclasses.hint_priority i) in
+      let instances = List.stable_sort (fun a b -> compare (priority a) (priority b)) instances in
+      let rec candidates = function
+        | [] -> if allow_abstract && can_abstract sigma goal then Some (sigma, [goal]) else None
+        | inst :: rest ->
+          let attempt =
+            let sigma, head = Evd.fresh_global env sigma (Typeclasses.instance_impl inst) in
+            let sigma, typ = Typing.type_of env sigma head in
+            let rec apply sigma premises typ =
+              match EConstr.kind sigma (Reductionops.whd_all env sigma typ) with
+              | Constr.Prod (_, dom, body) ->
+                let sigma, arg = Evarutil.new_evar env sigma dom in
+                let premises = if Compat.is_class_type env sigma dom then dom :: premises else premises in
+                apply sigma premises (EConstr.Vars.subst1 arg body)
+              | _ -> sigma, List.rev premises, typ in
+            let sigma, premises, conclusion = apply sigma [] typ in
+            let unified = try Some (Evarconv.unify env sigma Compat.conv conclusion goal)
+              with Pretype_errors.PretypeError _ -> None in
+            match unified with
+            | None -> None
+            | Some sigma ->
+              let rec solve sigma needed = function
+                | [] -> Some (sigma, needed)
+                | ty :: rest ->
+                  let ty = Evarutil.nf_evar sigma ty in
+                  if Evarutil.has_undefined_evars sigma ty then None else
+                  match discover true seen sigma ty with
+                  | None -> None
+                  | Some (sigma, requirements) ->
+                    solve sigma (needed @ requirements) rest in
+              solve sigma [] premises in
+          match attempt with
+          | None -> candidates rest
+          | Some (sigma, requirements) ->
+            let candidate_env = List.fold_left (fun env ty ->
+              Compat.push_named (Context.Named.Declaration.LocalAssum
+                (Context.make_annot (make_up_name_str "qc_premise") Sorts.Relevant,
+                 EConstr.to_constr sigma ty)) env) env requirements in
+            (match resolve_schedule_obligation candidate_env sigma goal with
+             | Some _ -> attempt | None -> candidates rest) in
+      candidates instances in
+  match discover allow_root [] sigma goal with
+  | None -> None
+  | Some (sigma, requirements) ->
+    let requirements = List.fold_left (fun acc ty ->
+      let ty = Evarutil.nf_evar sigma ty in
+      if List.exists (EConstr.eq_constr sigma ty) acc then acc else acc @ [ty]) [] requirements in
+    let env' = List.fold_left (fun env ty ->
+      Compat.push_named (Context.Named.Declaration.LocalAssum
+        (Context.make_annot (make_up_name_str "qc_requirement") Sorts.Relevant,
+         EConstr.to_constr sigma ty)) env) env requirements in
+    match resolve_schedule_obligation env' sigma goal with
+    | None -> None
+    | Some _ -> Some (List.map (fun ty ->
+        let expression = Flags.without_option Compat.print_universes
+          (Compat.extern_constr env sigma) ty in
+        let original_names = List.fold_left (fun map (original, fresh) ->
+          Names.Id.Map.add fresh original map) Names.Id.Map.empty names in
+        MEscape (Constrexpr_ops.replace_vars_constr_expr original_names expression)) requirements)
+
+(* The answer depends on the obligation, the scheduled inputs' types, the
+   proof-local context and universes, the global environment and the instance
+   database. Within a derivation the last two change only with a declaration;
+   derivation entry points clear the cache for changes between commands. *)
+let schedule_instance_cache = Hashtbl.create 256
+let schedule_instance_cache_context = ref None
+
+(* Answers of has_supplied_schedule_instance, for policy dependency states. *)
+let supplied_instance_cache = Hashtbl.create 256
+let supplied_instance_context = ref None
+
+(* Local ids shown to compiled policies. A variable keeps its id for the
+   whole derivation, so a committed step has the same view at a search node
+   and in every schedule below it, as bound_admissible assumes. Binders
+   inside terms are numbered from [policy_binder_base]. *)
+let policy_local_ids : (var, int) Hashtbl.t = Hashtbl.create 64
+let policy_binder_base = 1_000_000
+
+let policy_scope names =
+  List.iter (fun name ->
+    if not (Hashtbl.mem policy_local_ids name) then
+      Hashtbl.add policy_local_ids name (Hashtbl.length policy_local_ids)) names;
+  { ScoringView.names = List.map (fun name -> name, Hashtbl.find policy_local_ids name) names;
+    next = policy_binder_base }
+
+let clear_schedule_instance_cache () =
+  Hashtbl.reset schedule_instance_cache;
+  schedule_instance_cache_context := None;
+  Hashtbl.reset supplied_instance_cache;
+  supplied_instance_context := None;
+  Hashtbl.reset policy_local_ids
+
+(* Candidate schedules name their variables afresh, so the same instance
+   obligation recurs as alpha-variants. Key the cache on the obligation with
+   each variable not bound in the proof environment replaced by the index of
+   its first occurrence, across the inputs (in binding order), the relation
+   and the outputs. A variable named like a referenced constant's short name
+   could capture it when elaborated, so such a name is kept. Forms the key
+   does not cover keep their exact key. *)
+exception Opaque_obligation
+
+let canonical_obligation_key bound relation outputs ds constrained inputs =
+  let b = Buffer.create 256 in
+  let add = Buffer.add_string b in
+  let names = ref [] and next = ref 0 in
+  let referenced = ref Names.Id.Set.empty in
+  let var v =
+    if bound v || Names.Id.Set.mem v !referenced then
+      (add "E:"; add (Names.Id.to_string v); add " ")
+    else begin
+      let i = match List.find_opt (fun (w, _) -> Names.Id.equal v w) !names with
+        | Some (_, i) -> i
+        | None -> let i = !next in incr next; names := (v, i) :: !names; i in
+      add "#"; add (string_of_int i); add " "
+    end in
+  let qualid q = add (Libnames.string_of_qualid q); add " " in
+  let rec pat = function
+    | GenericLib.PCtr (c, ps) -> add "(C "; qualid c; List.iter pat ps; add ")"
+    | GenericLib.PVar v -> var v
+    | GenericLib.PParam -> add "P "
+    | GenericLib.PWild -> add "_ " in
+  let rec constr = function
+    | DArrow (a, c) -> add "(-> "; constr a; constr c; add ")"
+    | DLambda (p, a, c) -> add "(L "; var p; constr a; constr c; add ")"
+    | DProd ((v, a), c) -> add "(Pi "; var v; constr a; constr c; add ")"
+    | DTyParam p -> add "(Tp "; var p; add ")"
+    | DTyCtr (c, args) -> add "(T "; qualid c; List.iter constr args; add ")"
+    | DCtr (c, args) -> add "(K "; qualid c; List.iter constr args; add ")"
+    | DTyVar v -> add "(V "; var v; add ")"
+    | DApp (h, args) -> add "(A "; constr h; List.iter constr args; add ")"
+    | DMatch (scrutinee, branches) ->
+      add "(M "; constr scrutinee;
+      List.iter (fun (p, c) -> pat p; constr c) branches; add ")"
+    | DNot p -> add "(N "; constr p; add ")"
+    | DHole -> add "? " in
+  (* Input types come from product_free_rocq_type_to_mexp. *)
+  let rec ty = function
+    | MArrow (a, c) -> add "(-> "; ty a; ty c; add ")"
+    | MProd (binders, c) ->
+      add "(Pi "; List.iter (fun (v, a) -> var v; ty a) binders; ty c; add ")"
+    | MId v -> add "(V "; var v; add ")"
+    | MTyCtr (c, args) -> add "(T "; qualid c; List.iter ty args; add ")"
+    | MCtr (c, args) -> add "(K "; qualid c; List.iter ty args; add ")"
+    | MApp (h, args) -> add "(A "; ty h; List.iter ty args; add ")"
+    | MHole -> add "? "
+    | _ -> raise Opaque_obligation in
+  let rec refs_constr = function
+    | DArrow (a, c) | DLambda (_, a, c) | DProd ((_, a), c) -> refs_constr a; refs_constr c
+    | DTyCtr (q, args) | DCtr (q, args) -> refer q; List.iter refs_constr args
+    | DApp (h, args) -> List.iter refs_constr (h :: args)
+    | DMatch (scrutinee, branches) ->
+      refs_constr scrutinee; List.iter (fun (p, c) -> refs_pat p; refs_constr c) branches
+    | DNot p -> refs_constr p
+    | DTyParam _ | DTyVar _ | DHole -> ()
+  and refs_pat = function
+    | GenericLib.PCtr (q, ps) -> refer q; List.iter refs_pat ps
+    | GenericLib.(PVar _ | PParam | PWild) -> ()
+  and refs_ty = function
+    | MArrow (a, c) -> refs_ty a; refs_ty c
+    | MProd (binders, c) -> List.iter (fun (_, a) -> refs_ty a) binders; refs_ty c
+    | MTyCtr (q, args) | MCtr (q, args) -> refer q; List.iter refs_ty args
+    | MApp (h, args) -> List.iter refs_ty (h :: args)
+    | _ -> ()
+  and refer q = referenced := Names.Id.Set.add (Libnames.qualid_basename q) !referenced in
+  try
+    refs_constr relation; List.iter (fun (_, t) -> refs_ty t) inputs;
+    List.iter (fun (v, t) -> add "[in "; var v; ty t; add "]") inputs;
+    add "|"; constr relation; add "|";
+    List.iter var outputs;
+    Some (Buffer.contents b, ds, constrained)
+  with Opaque_obligation -> None
+
+let schedule_instance_canonical_cache = Hashtbl.create 256
+let schedule_instance_bound = ref (fun (_ : Names.Id.t) -> false)
+
+let has_schedule_instance ?(cached = true) relation outputs ds constrained =
+  let decide () =
+    let env, sigma, goal, names = elaborate_obligation relation outputs ds constrained in
+    match instance_requirements
+        ~allow_root:(match relation with DTyParam _ -> true | _ -> false)
+        env sigma goal names with Some _ -> true | None -> false in
+  let check = Sys.getenv_opt "QC_CHECK_INSTANCE_CACHE" <> None in
+  let report cached fresh =
+    Feedback.msg_warning (str ("[instance-cache] stale answer for " ^
+      rocq_constr_to_string relation ^ ": cached " ^ string_of_bool cached ^
+      ", fresh " ^ string_of_bool fresh)) in
+  let exact_key = (relation, outputs, ds, constrained, !schedule_inputs) in
+  if not cached then begin
+    let answer = decide () in
+    (if check then match Hashtbl.find_opt schedule_instance_cache exact_key with
+       | Some previous when previous <> answer -> report previous answer
+       | _ -> ());
+    answer
+  end else
+  let context = Global.env (), !schedule_locals, !schedule_universes in
+  (match !schedule_instance_cache_context with
+   | Some (env, locals, universes) when
+       env == (let e, _, _ = context in e) &&
+       locals == (let _, l, _ = context in l) &&
+       universes == (let _, _, u = context in u) -> ()
+   | _ ->
+     Hashtbl.reset schedule_instance_cache;
+     Hashtbl.reset schedule_instance_canonical_cache;
+     let env = schedule_env () in
+     let ids = List.fold_left (fun ids d ->
+       Names.Id.Set.add (Context.Named.Declaration.get_id d) ids)
+       Names.Id.Set.empty (Environ.named_context env) in
+     schedule_instance_bound := (fun v -> Names.Id.Set.mem v ids);
+     schedule_instance_cache_context := Some context);
+  match Hashtbl.find_opt schedule_instance_cache exact_key with
+  | Some answer -> answer
+  | None ->
+    let canonical = canonical_obligation_key !schedule_instance_bound
+      relation outputs ds constrained !schedule_inputs in
+    let answer = match Option.bind canonical (Hashtbl.find_opt schedule_instance_canonical_cache) with
+      | Some answer ->
+        (if check then let fresh = decide () in
+           if fresh <> answer then report answer fresh);
+        answer
+      | None ->
+        let answer = decide () in
+        Option.iter (fun key -> Hashtbl.replace schedule_instance_canonical_cache key answer) canonical;
+        answer in
+    Hashtbl.add schedule_instance_cache exact_key answer;
+    answer
+
+(* A policy score may call a dependency SuppliedInstance only when the
+   obligation resolves in the current context, without invented premises. *)
+let has_supplied_schedule_instance relation outputs ds constrained =
+  (* Cached like has_schedule_instance: by the obligation and inputs, within
+     one environment, local context and universe state. *)
+  let context = Global.env (), !schedule_locals, !schedule_universes in
+  (match !supplied_instance_context with
+   | Some (env, locals, universes) when
+       env == (let e, _, _ = context in e) &&
+       locals == (let _, l, _ = context in l) &&
+       universes == (let _, _, u = context in u) -> ()
+   | _ ->
+     Hashtbl.reset supplied_instance_cache;
+     supplied_instance_context := Some context);
+  let key = (relation, outputs, ds, constrained, !schedule_inputs) in
+  match Hashtbl.find_opt supplied_instance_cache key with
+  | Some answer -> answer
+  | None ->
+    let answer =
+      let env, sigma, goal, _ = elaborate_obligation relation outputs ds constrained in
+      match resolve_schedule_obligation env sigma goal with
+      | Some (sigma, _) -> not (Evd.has_undefined sigma)
+      | None -> false in
+    Hashtbl.add supplied_instance_cache key answer;
+    answer
+
+(* The score context of a constructor candidate for a compiled Rocq policy:
+   the constructor's locals and the requests of its nonrecursive sources,
+   each SuppliedInstance when an instance resolves in context and Pending
+   otherwise. Recursive steps add no request; the policy sees their source
+   category in the schedule. [terms] are further terms whose variables the
+   scope must name. Returns the scope too, for quoting the schedule. *)
+let compiled_context ind_name result_vars output_vars ds ~constrained steps terms =
+  let names = List.map fst result_vars @
+    List.concat_map ScoringView.step_variables steps @
+    List.concat_map ScoringView.free_vars_term terms
+    |> List.sort_uniq Stdlib.compare in
+  let scope = policy_scope names in
+  let local_types = List.fold_left (fun locals step ->
+    let outputs = match step with
+      | S_UC (name, SrcNonrec typ, _) -> [name, typ]
+      | S_ST (outputs, _, _) -> outputs
+      | _ -> [] in
+    List.fold_left (fun locals (name, typ) ->
+      if List.mem_assoc name locals then locals else locals @ [name, typ])
+      locals outputs) result_vars steps in
+  let dependencies = List.fold_left (fun acc step ->
+    let request = match step with
+      | S_UC (_, SrcNonrec (DTyParam _ as parameter), ps) ->
+        Some (parameter, [], producer_sort_to_derive_sort ps, false)
+      | _ -> schedule_step_dependence step in
+    match request with
+    | Some ((relation, indices, mode, constrained) as request)
+      when not (List.mem_assoc request acc) ->
+      let args = match relation with
+        | DTyCtr (_, args) | DNot (DTyCtr (_, args)) -> args
+        | _ -> [] in
+      let outputs = List.filteri (fun index _ -> List.mem index indices) args
+        |> List.concat_map variables_in_hypothesis in
+      (* A derived dependency's state comes from the memo; the read is
+         recorded, so a score that read an in-progress relation is not
+         shared as cycle-independent. *)
+      let memo_state = match relation with
+        | DTyCtr (name, _) ->
+          let find c =
+            let key = (name, indices, mode, c) in
+            let entry = InductiveScheduleKeyMap.find_opt key !mode_memo in
+            record_mode_read key entry;
+            entry in
+          (match find constrained with
+           | Some (ModeDone (_, true, Some (PolicyScore score))) -> Some (ScoringView.Completed score)
+           | Some (ModeInProgress _) -> Some ScoringView.InProgress
+           | _ -> None)
+        | _ -> None in
+      (* An obligation that cannot even be elaborated is not supplied. *)
+      let status = match memo_state with
+        | Some state -> state
+        | None ->
+          let supplied = try has_supplied_schedule_instance relation outputs mode constrained
+            with CErrors.UserError _ | Noninductive_dependency _ | Unavailable_mode _ -> false in
+          if supplied then ScoringView.Supplied else ScoringView.Pending in
+      acc @ [request, status]
+    | _ -> acc) [] steps in
+  let context = ScoringView.quote_context ~global:ScoringView.global_name scope
+    ind_name result_vars local_types output_vars ds constrained dependencies in
+  scope, context
+
+let schedule_result_and_constrained = function
+  | ProducerSchedule (constrained, _, result) -> Some result, constrained
+  | TheoremSchedule (result, _) -> Some result, false
+  | CheckerSchedule -> None, false
+
+let quoted_or_fail = function
+  | Ok value -> value
+  | Error message -> CErrors.user_err (str ("The Rocq scorer cannot see this schedule: " ^ message))
+
+(* Score a constructor candidate with a compiled Rocq policy. *)
+let compiled_schedule_score (policy : PolicyRegistry.compiled) ind_name
+    result_vars output_vars ds ((steps, sort) : schedule_with_density) =
+  let result, constrained = schedule_result_and_constrained sort in
+  let scope, context = compiled_context ind_name result_vars output_vars ds ~constrained
+    (List.map fst steps) (match result with None -> [] | Some r -> [r]) in
+  let schedule = ScoringView.quote_schedule ~global:ScoringView.global_name
+    ~finite_pins:(derivation_finite_pins ()) ~grade:policy_grade scope steps result in
+  policy.PolicyRegistry.score (quoted_or_fail context) (quoted_or_fail schedule)
+
+(* A compiled policy's bound at a search node: its committed steps, each with
+   its grade and whether that grade is final, the remaining hypotheses, and
+   how many of them must become checks. *)
+let compiled_node_bound (policy : PolicyRegistry.compiled) ind_name
+    result_vars output_vars ds sort graded (floor : GenericLib.prefix_floor) =
+  let _, constrained = schedule_result_and_constrained sort in
+  let steps = List.map (fun (step, _, _) -> step) graded in
+  let remaining = floor.GenericLib.remaining_hypotheses in
+  let scope, context = compiled_context ind_name result_vars output_vars ds ~constrained
+    steps (List.map fst remaining) in
+  let ( let* ) = Result.bind in
+  let finite_pins = derivation_finite_pins () in
+  let node =
+    let* committed = ScoringView.map_result (fun (step, grade, certain) ->
+      let* view = ScoringView.quote_step ~global:ScoringView.global_name ~finite_pins scope step in
+      Ok { PolicyViews.committed_view = view; committed_grade = policy_grade grade;
+           committed_certain = certain }) graded in
+    let* remaining = ScoringView.map_result (fun (hyp, polarity) ->
+      let* view = ScoringView.quote_closed ~global:ScoringView.global_name scope hyp in
+      Ok (view, polarity)) remaining in
+    let bound_names = List.filter (fun v -> not (List.mem v output_vars)) (List.map fst result_vars) @
+      List.concat_map (function
+        | S_UC (v, _, _) | S_Let (v, _) -> [v]
+        | S_ST (outputs, _, _) -> List.map fst outputs
+        | S_Match (v, p) -> v :: pat_vars p
+        | S_Check _ -> []) steps
+      |> List.sort_uniq Stdlib.compare in
+    let* bound = ScoringView.collect_ids scope bound_names in
+    (* As the density bound's look-ahead: occurrences, in the remaining
+       hypotheses, of variables the committed steps bound, plus the floor's
+       count of variables that several remaining hypotheses share. *)
+    let step_bound = List.concat_map (function
+      | S_UC (v, _, _) | S_Let (v, _) -> [v]
+      | S_ST (outputs, _, _) -> List.map fst outputs
+      | S_Match (_, p) -> pat_vars p
+      | S_Check _ -> []) steps in
+    let future_uses = List.length (List.filter (fun v -> List.mem v step_bound)
+      floor.GenericLib.bound_argument_occurrences)
+      + floor.GenericLib.future_variable_uses in
+    Ok { PolicyViews.node_steps = committed;
+         node_forced_checks = floor.GenericLib.forced_checks;
+         node_future_uses = future_uses;
+         node_remaining = remaining; node_bound = bound } in
+  policy.PolicyRegistry.bound (quoted_or_fail context) (quoted_or_fail node)
+
+let has_theorem_generator ty =
+  let expression = MTyCtr
+    (ty_ctr_of_string "QuickChick.Classes.TheoremGen",
+     [product_free_rocq_type_to_mexp ty]) in
+  let env, sigma, goal, _ = elaborate_schedule_expression
+    (obligation_variables ty) [] D_Thm expression in
+  match resolve_schedule_obligation env sigma goal with
+  | Some (sigma, _) -> not (Evd.has_undefined sigma)
+  | None -> false
+
+(* Prefix probes must not choose a dependency schedule or leave a provisional
+   grade in the memo used to score completed constructor candidates. Nested
+   probes would also rerun the experimental search for every dependency. *)
+let score_pruning_suspended = ref false
+
+let with_score_pruning_suspended f =
+  let previous = !score_pruning_suspended in
+  score_pruning_suspended := true;
+  Fun.protect ~finally:(fun () -> score_pruning_suspended := previous) f
+
+let with_temporary_memo_state f =
+  let saved_inductive = !mode_memo in
+  let saved_rule = !grade_memo in
+  let saved_relations = !rocq_relation_memo in
+  let saved_uncertainty = !provisional_reads in
+  Fun.protect ~finally:(fun () ->
+    mode_memo := saved_inductive;
+    grade_memo := saved_rule;
+    rocq_relation_memo := saved_relations;
+    provisional_reads := saved_uncertainty)
+    (fun () -> with_score_pruning_suspended f)
+
+(* A completed, cycle-independent dependency entry is determined by its key,
+   so candidates may share it. Without sharing, every candidate re-derives
+   every dependency, which multiplies along nested derivations. *)
+let reuse_stable_entries () =
+  match Sys.getenv_opt "QC_SCHEDULE_REUSE_STABLE" with
+  | Some ("0" | "false" | "no") -> false
+  | _ -> true
+
+(* Scoring a candidate derives its dependencies in scratch memo state. Shared
+   stable entries are visible to it and new ones are kept; everything else
+   it derives is discarded. Rankings never manage memo state themselves. *)
+let with_candidate_memo_state f =
+  with_temporary_memo_state (fun () ->
+    let reuse = reuse_stable_entries () in
+    if reuse then mode_memo := with_stable_entries !mode_memo;
+    let before = !mode_memo in
+    let result = f () in
+    if reuse then collect_stable_entries before;
+    result)
+
+(* Each candidate of each independent hypothesis group is derived on its own
+   by [derive] and scored by [score], which sees the schedule and its density
+   annotation. A candidate whose dependencies cannot be derived scores [None]. *)
+let score_group_candidates derive score groups =
+  List.map (List.map (fun schedule ->
+    try with_candidate_memo_state (fun () -> score schedule (derive schedule))
+    with Noninductive_dependency _ | Unavailable_mode _ -> None)) groups
+
+let budget_key ind_name result_vars output_vars ds = {
+  BudgetAwareScore.relation = ind_name;
+  output_indices = filter_mapi (fun i (v, _) ->
+    if List.mem v output_vars then Some i else None) result_vars;
+  derive_sort = ds }
+
+(* Finite pins depend on relation definitions and naming, so they are shared
+   by every context of one derivation and reset with the name cache. *)
+let budget_context inputs = {
+  BudgetAwareScore.input_vars = inputs;
+  finite_pins = derivation_finite_pins ();
+  completed_dependency = budget_dependency_score }
+
+(* QC_SCHEDULE_SELECTION_LOG=<file> appends one line per selected constructor
+   schedule, for comparing rankings across runs. *)
+let log_schedule_selection ind_name ctr result_vars output_vars ds opt schedule =
+  match Sys.getenv_opt "QC_SCHEDULE_SELECTION_LOG" with
+  | None | Some "" -> ()
+  | Some file ->
+    let key = budget_key ind_name result_vars output_vars ds in
+    let line = Printf.sprintf "%s|%s|%s|%b|%s|%s\n"
+      (ty_ctr_to_string ind_name)
+      (String.concat "," (List.map string_of_int key.BudgetAwareScore.output_indices))
+      (schedule_rank_derive_sort_to_string ds) opt
+      (constructor_to_string (fst ctr))
+      (String.concat " " (String.split_on_char '\n'
+         (schedule_with_densities_to_string schedule))) in
+    let channel = open_out_gen [Open_append; Open_creat] 0o644 file in
+    Fun.protect ~finally:(fun () -> close_out channel)
+      (fun () -> output_string channel line)
+
+let schedule_group_mode () = match Sys.getenv_opt "QC_SCHEDULE_GROUPS" with
+  | Some ("0" | "false" | "no") -> `Off
+  | Some "verify" -> `Verify
+  | _ -> `On
