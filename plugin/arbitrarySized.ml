@@ -107,9 +107,11 @@ let show_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -
         ctr,
         generate_names_from_type "p" ty,
         fun vs -> match vs with
-          | [] -> gStr (constructor_to_string ctr)
+          (* The printed name is the constructor's own, however [ctr] is
+             qualified to denote it. *)
+          | [] -> gStr (constructor_basename ctr)
           | _ -> str_append
-                  (gStr (constructor_to_string ctr ^ " "))
+                  (gStr (constructor_basename ctr ^ " "))
                   (fold_ty_vars
                     (fun _ v ty' ->
                       smart_paren @@

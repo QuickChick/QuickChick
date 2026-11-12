@@ -122,6 +122,7 @@ let rec coq_type_size ct =
 
 type constructor = qualid (* Opaque *)
 let constructor_to_string (x : constructor) = string_of_qualid x
+let constructor_basename (x : constructor) = Id.to_string (qualid_basename x)
 let gCtr id = qualid_to_coq_expr id
 let injectCtr s = 
   if s = "" then failwith "Called gInject with empty string";
@@ -182,18 +183,11 @@ let rec arrowify terminal l =
   | [] -> terminal
   | x::xs -> Arrow (x, arrowify terminal xs)
 
-let qualid_to_mib (r : qualid) : mutual_inductive_body =
-  let (mind, _) = Nametab.global_inductive r in
-  let env = Global.env () in
-  let mib = Environ.lookup_mind mind env in
-
-  mib
-
 (* Receives number of type parameters and one_inductive_body.
    -> Possibly ty_param list as well? 
    Returns list of constructor representations 
  *)
-let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
+let parse_constructors ?cns nparams param_names result_ty oib : ctr_rep list option =
   
   let parse_constructor (branch : constructor * constr) =
     let (ctr_id, ty_ctr) = branch in
@@ -231,10 +225,8 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
         end 
       end
       else if isInd ty then begin
-        let ((mind, i), _) = destInd ty in
-        let mib = qualid_to_mib @@ qualid_of_ident (Label.to_id (MutInd.label mind)) in
-        let oib = mib.mind_packets.(i) in
-        Some (TyCtr (qualid_of_ident @@ (oib.mind_typename), []))
+        let (ind, _) = destInd ty in
+        Some (TyCtr (Nametab.shortest_qualid_of_global Id.Set.empty (GlobRef.IndRef ind), []))
       end
       else if isConst ty then begin
         let (c,_) = destConst ty in 
@@ -246,27 +238,34 @@ let parse_constructors nparams param_names result_ty oib : ctr_rep list option =
        Some (ctr_id, arrowify result_ty types)
   in
 
-  let (cns : qualid list) = List.map qualid_of_ident (Array.to_list oib.mind_consnames) in
+  let (cns : qualid list) = match cns with
+    | Some cns -> cns
+    | None -> List.map qualid_of_ident (Array.to_list oib.mind_consnames) in
   let map (ctx, t) = Term.it_mkProd_or_LetIn t ctx in
   let lc = Array.map_to_list map oib.mind_nf_lc in
   sequenceM parse_constructor (List.combine cns lc)
 
 (* Convert mutual_inductive_body to this representation, if possible *)
-let dt_rep_from_mib (mib : mutual_inductive_body) : dt_rep option = 
-  let dt_rep_from_oib (oib : one_inductive_body) : sdt_rep option =
+(* With the inductive's name [mind], constructors are written by their
+   shortest unambiguous names, so that a constructor such as [Bool] is not
+   read as another global of the same name. *)
+let dt_rep_from_mib ?mind (mib : mutual_inductive_body) : dt_rep option = 
+  let dt_rep_from_oib i (oib : one_inductive_body) : sdt_rep option =
     let ty_ctr = oib.mind_typename in
+    let cns = Option.map (fun mind -> List.init (Array.length oib.mind_consnames) (fun j ->
+      Nametab.shortest_qualid_of_global Id.Set.empty (GlobRef.ConstructRef ((mind, i), j + 1)))) mind in
     parse_type_params oib.mind_arity_ctxt >>= fun ty_params ->
     let result_ctr = TyCtr (qualid_of_ident ty_ctr, List.map (fun x -> TyParam x) ty_params) in
-    parse_constructors mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
+    parse_constructors ?cns mib.mind_nparams ty_params result_ctr oib >>= fun ctr_reps ->
     Some (qualid_of_ident ty_ctr, ty_params, ctr_reps)
   in
 
-  Array.fold_left
-    (fun dt oib -> dt >>= fun (dt : sdt_rep list) ->
-      dt_rep_from_oib oib >>=
-      fun (sdt : sdt_rep) -> Some (sdt::dt))
-    (Some [])
-    mib.mind_packets
+  snd (Array.fold_left
+    (fun (i, dt) oib -> i + 1, (dt >>= fun (dt : sdt_rep list) ->
+      dt_rep_from_oib i oib >>=
+      fun (sdt : sdt_rep) -> Some (sdt::dt)))
+    (0, Some [])
+    mib.mind_packets)
 
 let qualid_to_mib r =
   let env = Global.env () in
@@ -290,9 +289,8 @@ let coerce_reference_to_dt_rep (c : constr_expr) : dt_rep option =
     | _ -> failwith "Not a reference"
   in
 
-  let mib : mutual_inductive_body = qualid_to_mib r in
-  
-  dt_rep_from_mib mib
+  let (mind, _) = Nametab.global_inductive r in
+  dt_rep_from_mib ~mind (qualid_to_mib r)
 
 (* Dependent derivations - lots of code reuse *)
 

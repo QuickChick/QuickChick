@@ -49,6 +49,8 @@ val coq_type_size : coq_type -> int
 
 type constructor 
 val constructor_to_string : constructor -> string
+(* The constructor's own name, without the qualification that denotes it. *)
+val constructor_basename : constructor -> string
 val gCtr : constructor -> coq_expr
 val injectCtr : string -> constructor
 
@@ -92,7 +94,7 @@ val sequenceM : ('a -> 'b option) -> 'a list -> 'b list option
 val sdt_rep_from_mib : mutual_inductive_body -> sdt_rep option
 
 val qualid_to_mib : Libnames.qualid -> mutual_inductive_body
-val dt_rep_from_mib : mutual_inductive_body -> dt_rep option
+val dt_rep_from_mib : ?mind:Names.MutInd.t -> mutual_inductive_body -> dt_rep option
 val coerce_reference_to_dt_rep : constr_expr -> dt_rep option
 
 

@@ -558,7 +558,7 @@ let abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result =
 
    Returns list of constructor representations 
  *)
-let dep_parse_constructors ?(abstract_calls=true) nparams param_names self oib : rocq_ctr list option =
+let dep_parse_constructors ?(abstract_calls=true) nparams param_names self ind oib : rocq_ctr list option =
   
   let parse_constructor branch : rocq_ctr option =
     let (ctr_id, ty_ctr) = branch in
@@ -588,7 +588,10 @@ let dep_parse_constructors ?(abstract_calls=true) nparams param_names self oib :
     Some (ctr_id, dep_arrowify result_ty pat_names types)
   in
 
-  let cns = List.map Libnames.qualid_of_ident (Array.to_list oib.Declarations.mind_consnames) in
+  (* Constructors by their shortest names, as inductives are: a bare name may
+     denote another global, such as a definition [Bool] shadowing [Z.Bool]. *)
+  let cns = List.init (Array.length oib.Declarations.mind_consnames) (fun j ->
+    Nametab.shortest_qualid_of_global Names.Id.Set.empty (Names.GlobRef.ConstructRef (ind, j + 1))) in
   let lc =  List.map (fun (ctx, t) -> Term.it_mkProd_or_LetIn t ctx) (Array.to_list oib.Declarations.mind_nf_lc) in
   sequenceM parse_constructor (List.combine cns lc)
 
@@ -606,7 +609,7 @@ let oib_to_unparameterized_relation ?abstract_calls ind (oib : Declarations.one_
     let ty_ctr = ind_name ind in
     dep_parse_type_params oib.Declarations.mind_arity_ctxt >>= fun ty_params ->
     List.iter (fun tp -> msg_debug (str (ty_param_to_string tp) ++ fnl ())) ty_params;
-    dep_parse_constructors ?abstract_calls (List.length ty_params) ty_params ty_ctr oib >>= fun ctr_reps ->
+    dep_parse_constructors ?abstract_calls (List.length ty_params) ty_params ty_ctr ind oib >>= fun ctr_reps ->
     dep_parse_type (List.length ty_params) ty_params oib.Declarations.mind_arity_ctxt ty_ctr >>= fun result_ty -> 
     Some (ty_ctr, ty_params, ctr_reps, result_ty)
 
@@ -731,7 +734,7 @@ let define_new_inductive ((ty_ctr, ty_params, ctrs, typ) : rocq_relation) =
   let oie =
     { mind_entry_typename = Names.Id.of_string name
     ; mind_entry_arity = constr_of_relation_type name ty_params typ
-    ; mind_entry_consnames = List.map (fun (c, _) -> Names.Id.of_string (Libnames.string_of_qualid c)) ctrs
+    ; mind_entry_consnames = List.map (fun (c, _) -> Libnames.qualid_basename c) ctrs
     ; mind_entry_lc = List.map (fun (_, t) -> constr_of_relation_type name ty_params t) ctrs
     } in
   let entry =
