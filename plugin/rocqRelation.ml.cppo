@@ -404,7 +404,11 @@ let parse_dependent_type_internal i nparams ty self arg_names =
     (* Rel, App, Ind, Construct, Prod *)
     else if Constr.isConst ty then begin 
       Error.msg_debug (str "Const: " ++ debug_constr ty ++ fnl ());
-      let (x,_) = Constr.destConst ty in 
+      let (x, u) = Constr.destConst ty in
+      (* An alias such as [Definition Step := ZKStep] stands for the inductive. *)
+      match Environ.constant_opt_value_in env (x, u) with
+      | Some body when Constr.isInd body -> aux locals i body
+      | _ ->
       (* Keep the qualified reference: a bare label may be mistaken for a binder. *)
       Some (DTyCtr (ty_ctr_of_string (Names.Constant.to_string x), []))
     end
