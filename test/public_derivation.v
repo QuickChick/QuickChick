@@ -143,7 +143,7 @@ Fail Definition public_chain_missing {A : Type} `{Gen A} :
 Definition public_empty_enum : Enum bool := {| enum := MkEnum (fun _ => lnil) |}.
 Definition public_single_enum : Enum bool := {| enum := returnEnum true |}.
 Example public_empty_has_no_witness :
-  @decOpt (PublicWitness bool false) (@DecOptPublicWitness bool false public_empty_enum) 3 = Some false.
+  @decOpt (PublicWitness bool false) (@DecOptPublicWitness bool false public_empty_enum) 3 = None.
 Proof. reflexivity. Qed.
 Example public_single_has_witness :
   @decOpt (PublicWitness bool false) (@DecOptPublicWitness bool false public_single_enum) 3 = Some true.

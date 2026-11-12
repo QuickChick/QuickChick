@@ -27,8 +27,10 @@ Proof. vm_compute. reflexivity. Qed.
 Example dbl_computes_output :
   LazyList_to_list (run (@enumSizeST _ (fun m => dbl 4 m) _ 3) 3) = [Some 8].
 Proof. vm_compute. reflexivity. Qed.
+(* Inverting [double] tries every n up to the size; a final None says that a
+   larger n is not ruled out. *)
 Example dbl_inverts_output :
-  LazyList_to_list (run (@enumSizeST _ (fun n => dbl n 6) _ 3) 3) = [Some 3].
+  LazyList_to_list (run (@enumSizeST _ (fun n => dbl n 6) _ 3) 3) = [Some 3; None].
 Proof. vm_compute. reflexivity. Qed.
 
 Inductive ev : nat -> Prop :=

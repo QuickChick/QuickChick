@@ -376,6 +376,7 @@ let c_guard check k (ds : derive_sort) =
 let c_bindEnum enum k = c_app (cInject "QuickChick.Enumerators.bindEnum") [c_hole; c_hole; enum; k]
 
 let c_enumeratingOpt enum k init_size = c_app (cInject "QuickChick.Enumerators.enumeratingOpt") [c_hole; enum; k; init_size]
+let c_enumerating enum k init_size = c_app (cInject "QuickChick.Enumerators.enumerating") [c_hole; enum; k; init_size]
 
 let c_forAllChecker check k = c_app (cInject "QuickChick.Checker.forAllChecker") [c_hole; c_hole; check; k]
 
@@ -401,16 +402,6 @@ let c_cons ty x xs = c_app (cInject "Coq.Init.Datatypes.cons") [ty; x; xs]
 let rec c_list ty = function
   | [] -> c_nil ty
   | x::xs -> c_cons ty x (c_list ty xs)
-
-let c_enumWithNone enum =
-  let x = fresh_name "enum_x" in
-  let none = c_ret D_Enum (c_None c_hole) in
-  let some =
-    c_bindEnum enum
-      (c_fun [(PVar x, None)] (fun _ -> c_ret D_Enum (c_Some c_hole (c_var x))))
-  in
-  c_app (cInject "QuickChick.Enumerators.enumerate")
-    [c_hole; c_list c_hole [none; some]]
 
 let derive_sort_to_string (ds : derive_sort) : string =
   match ds with
@@ -443,7 +434,9 @@ let c_bind (ms : monad_sort) (ds : derive_sort) (m1 : constr_expr) (vs : var lis
   | D_Enum, MEOpt -> c_bindOpt m1 k
   | D_Enum, MC -> c_guard m1 k ds
   | D_Check, MC -> c_andBind m1 k
-  | D_Check, ME -> c_enumeratingOpt (c_enumWithNone m1) k (c_var (var_of_string "init_size"))
+  (* An enumeration the size bound may cut short is bound as [EnumOpt] (see
+     [schedule_to_mexp]); what reaches here is complete. *)
+  | D_Check, ME -> c_enumerating m1 k (c_var (var_of_string "init_size"))
   | D_Check, MEOpt -> c_enumeratingOpt m1 k (c_var (var_of_string "init_size"))
   | D_Thm, MC -> c_guard m1 k ds
   | D_Thm, MG -> c_forAllChecker m1 k
@@ -537,6 +530,58 @@ let unconstrained_producer (ps : producer_sort) ty fuel =
   match ps with
   | PS_E -> m_enumSized ty fuel
   | PS_G -> m_arbitrarySized ty fuel
+
+(* Whether every value of [ty] is enumerated at any size: a non-recursive
+   inductive whose constructors' fields are all such types, after unfolding
+   definitions. Anything else, including type parameters, functions and
+   recursive types such as lists, may be cut short by the size bound. *)
+let enumeration_complete (ty : rocq_type) : bool =
+  let env = Global.env () in
+  let rec ind_complete visited ((mind, _) as ind) params =
+    if List.exists (Names.Ind.CanOrd.equal ind) visited then false else
+    let mib = Environ.lookup_mind mind env in
+    Array.length mib.Declarations.mind_packets = 1 &&
+    let oib = mib.Declarations.mind_packets.(0) in
+    let npars = mib.Declarations.mind_nparams in
+    List.length params = npars &&
+    Array.for_all (fun (ctx, _) ->
+      (* [ctx] holds the parameters, then the fields, innermost first. *)
+      let binders = List.rev ctx in
+      List.length binders >= npars &&
+      let fields = CList.skipn npars binders in
+      (* [fields] is outermost first; a field's [Rel i] up to its position is
+         an earlier field (a dependency), beyond that a parameter, and beyond
+         the parameters the inductive itself. *)
+      List.for_all (fun (k, decl) ->
+        match decl with
+        | Context.Rel.Declaration.LocalDef _ -> false
+        | Context.Rel.Declaration.LocalAssum (_, t) ->
+          constr_complete (ind :: visited) (fun i ->
+            if i <= k then None
+            else if i - k <= npars then Some (List.nth params (npars - (i - k)))
+            else None) t)
+        (List.mapi (fun k d -> (k, d)) fields)) oib.Declarations.mind_nf_lc
+  and constr_complete visited rel t =
+    let (head, args) = Compat.decompose_app_list t in
+    match Constr.kind head with
+    | Constr.Rel i when args = [] -> (match rel i with Some c -> c | None -> false)
+    | Constr.Ind (ind, _) ->
+      ind_complete visited ind (List.map (constr_complete visited rel) args)
+    | Constr.Const (c, u) when args = [] ->
+      (match Environ.constant_opt_value_in env (c, u) with
+       | Some body -> constr_complete visited rel body
+       | None -> false)
+    | _ -> false in
+  let rec rocq_complete = function
+    | DTyCtr (c, args) ->
+      (match Nametab.locate c with
+       | Names.GlobRef.IndRef ind -> ind_complete [] ind (List.map rocq_complete args)
+       | Names.GlobRef.ConstRef c when args = [] ->
+         constr_complete [] (fun _ -> None) (Compat.mkConst c)
+       | _ -> false
+       | exception Not_found -> false)
+    | _ -> false in
+  rocq_complete ty
 
 let such_that_producer (ps : producer_sort) vars p fuel =
   let p_vars = List.map (fun v -> PVar v) vars in
@@ -637,6 +682,13 @@ let schedule_to_mexp ((steps, s_sort) : schedule) (mfuel : mexp) (def_fuel : mex
   in
   List.fold_right (fun schd acc ->
     match s_sort, schd with
+    (* In a checker or a constrained enumerator, an enumeration the size bound
+       may cut short ends in [None], so that a checker finding nothing in it
+       answers [None], not [Some false]. *)
+    | (CheckerSchedule | ProducerSchedule (true, PS_E, _)), S_UC (v, SrcNonrec ty, PS_E)
+      when not (enumeration_complete ty) ->
+        let producer = unconstrained_producer PS_E (product_free_rocq_type_to_mexp ty) def_fuel in
+        MBind (MEOpt, MApp (MConst "QuickChick.Enumerators.enumIncomplete", [MHole; producer]), [v], acc)
     | TheoremSchedule _, S_UC (v, SrcNonrec ty, PS_G) ->
         let producer = m_theoremArbitrarySized (product_free_rocq_type_to_mexp ty) def_fuel in
         MBind (MGShrink, producer, [v], acc)

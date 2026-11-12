@@ -26,8 +26,10 @@ Definition empty_enum : EnumSized bool :=
   {| enumSized := fun _ => MkEnum (fun _ => lnil) |}.
 Definition singleton_enum : EnumSized bool :=
   {| enumSized := fun _ => returnEnum true |}.
+(* The checker cannot tell an empty enumeration from one the size bound cut
+   short, so with no witness it answers None. *)
 Example empty_has_no_witness :
-  @decOpt (HasWitness bool false) (@DecOpt_HasWitness_II_instance bool false empty_enum) 3 = Some false.
+  @decOpt (HasWitness bool false) (@DecOpt_HasWitness_II_instance bool false empty_enum) 3 = None.
 Proof. reflexivity. Qed.
 Example singleton_has_witness :
   @decOpt (HasWitness bool false) (@DecOpt_HasWitness_II_instance bool false singleton_enum) 3 = Some true.
