@@ -27,3 +27,15 @@ Example checks :
    decOpt (P := typed ctx0 (Let (Lit 1) (Var 1)) TNat) 5)
   = (Some true, Some false, Some true, Some true, Some false).
 Proof. vm_compute. reflexivity. Qed.
+
+(* A premise may pass an extended context to another relation, in a mode
+   that needs an instance check: here [typed]'s type is an output. *)
+Inductive wrapped : (nat -> ty) -> tm -> Prop :=
+| W ctx e t : typed (fun k => match k with 0 => TNat | S k => ctx k end) e t -> wrapped ctx e.
+
+QuickChick Derive Checker for (wrapped ctx e).
+
+Example wrapped_checks :
+  (decOpt (P := wrapped ctx0 (Var 0)) 5, decOpt (P := wrapped ctx0 (Var 1)) 5)
+  = (Some true, Some true).
+Proof. vm_compute. reflexivity. Qed.

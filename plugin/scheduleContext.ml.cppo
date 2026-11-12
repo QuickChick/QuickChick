@@ -77,6 +77,16 @@ let rec obligation_variables = function
   | DApp (head, args) -> List.concat_map obligation_variables (head :: args)
   | DNot p -> obligation_variables p
   | DHole -> []
+  (* The free variables of a computed argument such as [fun k => match k ...]. *)
+  | DLambda (v, _, body) -> List.filter (fun u -> u <> v) (obligation_variables body)
+  | DMatch (scrutinee, branches) ->
+    let rec bound = function
+      | PVar v -> [v]
+      | PCtr (_, ps) -> List.concat_map bound ps
+      | PParam | PWild -> [] in
+    obligation_variables scrutinee @ List.concat_map (fun (p, body) ->
+      let vs = bound p in
+      List.filter (fun u -> not (List.mem u vs)) (obligation_variables body)) branches
   | _ -> CErrors.user_err (str "QuickChick cannot infer a dependency containing a binder.")
 
 let distinct_variables xs =
