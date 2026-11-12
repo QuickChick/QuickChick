@@ -338,6 +338,21 @@ let rec correct_rocq_constr_with cv (c : rocq_constr) : rocq_constr =
     DProd (v, correct_rocq_constr_with cv c)
   | DArrow (c1, c2) ->
     DArrow (correct_rocq_constr_with cv c1, correct_rocq_constr_with cv c2)
+  (* A computed argument, such as an extended context [fun k => ...]: rename
+     its free variables and leave the ones it binds. *)
+  | DLambda (v, ty, body) ->
+    DLambda (v, correct_rocq_constr_with cv ty,
+             correct_rocq_constr_with (fun u -> if u = v then u else cv u) body)
+  | DMatch (scrutinee, branches) ->
+    let rec bound = function
+      | PVar v -> [v]
+      | PCtr (_, ps) -> List.concat_map bound ps
+      | PParam | PWild -> [] in
+    DMatch (correct_rocq_constr_with cv scrutinee,
+            List.map (fun (p, body) ->
+              let vs = bound p in
+              (p, correct_rocq_constr_with (fun u -> if List.mem u vs then u else cv u) body))
+              branches)
 
 let rec correct_pat_with cv (p : pat) : pat =
   match p with

@@ -155,7 +155,7 @@ and ty_ctor_constrains_variable = function
   | _ -> false
 
 and contains_function_call = function
-  | DApp (_, _) -> true
+  | DApp (_, _) | DLambda _ | DMatch _ -> true
   | DCtr (_, args) | DTyCtr (_, args) -> List.exists contains_function_call args
   | _ -> false
 

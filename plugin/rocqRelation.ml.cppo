@@ -500,13 +500,18 @@ let abstract_conclusion_calls ty_ctr nparams param_pats ctr_pats result =
       |> Environ.push_rel_context (decls param_pats)
       |> Environ.push_rel_context (decls ctr_pats) in
     let sigma = Evd.from_env env in
+    (* A call is a defined function, or a function-valued constructor
+       argument such as a context [G] in [G x], applied to arguments. *)
     let call_type t =
-      match Constr.kind (fst (Compat.decompose_app_list t)) with
-      | Constr.Const _ | Constr.Proj _ ->
+      let (h, xs) = Compat.decompose_app_list t in
+      let is_call = match Constr.kind h with
+        | Constr.Const _ | Constr.Proj _ -> true
+        | Constr.Rel i -> xs <> [] && i <= List.length ctr_pats
+        | _ -> false in
+      if not is_call then None else
         let ty = Retyping.get_type_of env sigma (EConstr.of_constr t) in
         if Reductionops.is_arity env sigma ty then None
-        else Some (EConstr.Unsafe.to_constr ty)
-      | _ -> None in
+        else Some (EConstr.Unsafe.to_constr ty) in
     let rec collect acc t =
       match call_type t with
       | Some ty -> (t, ty) :: acc

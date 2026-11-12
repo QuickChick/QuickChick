@@ -43,11 +43,20 @@ let remove_duplicates l =
   remove_duplicates' l []
 
 let variables_in_hypothesis (hyp : rocq_constr) : var list =
+  let rec pattern_vars = function
+    | PVar v -> [v]
+    | PCtr (_, ps) -> List.concat_map pattern_vars ps
+    | PParam | PWild -> [] in
+  let without bound = List.filter (fun v -> not (List.mem v bound)) in
   let rec collect_tyvars = function
     | DTyVar x -> [x]
     | DCtr (_, ds) -> List.concat (List.map collect_tyvars ds)
-    | DApp (_, ds) -> List.concat (List.map collect_tyvars (ds))
+    | DApp (d, ds) -> List.concat (List.map collect_tyvars (d :: ds))
     | DTyCtr (_, ds) -> List.concat (List.map collect_tyvars ds)
+    | DLambda (v, _, body) -> without [v] (collect_tyvars body)
+    | DMatch (scrutinee, branches) ->
+      collect_tyvars scrutinee @
+      List.concat_map (fun (p, body) -> without (pattern_vars p) (collect_tyvars body)) branches
     | _ -> []
   in
   remove_duplicates (collect_tyvars hyp)
@@ -200,8 +209,12 @@ let rec product_free_rocq_type_to_mexp (rt : rocq_type) : mexp =
       MArrow (product_free_rocq_type_to_mexp domain, product_free_rocq_type_to_mexp codomain)
   | DProd ((name, domain), codomain) ->
       MProd ([name, product_free_rocq_type_to_mexp domain], product_free_rocq_type_to_mexp codomain)
-  | DMatch _ -> failwith "Not a product-free type: Matches contain bindings"
-  | DLambda _ -> failwith "Not a product-free type: Lambdas contain bindings"
+  (* Computed arguments, such as an extended context [fun k => match k ...]. *)
+  | DMatch (scrutinee, branches) ->
+      MMatch (product_free_rocq_type_to_mexp scrutinee,
+              List.map (fun (p, body) -> (p, product_free_rocq_type_to_mexp body)) branches)
+  | DLambda (name, domain, body) ->
+      MFun ([PVar name, Some (product_free_rocq_type_to_mexp domain)], product_free_rocq_type_to_mexp body)
   | DTyParam p -> MId p
   | DTyCtr (c, ds) -> MTyCtr (c, List.map product_free_rocq_type_to_mexp ds)
   | DCtr (c, ds) -> MCtr (c, List.map product_free_rocq_type_to_mexp ds)

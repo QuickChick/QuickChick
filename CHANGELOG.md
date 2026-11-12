@@ -74,6 +74,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   defined by a function is checked once its variables are generated. After
   `intros`, it tests the goal with the variables it mentions, and the
   hypotheses about them, quantified again.
+- Relations may take functions, such as a typing context `nat -> ty`, apply
+  them in a conclusion (`ctx n`), and pass computed arguments such as
+  `fun k => match k with ...` to their premises.
 - `Show`, `Shrink` and `Arbitrary` derive for records and `Variant`s.
 - Shrinking stops after `maxShrinks` successful shrinks, as documented.
 - `forAllShrinkNonDet n` retests a shrink candidate whose test discards, up
