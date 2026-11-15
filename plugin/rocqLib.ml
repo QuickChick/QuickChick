@@ -1,12 +1,12 @@
 open RocqExpr
 
-let gExIntro_impl (witness : coq_expr) (proof : coq_expr) : coq_expr =
+let gExIntro_impl (witness : rocq_expr) (proof : rocq_expr) : rocq_expr =
   gApp (gInject "ex_intro") [hole; witness; proof]
 
-let gExIntro (x : string) (pred : var -> coq_expr) (witness : coq_expr) (proof : coq_expr) : coq_expr =
+let gExIntro (x : string) (pred : var -> rocq_expr) (witness : rocq_expr) (proof : rocq_expr) : rocq_expr =
   gApp (gInject "ex_intro") [(gFun [x] (fun [x] -> pred x)); witness; proof]
 
-let gEx (x : string) (pred : var -> coq_expr) : coq_expr =
+let gEx (x : string) (pred : var -> rocq_expr) : rocq_expr =
   gApp (gInject "ex") [(gFun [x] (fun [x] -> pred x))]
 
 let gConjIntro p1 p2 =

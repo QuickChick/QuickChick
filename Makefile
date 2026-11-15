@@ -77,7 +77,7 @@ tests:
 	coqc examples/TacticExample.v
 
 COMPATFILES:= \
-	plugin/coqExpr.ml \
+	plugin/rocqExpr.ml \
 	plugin/genericLib.ml \
 	plugin/publicDerive.ml \
 	plugin/mergeTypes.ml \

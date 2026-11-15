@@ -266,7 +266,7 @@ let rec convert_to_range dt =
        
   
 (* 
-type check = (coq_expr -> coq_expr) * int *)
+type check = (rocq_expr -> rocq_expr) * int *)
 
 let rec evaluate_range (umap : umap) (r : range) : rocq_constr option =
   match r with

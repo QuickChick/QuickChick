@@ -39,14 +39,14 @@ let hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous)
 let hole = CAst.make @@ CHole (None, Namegen.IntroAnonymous, None)
 #endif
 
-type coq_expr = constr_expr (* Opaque *)
+type rocq_expr = constr_expr (* Opaque *)
 
-let interp_open_coq_expr env evd e = fst (Constrintern.interp_constr env evd e)
+let interp_open_rocq_expr env evd e = fst (Constrintern.interp_constr env evd e)
 
-let interp_coq_expr_evars env evd e =
+let interp_rocq_expr_evars env evd e =
   Constrintern.interp_constr_evars env evd e
 
-let debug_coq_expr (c : coq_expr) : unit =
+let debug_rocq_expr (c : rocq_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   msg_debug (pr_constr_expr
@@ -57,10 +57,10 @@ let debug_coq_expr (c : coq_expr) : unit =
 
 type var = Id.t (* Opaque *)
 let var_to_string = Id.to_string
-let gVar (x : var) : coq_expr =
+let gVar (x : var) : rocq_expr =
   CAst.make @@ CRef (qualid_of_ident x,None)
 
-let qualid_to_coq_expr q = 
+let qualid_to_rocq_expr q = 
   mkRefC q
 
 (* Standard library paths written with the Coq prefix. Rocq 9 names the
@@ -89,7 +89,7 @@ let gTyParam = mkIdentC
 
 type ty_ctr   = qualid (* Opaque *)
 let ty_ctr_to_string (x : ty_ctr) = string_of_qualid x
-let gTyCtr = qualid_to_coq_expr
+let gTyCtr = qualid_to_rocq_expr
 let tyCtrToQualid x = x
 
 type arg = local_binder_expr
@@ -110,20 +110,20 @@ let gArg ?assumName:(an=hole) ?assumType:(at=hole) ?assumImplicit:(ai=false) ?as
 let str_lst_to_string sep (ss : string list) = 
   List.fold_left (fun acc s -> acc ^ sep ^ s) "" ss
 
-type coq_type = 
-  | Arrow of coq_type * coq_type
-  | TyCtr of ty_ctr * coq_type list
+type rocq_type = 
+  | Arrow of rocq_type * rocq_type
+  | TyCtr of ty_ctr * rocq_type list
   | TyParam of ty_param
 
-let rec coq_type_size ct =
+let rec rocq_type_size ct =
   match ct with
-  | Arrow (_,ct') -> 1 + coq_type_size ct'
+  | Arrow (_,ct') -> 1 + rocq_type_size ct'
   | _ -> 0
 
 type constructor = qualid (* Opaque *)
 let constructor_to_string (x : constructor) = string_of_qualid x
 let constructor_basename (x : constructor) = Id.to_string (qualid_basename x)
-let gCtr id = qualid_to_coq_expr id
+let gCtr id = qualid_to_rocq_expr id
 let injectCtr s = 
   if s = "" then failwith "Called gInject with empty string";
   qualid_of_string (rocq_path s)
@@ -148,7 +148,7 @@ module Ord_ctr = struct
   let compare x y = Stdlib.compare (string_of_qualid x) (string_of_qualid y)
 end
 
-type ctr_rep = constructor * coq_type 
+type ctr_rep = constructor * rocq_type 
 type sdt_rep = ty_ctr * ty_param list * ctr_rep list
 type dt_rep = sdt_rep list
 let (>>=) m f = 
@@ -336,7 +336,7 @@ let gFunWithArgs args f_body =
 
 let gIf b t f = CAst.make @@ CIf (b, (None, None) , t, f)
 
-let gFun xss (f_body : var list -> coq_expr) =
+let gFun xss (f_body : var list -> rocq_expr) =
   match xss with
   | [] -> f_body []
   | _ ->
@@ -349,7 +349,7 @@ let gFun xss (f_body : var list -> coq_expr) =
   let fun_body = f_body xvs in
   mkCLambdaN binder_list fun_body 
 
-let gFunTyped xts (f_body : var list -> coq_expr) =
+let gFunTyped xts (f_body : var list -> rocq_expr) =
   match xts with
   | [] -> f_body []
   | _ ->
@@ -363,7 +363,7 @@ let gFunTyped xts (f_body : var list -> coq_expr) =
   mkCLambdaN binder_list fun_body 
 
 (* with Explicit/Implicit annotations *)  
-let gRecFunInWithArgs ?structRec:(rec_id=None) ?assumType:(typ=hole) (fs : string) args (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) = 
+let gRecFunInWithArgs ?structRec:(rec_id=None) ?assumType:(typ=hole) (fs : string) args (f_body : (var * var list) -> rocq_expr) (let_body : var -> rocq_expr) = 
   let fv  = fresh_name fs in
 #if COQ_VERSION >= (8, 20, 0)
   let xvs = List.map (fun (CLocalAssum ([{CAst.v = n;_}], _, _, _)) ->
@@ -386,11 +386,11 @@ let gRecFunInWithArgs ?structRec:(rec_id=None) ?assumType:(typ=hole) (fs : strin
 #endif
     let_body fv)
              
-let gRecFunIn ?structRec:(rec_id=None) ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body : (var * var list) -> coq_expr) (let_body : var -> coq_expr) =
+let gRecFunIn ?structRec:(rec_id=None) ?assumType:(typ = hole) (fs : string) (xss : string list) (f_body : (var * var list) -> rocq_expr) (let_body : var -> rocq_expr) =
   let xss' = List.map (fun s -> fresh_name s) xss in
   gRecFunInWithArgs ~structRec:rec_id ~assumType:typ fs (List.map (fun x -> gArg ~assumName:(gVar x) ()) xss') f_body let_body 
 
-let gMatch discr ?catchAll:(body=None) ?params:(holes=0) ?explicit_params (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
+let gMatch discr ?catchAll:(body=None) ?params:(holes=0) ?explicit_params (branches : (constructor * string list * (var list -> rocq_expr)) list) : rocq_expr =
   CAst.make @@ CCases (MatchStyle,
           None (* return *), 
           [(discr, None, None)], (* single discriminee, no as/in *)
@@ -408,11 +408,11 @@ let gMatch discr ?catchAll:(body=None) ?params:(holes=0) ?explicit_params (branc
                                  | None -> []
                                  | Some c' -> [CAst.make ([[CAst.make @@ CPatAtom None]], c')])
 
-let gMatchReturn (discr : coq_expr)
+let gMatchReturn (discr : rocq_expr)
       ?catchAll:(body=None)
       (as_id : string)
-      (ret : var -> coq_expr)
-      (branches : (constructor * string list * (var list -> coq_expr)) list) : coq_expr =
+      (ret : var -> rocq_expr)
+      (branches : (constructor * string list * (var list -> rocq_expr)) list) : rocq_expr =
   let as_id' = fresh_name as_id in
   CAst.make @@ CCases (MatchStyle,
           Some (ret as_id'), (* return *)
@@ -539,7 +539,7 @@ let g_quickCheck p = gApp (gInject "QuickChick.Test.quickCheck") [p]
 let g_show typ = gApp (gInject "QuickChick.Show.show") [typ]
 
 (* Recursion combinators / fold *)
-(* fold_ty : ( a -> coq_type -> a ) -> ( ty_ctr * coq_type list -> a ) -> ( ty_param -> a ) -> coq_type -> a *)
+(* fold_ty : ( a -> rocq_type -> a ) -> ( ty_ctr * rocq_type list -> a ) -> ( ty_param -> a ) -> rocq_type -> a *)
 let rec fold_ty arrow_f ty_ctr_f ty_param_f ty = 
   match ty with
   | Arrow (ty1, ty2) -> 
@@ -555,7 +555,7 @@ let generate_names_from_type base_name ty =
   List.rev (snd (fold_ty' (fun (i, names) _ -> (i+1, (Printf.sprintf "%s%d" base_name i) :: names)) (0, []) ty))
 
 (* a := var list -> var -> a *)
-let fold_ty_vars (f : var list -> var -> coq_type -> 'a) (mappend : 'a -> 'a -> 'a) (base : 'a) ty : var list -> 'a =
+let fold_ty_vars (f : var list -> var -> rocq_type -> 'a) (mappend : 'a -> 'a -> 'a) (base : 'a) ty : var list -> 'a =
   fun allVars -> fold_ty' (fun acc ty -> fun (v::vs) -> mappend (f allVars v ty) (acc vs)) (fun _ -> base) ty allVars
 
 (* Declarations *)
@@ -617,7 +617,7 @@ let declare_class_instance ?(global=true) ?(priority=42) instance_arguments inst
   msg_debug (str (Id.to_string cid) ++ fnl ())
 
 (* Whether an expression mentions any of the given names. *)
-let mentions names (e : coq_expr) =
+let mentions names (e : rocq_expr) =
   let free = Constrexpr_ops.free_vars_of_constr_expr e in
   List.exists (fun name -> Id.Set.mem name free) names
 
@@ -625,7 +625,7 @@ let mentions names (e : coq_expr) =
    its arguments. The function is defined where its instance is, so an
    explicit application to the instance's own parameters, [@f A H], is
    replaced whole. A bound occurrence of the name is left alone. *)
-let inline_functions (functions : (var * (arg list * coq_expr)) list) (e : coq_expr) =
+let inline_functions (functions : (var * (arg list * rocq_expr)) list) (e : rocq_expr) =
   let inlined bound q =
     if qualid_is_ident q && not (List.mem (qualid_basename q) bound) then
       Option.map (fun (args, body) -> CAst.make (CLambdaN (args, body)))
@@ -637,7 +637,7 @@ let inline_functions (functions : (var * (arg list * coq_expr)) list) (e : coq_e
     | _ -> Constrexpr_ops.map_constr_expr_with_binders (fun id b -> id :: b) go bound e in
   go [] e
 
-let define_new_fixpoint (functions : (var * arg list * var * coq_expr * coq_expr) list) =
+let define_new_fixpoint (functions : (var * arg list * var * rocq_expr * rocq_expr) list) =
   let open Vernacexpr in
 
   let fixpoint_exprs = List.map

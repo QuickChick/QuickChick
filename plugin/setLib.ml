@@ -1,13 +1,13 @@
 open RocqExpr
 
-let set_singleton (c : coq_expr) : coq_expr = gApp (gInject "set1") [c]
-let set_empty : coq_expr = gInject "set0"
-let set_full : coq_expr = gInject "setT"
+let set_singleton (c : rocq_expr) : rocq_expr = gApp (gInject "set1") [c]
+let set_empty : rocq_expr = gInject "set0"
+let set_full : rocq_expr = gInject "setT"
 
-let set_bigcup (x : string) (p : coq_expr) (c : var -> coq_expr) : coq_expr =
+let set_bigcup (x : string) (p : rocq_expr) (c : var -> rocq_expr) : rocq_expr =
   gApp (gInject "bigcup") [p; gFun [x] (fun [x] -> c x)]
 
-let set_suchThat (x : string) (t : coq_expr) (p : var -> coq_expr) : coq_expr =
+let set_suchThat (x : string) (t : rocq_expr) (p : var -> rocq_expr) : rocq_expr =
   gFunTyped [("x", t)] (fun [x] -> p x)
 
 let set_eq c1 c2 = gApp (gInject "set_eq") [c1;c2]
@@ -122,7 +122,7 @@ let setI_subset_compat p1 p2 =
 let nil_subset p =
   gApp (gInject "nil_subset") [p]
 
-let cons_subset (hd : coq_expr) (tl : coq_expr) (p : coq_expr) (phd : coq_expr) (ptl : coq_expr) =
+let cons_subset (hd : rocq_expr) (tl : rocq_expr) (p : rocq_expr) (phd : rocq_expr) (ptl : rocq_expr) =
   gApp ~explicit:true (gInject "cons_subset") [hole; hd; tl; p; phd; ptl]
 
 let setI_set_incl hsub1 hsub2 =

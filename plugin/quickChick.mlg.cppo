@@ -471,7 +471,7 @@ let qcFuzz_main prop_def temp_dir execn prop_mlf prop_mlif prop fuzzLoop =
           let ctr_names =
             match ctrs with
             | [ctr,ctr_ty] ->
-               if RocqExpr.coq_type_size ctr_ty = 1 then [""]
+               if RocqExpr.rocq_type_size ctr_ty = 1 then [""]
                else [qualify (RocqExpr.constructor_to_string ctr)]
             | _ -> List.map (fun (ctr,_) -> qualify (RocqExpr.constructor_to_string ctr)) ctrs in
           Extraction_plugin.Table.extract_inductive 

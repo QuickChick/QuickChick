@@ -2,7 +2,7 @@ open Pp
 open Util
 open RocqExpr
 open SetLib
-open CoqLib
+open RocqLib
 open Feedback
 
 let sizeM = gInject "QuickChick.Classes.size"
@@ -11,7 +11,7 @@ let succ_zero x = false_ind hole (succ_neq_zero_app hole x)
 let base_ctrs ty_ctr ctrs = List.filter (fun (_, ty) -> isBaseBranch ty_ctr ty) ctrs
 
 (* Produces the record of the sized typeclass *)
-let sized_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * arg list * var * coq_expr * coq_expr) list) =
+let sized_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -> var list -> rocq_expr) * ((var * arg list * var * rocq_expr * rocq_expr) list) =
   let impl_function_names : (ty_ctr * var) list =
     List.map (fun (ty, _, _) -> 
       let type_name = ty_ctr_to_string ty in
@@ -20,11 +20,11 @@ let sized_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr 
       (ty, function_name)
     ) types in
 
-  let generate_size_function ((ty, ty_params, ctors) : (ty_ctr * ty_param list * ctr_rep list)) : var * arg list * var * coq_expr * coq_expr =
+  let generate_size_function ((ty, ty_params, ctors) : (ty_ctr * ty_param list * ctr_rep list)) : var * arg list * var * rocq_expr * rocq_expr =
     let function_name = List.assoc ty impl_function_names in
 
-    let coqTyParams = List.map gTyParam ty_params in
-    let full_type = gApp ~explicit:true (gTyCtr ty) coqTyParams in
+    let rocqTyParams = List.map gTyParam ty_params in
+    let full_type = gApp ~explicit:true (gTyCtr ty) rocqTyParams in
 
     let arg = fresh_name "x" in
     let arg_type = full_type in
@@ -62,14 +62,14 @@ let sized_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr 
           gApp (gInject "S") [maximum opts]
       ) in
     let body = gMatch (gVar arg) (List.map create_branch ctors) in
-    debug_coq_expr body;
+    debug_rocq_expr body;
 
     (function_name, [gArg ~assumName:(gVar arg) ~assumType:arg_type ()], arg, return_type, body) in
 
   let functions = List.map generate_size_function types in
 
   (* returns {| size := size_impl_... |} *)
-  let instance_record ty_ctr _ivars : coq_expr =
+  let instance_record ty_ctr _ivars : rocq_expr =
     let impl_function_name = List.assoc ty_ctr impl_function_names in
     gRecord [("size", gVar impl_function_name)] in
   
@@ -110,12 +110,12 @@ let rec dropIH cty ty_ctr l =
 
 
 
-let zeroEqProof ty_ctr ctrs (ind_scheme : coq_expr) size zeroType zeroSized iargs =
+let zeroEqProof ty_ctr ctrs (ind_scheme : rocq_expr) size zeroType zeroSized iargs =
   if List.is_empty ctrs then failwith "zeroEqProof call with no ctrs" else ();
   (* Common helpers, refactor? *)
-  let coqTyCtr = gTyCtr ty_ctr in
-  let coqTyParams = List.map gVar (list_drop_every 2 iargs) in
-  let _full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
+  let rocqTyCtr = gTyCtr ty_ctr in
+  let rocqTyParams = List.map gVar (list_drop_every 2 iargs) in
+  let _full_dt = gApp ~explicit:true rocqTyCtr rocqTyParams in
 
   let base_ctrs = base_ctrs ty_ctr ctrs in
 
@@ -160,7 +160,7 @@ let zeroEqProof ty_ctr ctrs (ind_scheme : coq_expr) size zeroType zeroSized iarg
          gExIntro_impl arg (gConjIntro gI (intro_set ty2 ctr_args' ctr (arg :: acc)))
        | [] -> failwith "Internal: wrong number of arguments")
     | _ -> gEqRefl hole
-             (* (gApp ~explicit:true (gCtr ctr) (coqTyParams @ List.rev acc)) *)
+             (* (gApp ~explicit:true (gCtr ctr) (rocqTyParams @ List.rev acc)) *)
   in
 
   let rec intro_unions ctrs args curr_ctr =
@@ -181,7 +181,7 @@ let zeroEqProof ty_ctr ctrs (ind_scheme : coq_expr) size zeroType zeroSized iarg
     let (_, iargs) = gen_args ty ty_ctr 0 in
     gFun iargs (fun iargs ->
         let (args, _) = dropIH ty ty_ctr iargs in
-        let elem = gApp ~explicit:true (gCtr ctr) (coqTyParams @ (List.map gVar args)) in
+        let elem = gApp ~explicit:true (gCtr ctr) (rocqTyParams @ (List.map gVar args)) in
         let lhs = gApp zeroSized [elem] in
         let rhs = gEq (gApp size [elem]) (gInt 0) in
         if isBaseBranch ty_ctr ty then
@@ -194,14 +194,14 @@ let zeroEqProof ty_ctr ctrs (ind_scheme : coq_expr) size zeroType zeroSized iarg
             (gFunTyped [("H1", rhs)] (fun [h1] -> succ_zero (gVar h1))))
   in
   let proofs = List.map create_case ctrs in
-  gApp ~explicit:true ind_scheme (coqTyParams @ (zeroType :: proofs))
+  gApp ~explicit:true ind_scheme (rocqTyParams @ (zeroType :: proofs))
 
 
-let succEqProof ty_ctr ctrs (ind_scheme : coq_expr) succType succSized iargs =
+let succEqProof ty_ctr ctrs (ind_scheme : rocq_expr) succType succSized iargs =
   (* Common helpers, refactor? *)
-  let coqTyCtr = gTyCtr ty_ctr in
-  let coqTyParams = List.map gVar (list_drop_every 2 iargs) in
-  let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
+  let rocqTyCtr = gTyCtr ty_ctr in
+  let rocqTyParams = List.map gVar (list_drop_every 2 iargs) in
+  let full_dt = gApp ~explicit:true rocqTyCtr rocqTyParams in
 
   let _base_ctrs = base_ctrs ty_ctr ctrs in
 
@@ -270,7 +270,7 @@ let succEqProof ty_ctr ctrs (ind_scheme : coq_expr) succType succSized iargs =
          gExIntro_impl arg
            (gConjIntro leq_l (intro_set leq_r ty2 ctr_args' iargs' ctr (arg :: acc)))
        | [] -> failwith "Internal: wrong number of arguments")
-    | _ -> gEqRefl (gApp ~explicit:true (gCtr ctr) (coqTyParams @ List.rev acc))
+    | _ -> gEqRefl (gApp ~explicit:true (gCtr ctr) (rocqTyParams @ List.rev acc))
   in
 
   let rec intro_unions h ctrs args ihargs curr_ctr =
@@ -291,7 +291,7 @@ let succEqProof ty_ctr ctrs (ind_scheme : coq_expr) succType succSized iargs =
     let (_, iargs) = gen_args ty ty_ctr 0 in
     gFun iargs (fun iargs ->
         let (args, ihargs) = dropIH ty ty_ctr iargs in
-        let elem = gApp ~explicit:true (gCtr ctr) (coqTyParams @ (List.map gVar args)) in
+        let elem = gApp ~explicit:true (gCtr ctr) (rocqTyParams @ (List.map gVar args)) in
         let leq_size size = set_suchThat "x" full_dt (fun x -> gle (gApp sizeM [gVar x]) size) in
         let lhs = gApp (gApp succSized [(leq_size (gVar size))]) [elem] in
         let rhs = gApp (leq_size (gSucc (gVar size))) [elem] in
@@ -307,21 +307,21 @@ let succEqProof ty_ctr ctrs (ind_scheme : coq_expr) succType succSized iargs =
   let proofs size = List.map (create_case size) ctrs in
   gFun
     ["size"]
-    (fun [size] -> gApp ~explicit:true ind_scheme (coqTyParams @ ((succType size) :: (proofs size))))
+    (fun [size] -> gApp ~explicit:true ind_scheme (rocqTyParams @ ((succType size) :: (proofs size))))
 
 
 let sizeEqType ty_ctr ctrs ind_scheme iargs =
 
   (* Common helpers, refactor? *)
-  let coqTyCtr = gTyCtr ty_ctr in
-  let coqTyParams = List.map gVar (list_drop_every 2 iargs) in
-  let full_dt = gApp ~explicit:true coqTyCtr coqTyParams in
+  let rocqTyCtr = gTyCtr ty_ctr in
+  let rocqTyParams = List.map gVar (list_drop_every 2 iargs) in
+  let full_dt = gApp ~explicit:true rocqTyCtr rocqTyParams in
 
   let bases = base_ctrs ty_ctr ctrs in
 
   (* Second reverse fold necessary *)
   let create_branch set tps (ctr,ty) =
-    let rec aux i acc ty : coq_expr =
+    let rec aux i acc ty : rocq_expr =
       match ty with
       | Arrow (ty1, ty2) ->
          let fi = Printf.sprintf "f%d" i in
@@ -331,7 +331,7 @@ let sizeEqType ty_ctr ctrs ind_scheme iargs =
       | _ -> set_singleton (gApp ~explicit:true (gCtr ctr) (tps @ (List.map gVar (List.rev acc)))) in
     aux 0 [] ty in
 
-  let lhs set ctrs = set_unions (List.map (create_branch set coqTyParams) ctrs) in
+  let lhs set ctrs = set_unions (List.map (create_branch set rocqTyParams) ctrs) in
   let rhs size = set_suchThat "x" full_dt (fun x -> gEq (gApp sizeM [gVar x]) size) in
 
   let zeroSized = lhs hole bases in
@@ -353,11 +353,11 @@ let sizeEqType ty_ctr ctrs ind_scheme iargs =
   let succSized_spec = succEqProof ty_ctr ctrs ind_scheme succType succSized iargs in
 
   msg_debug (str "zeroSized");
-  debug_coq_expr zeroSized;
+  debug_rocq_expr zeroSized;
   msg_debug (str "succSized");
-  debug_coq_expr succSized;
+  debug_rocq_expr succSized;
   msg_debug (str "zeroSized_spec");
-  debug_coq_expr zeroSized_spec;
-  debug_coq_expr succSized_spec;  
+  debug_rocq_expr zeroSized_spec;
+  debug_rocq_expr succSized_spec;  
   gRecord [("zeroSized", zeroSized); ("succSized", succSized);
            ("zeroSized_spec", zeroSized_spec); ("succSized_spec", succSized_spec)]

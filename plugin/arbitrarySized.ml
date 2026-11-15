@@ -8,7 +8,7 @@ let rec replace v x = function
       then x::ys
       else y::(replace v x ys)
 
-let shrink_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * arg list * var * coq_expr * coq_expr) list) =
+let shrink_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -> var list -> rocq_expr) * ((var * arg list * var * rocq_expr * rocq_expr) list) =
   let impl_function_names : (ty_ctr * var) list =
     List.map (fun (ty, _, _) -> 
       let type_name = ty_ctr_to_string ty in
@@ -17,11 +17,11 @@ let shrink_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr
       (ty, function_name)
     ) types in
 
-  let generate_shrink_function ((ty, ty_params, ctors) : (ty_ctr * ty_param list * ctr_rep list)) : var * arg list * var * coq_expr * coq_expr =
+  let generate_shrink_function ((ty, ty_params, ctors) : (ty_ctr * ty_param list * ctr_rep list)) : var * arg list * var * rocq_expr * rocq_expr =
     let function_name = List.assoc ty impl_function_names in
 
-    let coqTyParams = List.map gTyParam ty_params in
-    let full_type = gApp ~explicit:true (gTyCtr ty) coqTyParams in
+    let rocqTyParams = List.map gTyParam ty_params in
+    let full_type = gApp ~explicit:true (gTyCtr ty) rocqTyParams in
 
     let arg = fresh_name "x" in
     let arg_type = full_type in
@@ -45,7 +45,7 @@ let shrink_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr
           let liftNth =
             gFun ["shrunk"]
             (fun [shrunk] ->
-              gApp ~explicit:true (gCtr ctr) (coqTyParams @ (replace (gVar v) (gVar shrunk) (List.map gVar allParams))))
+              gApp ~explicit:true (gCtr ctr) (rocqTyParams @ (replace (gVar v) (gVar shrunk) (List.map gVar allParams))))
           in
 
           lst_appends (match find_ty_ctr ty' with
@@ -61,14 +61,14 @@ let shrink_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr
         list_nil ty
     ) in
     let body = gMatch (gVar arg) ~explicit_params:(List.length ty_params) (List.map create_branch ctors) in
-    debug_coq_expr body;
+    debug_rocq_expr body;
 
     (function_name, [gArg ~assumName:(gVar arg) ~assumType:arg_type ()], arg, return_type, body) in
 
   let functions = List.map generate_shrink_function types in
 
   (* returns {| shrink := @show_impl_... |} *)
-  let instance_record ty_ctr ivars : coq_expr =
+  let instance_record ty_ctr ivars : rocq_expr =
     let impl_function_name = List.assoc ty_ctr impl_function_names in
     let implicit_arguments = List.map gVar ivars in
 
@@ -79,7 +79,7 @@ let shrink_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr
   
   (instance_record, functions)
 
-let show_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -> var list -> coq_expr) * ((var * arg list * var * coq_expr * coq_expr) list) =
+let show_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -> var list -> rocq_expr) * ((var * arg list * var * rocq_expr * rocq_expr) list) =
   let impl_function_names : (ty_ctr * var) list =
     List.map (fun (ty, _, _) -> 
       let type_name = ty_ctr_to_string ty in
@@ -88,11 +88,11 @@ let show_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -
       (ty, function_name)
     ) types in
 
-  let generate_show_function ((ty, ty_params, ctors) : (ty_ctr * ty_param list * ctr_rep list)) : var * arg list * var * coq_expr * coq_expr =
+  let generate_show_function ((ty, ty_params, ctors) : (ty_ctr * ty_param list * ctr_rep list)) : var * arg list * var * rocq_expr * rocq_expr =
     let function_name = List.assoc ty impl_function_names in
 
-    let coqTyParams = List.map gTyParam ty_params in
-    let full_type = gApp ~explicit:true (gTyCtr ty) coqTyParams in
+    let rocqTyParams = List.map gTyParam ty_params in
+    let full_type = gApp ~explicit:true (gTyCtr ty) rocqTyParams in
 
     let arg = fresh_name "x" in
     let arg_type = full_type in
@@ -131,7 +131,7 @@ let show_decl (types : (ty_ctr * ty_param list * ctr_rep list) list) : (ty_ctr -
   let functions = List.map generate_show_function types in
 
   (* returns {| show := show_impl_... |} *)
-  let instance_record ty_ctr _ivars : coq_expr =
+  let instance_record ty_ctr _ivars : rocq_expr =
     let impl_function_name = List.assoc ty_ctr impl_function_names in
     gRecord [("show", gVar impl_function_name)] in
   
@@ -223,7 +223,7 @@ let fuzzy_decl ty_ctr ctrs iargs =
          (* Fuzz options based on the different constructors *)
          let opts_base = convert_ctr (ctr, ty) ctrs all_vars in
 
-         let rec aux opts ty acc_vars : coq_expr =
+         let rec aux opts ty acc_vars : rocq_expr =
            match ty, acc_vars with
            | Arrow (ty1, ty2), v :: vs ->
               (* lift a generator for ty1 to a generator for the whole thing *)
@@ -262,7 +262,7 @@ let fuzzy_decl ty_ctr ctrs iargs =
     (* Create the function body by recursing on the structure of x *)
     gFun ["x"] (fun [x] -> fuzzy_body x)
   in
-  debug_coq_expr fuzzy_fun;
+  debug_rocq_expr fuzzy_fun;
   gRecord [("fuzz", fuzzy_fun)]
 
 (* Mutator derivation *)
@@ -276,8 +276,8 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
   (* the number is the number of type class constraints included in `param_class_names` in simpleDriver *)
   let tyParams = List.map gVar (list_keep_every 4 iargs) in
 
-  let unfold_coq_type : coq_type -> coq_type list * coq_type =
-    let rec aux prm_typs (typ : coq_type) =
+  let unfold_rocq_type : rocq_type -> rocq_type list * rocq_type =
+    let rec aux prm_typs (typ : rocq_type) =
       match typ with 
       | Arrow (typ1, typ2) -> aux (typ1 :: prm_typs) typ2
       | _ -> (List.rev prm_typs, typ)
@@ -297,33 +297,33 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
     | None -> def
   in
 
-  let coq_expr_to_thunk (e : coq_expr) : coq_expr = gFun ["_tt"] (fun [_] -> e) in
+  let rocq_expr_to_thunk (e : rocq_expr) : rocq_expr = gFun ["_tt"] (fun [_] -> e) in
   
   let mutate_fun =
   
     let mutate_body x =
 
-      let weight_reg : coq_expr = 
+      let weight_reg : rocq_expr = 
         gInt 1
       in 
-      let weight_rcm (n_preserved : int) : coq_expr = 
+      let weight_rcm (n_preserved : int) : rocq_expr = 
         gApp (gInject "Nat.pow") [gInt 2; gInt n_preserved] 
       in
-      let weight_rec_ind (e_size : coq_expr) : coq_expr = 
+      let weight_rec_ind (e_size : rocq_expr) : rocq_expr = 
         gApp (gInject "Nat.pow") [gInt 2; e_size] in
-      let weight_rec_nonind : coq_expr = 
+      let weight_rec_nonind : rocq_expr = 
         gInt 1 
       in
 
       let create_branch 
-            (x' : coq_expr) (aux_mutate : var) 
-            ((ctr, ty) : constructor * coq_type) : 
-            constructor * string list * (var list -> coq_expr) =
+            (x' : rocq_expr) (aux_mutate : var) 
+            ((ctr, ty) : constructor * rocq_type) : 
+            constructor * string list * (var list -> rocq_expr) =
         (ctr, generate_names_from_type "p" ty,
-         fun (all_vars : var list) : coq_expr ->
-            let ctr_arg_typs : coq_type list = fst (unfold_coq_type ty) in
-            let ctr_args : coq_expr list = List.map gVar all_vars in
-            let ctr_env : (int option * coq_expr * (coq_type -> bool)) list =  
+         fun (all_vars : var list) : rocq_expr ->
+            let ctr_arg_typs : rocq_type list = fst (unfold_rocq_type ty) in
+            let ctr_args : rocq_expr list = List.map gVar all_vars in
+            let ctr_env : (int option * rocq_expr * (rocq_type -> bool)) list =  
               (None, x', isCurrentTyCtr) ::
               List.map_i 
                 (fun i ty -> (Some i, List.nth ctr_args i, fun ty' -> ty == ty')) 
@@ -331,21 +331,21 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             in
 
             (* regenerate *)
-            let regs : (coq_expr * coq_expr) list = 
-              [(weight_reg, coq_expr_to_thunk @@ gInject "arbitrary")] 
+            let regs : (rocq_expr * rocq_expr) list = 
+              [(weight_reg, rocq_expr_to_thunk @@ gInject "arbitrary")] 
             in
 
             (* recombines *)
             (* LEO: Maybe, filter the "noop" mutation that comes out *)
-            let rcms : (coq_expr * coq_expr) list =
+            let rcms : (rocq_expr * rocq_expr) list =
               (* all recombine options under nested freq *)
-              (fun x -> [(gInt 1, coq_expr_to_thunk x)]) @@
+              (fun x -> [(gInt 1, rocq_expr_to_thunk x)]) @@
               frequencyThunked @@
-              List.map (fun (n_preserved, e) -> (weight_rcm n_preserved, coq_expr_to_thunk e)) @@
+              List.map (fun (n_preserved, e) -> (weight_rcm n_preserved, rocq_expr_to_thunk e)) @@
               List.map_append
                 (fun (ctr', ctr'_typ) ->
-                  let ctr'_prm_typs : coq_type list = 
-                    fst (unfold_coq_type ctr'_typ) 
+                  let ctr'_prm_typs : rocq_type list = 
+                    fst (unfold_rocq_type ctr'_typ) 
                   in
                   (* convert lists of lists of (optional) arguments into
                      applications, complete with any arguments that were None
@@ -356,9 +356,9 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                       let n_preserved_ref = ref 0 in
                       let diff = ref false in
                       let rec f 
-                          (opt_args' : (int option * coq_expr) option list) 
-                          (args : coq_expr list) n_preserved i : 
-                          coq_expr =
+                          (opt_args' : (int option * rocq_expr) option list) 
+                          (args : rocq_expr list) n_preserved i : 
+                          rocq_expr =
                         match opt_args' with
                         | [] ->
                           n_preserved_ref := n_preserved;
@@ -389,7 +389,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                      using arbitrary (via None) *)
                   List.fold_right 
                     (fun ctr'_prm_ty argss ->
-                      let opt_args : (int option * coq_expr) option list =
+                      let opt_args : (int option * rocq_expr) option list =
                         None ::
                         List.filter_map
                           (fun (opt_i, arg, is_ty) -> 
@@ -410,7 +410,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
             in
 
             (* recursions *)
-            let recs : (coq_expr * coq_expr) list =
+            let recs : (rocq_expr * rocq_expr) list =
               List.map_i
                 (fun i arg_typ -> 
                   let ctr_arg = List.nth ctr_args i in
@@ -418,14 +418,14 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
                     (* mutate child *)
                     (* return input where child is replaced *)
                     ( weight_rec_ind (gApp (gInject "size") [ctr_arg]),
-                      coq_expr_to_thunk @@
+                      rocq_expr_to_thunk @@
                       bindGen (gApp (gVar aux_mutate) [ctr_arg]) 
                         (var_to_string (List.nth all_vars i) ^ "'") (fun child' -> 
                       returnGen (gApp ~explicit:true (gCtr ctr) 
                         (tyParams @ List.assign ctr_args i (gVar child')))))
                   else
                     ( weight_rec_nonind,
-                      coq_expr_to_thunk @@
+                      rocq_expr_to_thunk @@
                       bindGen (gApp (gInject "mutate") [ctr_arg])
                         (var_to_string (List.nth all_vars i) ^ "'") (fun child' ->
                       returnGen (gApp ~explicit:true (gCtr ctr)
@@ -438,7 +438,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
         )
       in
   
-      let aux_mutate_body rec_fun x' : coq_expr = 
+      let aux_mutate_body rec_fun x' : rocq_expr = 
         gMatch (gVar x') (List.map (create_branch (gVar x') rec_fun) ctrs) 
       in
   
@@ -451,7 +451,7 @@ let mutate_decl ty_ctr (ctrs : ctr_rep list) (iargs : var list) =
     gFun ["x"] (fun [x] -> mutate_body x)
   
   in
-  debug_coq_expr mutate_fun;
+  debug_rocq_expr mutate_fun;
   gRecord [("mutate", mutate_fun)]
 
 (** Shrinking Derivation *)

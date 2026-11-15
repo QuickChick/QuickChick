@@ -35,12 +35,12 @@ let derive (cn : derivable) (c : constr_expr) =
     | Some dt -> dt
     | None -> failwith "Not supported type"  in
 
-  let coqTyCtr = List.map (fun (ty_ctr, _, _) -> gTyCtr ty_ctr) dt in
-  let coqTyParams = List.map (fun (_, ty_params, _) -> List.map gTyParam ty_params) dt in
+  let rocqTyCtr = List.map (fun (ty_ctr, _, _) -> gTyCtr ty_ctr) dt in
+  let rocqTyParams = List.map (fun (_, ty_params, _) -> List.map gTyParam ty_params) dt in
 
   let full_dt = List.map2
-    (fun coqTyCtr coqTyParams -> gApp ~explicit:true coqTyCtr coqTyParams)
-    coqTyCtr coqTyParams in
+    (fun rocqTyCtr rocqTyParams -> gApp ~explicit:true rocqTyCtr rocqTyParams)
+    rocqTyCtr rocqTyParams in
 
   let class_name = derivable_to_string cn in
 
@@ -53,11 +53,11 @@ let derive (cn : derivable) (c : constr_expr) =
   in
 
   (* Generate typeclass constraints. For each type parameter "A" we need `{_ : <Class Name> A} *)
-  let instance_arguments : (arg list) list = List.map (fun coqTyParams ->
+  let instance_arguments : (arg list) list = List.map (fun rocqTyParams ->
     List.concat @@
       List.map (fun tp -> (gArg ~assumName:tp ~assumImplicit:true ()) ::
         (List.map (fun name -> gArg ~assumType:(gApp (gInject name) [tp]) ~assumGeneralized:true ()) param_class_names)
-      ) coqTyParams) coqTyParams
+      ) rocqTyParams) rocqTyParams
   in
 
   (* The instance type *)
@@ -66,8 +66,8 @@ let derive (cn : derivable) (c : constr_expr) =
 
   (* Create the instance record. Only need to extend this for extra instances *)
   let (instance_record, functions_to_mutually_define) :
-      (ty_ctr -> var list -> coq_expr)
-      * (var * arg list * var * coq_expr * coq_expr) list =
+      (ty_ctr -> var list -> rocq_expr)
+      * (var * arg list * var * rocq_expr * rocq_expr) list =
     (* Copying code for Arbitrary, Sized from derive.ml *)
     match cn with
     | Show -> show_decl dt
