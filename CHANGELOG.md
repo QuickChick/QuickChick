@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
   import leaves Stdlib's `Derive` syntax alone.
 - The `quickchick` proof tactic keeps its generated test and helpers local to
   the proof. A saved test can be rerun before the proof ends.
+- A test program is compiled with `ocamlfind ocamlopt` directly unless
+  `QCInclude` adds OCaml directories, which still use `ocamlbuild`. This
+  takes about half a second per test instead of two and a half.
 - Testing works inside ordinary and nested modules and on properties exported
   by applied functors. An unapplied functor cannot run a test.
 - Public derivations accept fixed or repeated inputs, such as

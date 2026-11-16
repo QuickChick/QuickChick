@@ -256,8 +256,17 @@ let define_and_run c env evd =
     | [] -> ""
     | x -> "-pkgs '" ^ (String.concat "," x) ^ "'"
   in
+  (* Without included OCaml directories the test is a single module, which
+     ocamlfind compiles directly; ocamlbuild's start-up alone takes most of a
+     two-second build. Included directories need ocamlbuild to find and order
+     their modules. *)
+  let single_module = SummaryRef.(!extra_dir) = [] && SummaryRef.(!dune_file) = None in
   let exec_command =
     match SummaryRef.(!dune_file) with
+    | None when single_module ->
+       let pkgs = String.concat "," ("unix" :: SummaryRef.(!extra_pkg)) in
+       Printf.sprintf "cd %s && ocamlfind ocamlopt -package '%s' -linkpkg -w -3 %s %s -o %s > build.log 2> build.err"
+         dir pkgs (Filename.basename mlif) (Filename.basename mlf) (Filename.basename execn)
     | None -> "cd " ^ dir ^ " && ocamlbuild -use-ocamlfind " ^ packages ^ " -lib unix -cflags \"-w -3\" " ^ Filename.basename execn ^ " -quiet > build.log 2> build.err"
     | Some s ->
        (* Modify the dune file to add the executable name and put it in the output dir *) 
@@ -270,6 +279,7 @@ let define_and_run c env evd =
   let execn =
     let (</>) = Filename.concat in
     match SummaryRef.(!dune_file) with
+    | None when single_module -> execn
     | None -> Filename.dirname execn </> "_build" </> Filename.basename execn
     | Some _ -> dir ^ "/_build/default/" ^ (Filename.chop_extension (Filename.basename execn)) ^ ".exe" in
 
