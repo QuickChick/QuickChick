@@ -203,7 +203,7 @@ in normal use.
 | `QC_SCHEDULE_POR=0` | Disable swap reduction. |
 | `QC_SCHEDULE_REUSE_STABLE=0`, `QC_SCHEDULE_CONTEXT_REUSE=0` | Disable memo sharing or contextual replay. |
 | `QC_THEOREM_LAZY_SCORING=0` | Score every theorem candidate. |
-| `QC_BUDGET_AWARE_DEMO=relation` | Print BudgetAware scores of every candidate for that relation (used by `test/budget_aware`). |
+| `QC_BUDGET_AWARE_DEMO=relation` | Print BudgetAware scores of every candidate for that relation. |
 | `QC_CARDINALITY_TRACE=1` | Print the cardinality count of each mode. |
 
 Dune does not track environment variables, so compare modes in separate

@@ -1,7 +1,6 @@
 (* Diagnostics of one constructor's schedule selection, switched on by
-   environment variables: the BudgetAware demonstration used by
-   test/budget_aware, and verification that grouped search keeps the joint
-   search's best score. Neither changes a selection. *)
+   environment variables: the BudgetAware demonstration, and verification
+   that grouped search keeps the joint search's best score. Neither changes a selection. *)
 open Pp
 open GenericLib
 open RelationInfo

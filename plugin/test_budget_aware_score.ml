@@ -1,3 +1,5 @@
+(* Expected scores were checked against Specimen's BudgetAwareScore at
+   revision 121cf23435a17d93f1dde283daa62d2899628a8b. *)
 module N = Quickchick_plugin.GenericLib
 module B = Quickchick_plugin.BudgetAwareScore
 module U = Quickchick_plugin.UnifyQC

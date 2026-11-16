@@ -22,7 +22,9 @@ QuickChick Derive Enumerator for (fun n2 => distinct_members ets n1 n2).
 QuickChick Derive Checker for (distinct_members ets n1 n2).
 
 (* A dense constructor: its BudgetAware scores tie on every field but the
-   variable-dependency counts, which the look-ahead bounds. *)
+   variable-dependency counts, which the look-ahead bounds. Verification
+   searches every pruned branch, so its cost grows quickly with the number of
+   premises: twelve take seconds, sixteen took minutes. *)
 
 Inductive le' : nat -> nat -> Prop :=
 | le_n' n : le' n n
@@ -33,5 +35,5 @@ Inductive plus' : nat -> nat -> nat -> Prop :=
 | plus_S n m p : plus' n m p -> plus' (S n) m (S p).
 
 Inductive dense : list nat -> nat -> nat -> Prop :=
-| Dense l a b x1 x2 x3 x4 x5 x6 : le' x1 a -> le' x1 x4 -> le' x1 x6 -> le' a x3 -> le' x1 x2 -> le' a b -> le' a x5 -> plus' a x1 x6 -> le' x4 x6 -> plus' x6 x5 b -> le' x1 x5 -> le' x2 x5 -> plus' x6 x3 a -> plus' x3 x2 x4 -> mem a l -> mem b l -> dense l a b.
+| Dense l a b x1 x2 x3 x4 x5 x6 : le' x1 a -> le' x1 x4 -> le' x1 x6 -> le' a x3 -> plus' a x1 x6 -> le' x4 x6 -> plus' x6 x5 b -> le' x2 x5 -> plus' x6 x3 a -> plus' x3 x2 x4 -> mem a l -> mem b l -> dense l a b.
 QuickChick Derive Generator for (fun p => let '(a, b) := p in dense l a b).

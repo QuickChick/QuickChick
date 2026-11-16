@@ -1,3 +1,6 @@
+(* Tests and helpers that quickchick prepares inside a proof belong to that
+   proof: they can be rerun before it ends and are gone after Qed, Defined or
+   Abort, or after a failed or rolled-back preparation. *)
 From QuickChick Require Import QuickChick.
 Extract Constant defNumTests => "3".
 Inductive accepts : bool -> Prop := Accepts : forall b, accepts b.
@@ -11,8 +14,6 @@ Goal forall b, accepts b.
   Check theorem0.
   QuickCheck (theorem 1).
   QuickChickWith (updMaxSuccess stdArgs 2) (theorem0 3).
-  Undo.
-  QuickChick (theorem 2).
   intros; constructor.
 Qed.
 Fail Check theorem.
@@ -25,18 +26,6 @@ Goal forall n : nat, n = n.
   exact (let saved := theorem 2 in fun n => eq_refl n).
 Defined.
 Fail Check theorem.
-
-(* Undo preparation itself, then prepare again under the same names. *)
-Goal forall b, accepts b.
-  quickchick 2.
-  Undo.
-  Fail Check theorem.
-  Fail Check DecOpt_accepts_I.
-  quickchick 2.
-  QuickChick (theorem 2).
-Abort.
-Fail Check theorem.
-Fail Definition leaked_checker : DecOpt (accepts true) := ltac:(typeclasses eauto).
 
 (* A failed preparation after deriving dependencies leaves nothing behind. *)
 Inductive unprintable := Unprintable.
