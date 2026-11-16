@@ -90,15 +90,26 @@ let unk_provider =
   let np = mk_name_provider "unkn" in
   { next_unknown = fun () -> Unknown.from_string (np.next_name ()) }
 
-let is_inductive ty_name : bool =
-  let locate_result = Nametab.locate_all ty_name in
-  List.exists (function
-               | Names.GlobRef.IndRef _ -> true
-               | _ -> false) locate_result
+(* Whether a name in a pattern refers to a type: an inductive, or a constant
+   whose type is a sort, such as [Event := Loc * Loc * Msg]. Value constants
+   in a conclusion have already become equality premises (see
+   abstract_conclusion_calls), so a type is the only other non-constructor
+   that reaches a pattern. The name is resolved as the generated code will
+   resolve it; one that does not resolve is not assumed to be a type. *)
+let is_type_reference name : bool =
+  match Nametab.locate name with
+  | Names.GlobRef.IndRef _ -> true
+  | Names.GlobRef.ConstRef c ->
+    let env = Global.env () in
+    let ty = (Environ.lookup_constant c env).Declarations.const_type in
+    Reductionops.is_arity env (Evd.from_env env) (EConstr.of_constr ty)
+  | _ -> false
+  | exception Not_found -> false
 
+(* A type argument of a constructor is erased in a pattern. *)
 let make_types_wild_in_pat p =
   match p with
-  | PCtr (c, ps) when is_inductive c -> PWild
+  | PCtr (c, _) when is_type_reference c -> PWild
   | _ -> p
 
 (* Match a constructor/ranges list to a fixed input *)
