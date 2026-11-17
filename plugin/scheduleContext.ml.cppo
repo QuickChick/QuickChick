@@ -421,6 +421,121 @@ let has_schedule_instance ?(cached = true) relation outputs ds constrained =
 
 (* A policy score may call a dependency SuppliedInstance only when the
    obligation resolves in the current context, without invented premises. *)
+(* Missing Dec_Eq instances. An equality check compiles to a DecOpt
+   instance, usually from Dec_Eq. When none exists for a closed type, the
+   check is still available if QuickChick can build one with [dec_eq], for
+   the type itself or for its type arguments (list RequestType needs
+   Dec_Eq RequestType). The instances a compilation needs are declared in
+   its scope before its helpers and reported; a type for which none can be
+   built makes the check unavailable, and that is reported too. *)
+
+let derived_instance_warning = Compat.warning ~name:"quickchick-derived-instance" (fun what ->
+  str ("QuickChick derived " ^ what ^ " for this test or derivation; declare your own instance to replace it."))
+
+let missing_instance_warning = Compat.warning ~name:"quickchick-missing-instance" (fun what ->
+  str ("QuickChick skipped schedules that need " ^ what ^ ", which it cannot derive; declare that instance to make them available."))
+
+(* A type as an argument: parenthesized when it is an application. *)
+let parenthesize key =
+  if String.contains key ' ' && not (key.[0] = '(' && key.[String.length key - 1] = ')')
+  then "(" ^ key ^ ")" else key
+
+(* Each report once per command. *)
+let reported_instances : (string, unit) Hashtbl.t = Hashtbl.create 8
+let report_once warn what =
+  if not (Hashtbl.mem reported_instances what) then begin
+    Hashtbl.add reported_instances what (); warn what end
+
+(* Dec_Eq types to declare before the next definitions, in order. *)
+let pending_dec_eq : (string * EConstr.t) list ref = ref []
+let dec_eq_plans : (string, EConstr.t list option) Hashtbl.t = Hashtbl.create 8
+
+let reset_derived_instances () =
+  Hashtbl.reset reported_instances; Hashtbl.reset dec_eq_plans; pending_dec_eq := []
+
+let dec_eq_class () = Nametab.global_of_path
+  (Libnames.path_of_string "QuickChick.Decidability.Dec_Eq")
+
+let type_key env sigma ty = Pp.string_of_ppcmds (Printer.pr_econstr_env env sigma ty)
+
+(* The type compared by an equality obligation [DecOpt (@eq T a b)]. *)
+let equality_type env sigma goal =
+  let goal = Reductionops.nf_betaiotazeta env sigma goal in
+  match EConstr.kind sigma goal with
+  | Constr.App (_, [| prop |]) ->
+    (match EConstr.kind sigma (Reductionops.nf_betaiotazeta env sigma prop) with
+     | Constr.App (eq, [| ty; _; _ |]) when
+         (match EConstr.kind sigma eq with
+          | Constr.Ind (ind, _) -> Names.GlobRef.CanOrd.equal (Names.GlobRef.IndRef ind)
+              (Coqlib.lib_ref "core.eq.type")
+          | _ -> false) -> Some ty
+     | _ -> None)
+  | _ -> None
+
+(* A type with no variables, local or existential, and no free indices. *)
+let closed_type sigma ty =
+  let found = ref false in
+  let rec visit t = (match EConstr.kind sigma t with
+    | Constr.Var _ | Constr.Evar _ -> found := true | _ -> ());
+    EConstr.iter sigma visit t in
+  visit ty; EConstr.Vars.closed0 sigma ty && not !found
+
+(* Whether [dec_eq] proves Dec_Eq [ty] in [env], where [env] may assume
+   instances for other types as hypotheses. *)
+let dec_eq_derivable env sigma ty =
+  let expression = Constrexpr_ops.mkAppC
+    (CAst.make (Constrexpr.CRef (Libnames.qualid_of_string "QuickChick.Decidability.qc_derive_dec_eq", None)),
+     [Compat.extern_constr env sigma ty]) in
+  (* dec_eq does not fail on goals it cannot solve; they remain as holes. *)
+  try
+    let sigma, term = Constrintern.interp_constr_evars env sigma expression in
+    not (Evarutil.has_undefined_evars sigma term)
+  with e when CErrors.noncritical e -> false
+
+let dec_eq_resolvable env sigma ty =
+  let sigma, cls = Evd.fresh_global env sigma (dec_eq_class ()) in
+  resolve_schedule_obligation env sigma (EConstr.mkApp (cls, [| ty |])) <> None
+
+(* The closed types whose Dec_Eq must be built for Dec_Eq [ty] to resolve,
+   or None when [dec_eq] cannot build them. Assumed instances are added to the
+   environment as hypotheses, which instance resolution uses. *)
+let rec dec_eq_plan env sigma assumed ty =
+  let assume env sigma tys = List.fold_left (fun env t ->
+    let sigma, cls = Evd.fresh_global env sigma (dec_eq_class ()) in
+    let id = Namegen.next_ident_away (Names.Id.of_string "qc_assumed_dec_eq")
+      (Environ.ids_of_named_context_val (Environ.named_context_val env)) in
+    EConstr.push_named (Context.Named.Declaration.LocalAssum
+      (Context.make_annot id Compat.relevant, EConstr.mkApp (cls, [| t |]))) env) env tys in
+  let env' = assume env sigma assumed in
+  if dec_eq_resolvable env' sigma ty then Some []
+  else if dec_eq_derivable env' sigma ty then Some [ty]
+  else
+    let _, args = Compat.edecompose_app sigma ty in
+    let type_args = List.filter (fun arg ->
+      try EConstr.isSort sigma (Reductionops.whd_all env sigma
+            (Retyping.get_type_of env sigma arg))
+      with _ -> false) (Array.to_list args) in
+    let plan = List.fold_left (fun acc arg -> match acc with
+      | None -> None
+      | Some planned -> match dec_eq_plan env sigma (assumed @ planned) arg with
+        | None -> None | Some more -> Some (planned @ more)) (Some []) type_args in
+    match plan with
+    | Some planned when planned <> [] &&
+        dec_eq_resolvable (assume env sigma (assumed @ planned)) sigma ty -> Some planned
+    | _ -> None
+
+(* The plan for an equality obligation that has no instance, cached per type. *)
+let equality_plan env sigma goal =
+  match equality_type env sigma goal with
+  | Some ty when closed_type sigma ty ->
+    let key = type_key env sigma ty in
+    let plan = match Hashtbl.find_opt dec_eq_plans key with
+      | Some plan -> plan
+      | None -> let plan = dec_eq_plan env sigma [] ty in
+        Hashtbl.replace dec_eq_plans key plan; plan in
+    Some (key, plan, List.map (fun t -> type_key env sigma t, t) (Option.default [] plan))
+  | _ -> None
+
 let has_supplied_schedule_instance relation outputs ds constrained =
   (* Cached like has_schedule_instance: by the obligation and inputs, within
      one environment, local context and universe state. *)

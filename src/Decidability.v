@@ -178,6 +178,10 @@ Ltac dec_eq :=
            end
          end.
 
+(* A Dec_Eq instance for [A] built by [dec_eq]. Automatic testing uses it to
+   derive an instance that an equality check needs and that is missing. *)
+Notation qc_derive_dec_eq A := (ltac:(dec_eq) : Dec_Eq A) (only parsing).
+
 #[global] Instance Dec_Eq_implies_DecEq {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 Proof.
 constructor.

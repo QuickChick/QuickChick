@@ -7,12 +7,19 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased] — 3.0 candidate
 
 - Schedule selection no longer picks schedules that cannot be compiled. An
-  equality check needs an existing decidable-equality instance (usually
-  `Dec_Eq`); without one, the check is unavailable. A generator or
-  enumerator derived for a type argument, such as the element type of a
-  list, is now compiled along with the producer that needs it. Before,
-  `quickchick` and derivations could stop with "cannot propagate a
-  dependency requirement" or unresolved implicit arguments.
+  equality check needs a decidable-equality instance (usually `Dec_Eq`);
+  when one is missing, QuickChick derives it with `dec_eq`, for the type or
+  its type arguments, and declares it only for that test or derivation.
+  Generators and enumerators derived for type arguments, such as the element
+  type of a list, are compiled with the producer that needs them. Before,
+  `quickchick` and derivations could stop with "cannot propagate a dependency
+  requirement" or unresolved implicit arguments.
+- Instances QuickChick derives on its own, `Dec_Eq` and unconstrained
+  `GenSized` or `EnumSized` for types other than the one requested, are
+  reported by the warning `quickchick-derived-instance`, so that a better
+  hand-written instance can replace them. When it cannot derive a `Dec_Eq`,
+  the schedules that need it are skipped and `quickchick-missing-instance`
+  says so. Both are on by default; `-w -quickchick` silences them.
 - `quickchick_schedules` lists a goal's theorem schedules, best first, in
   the order `quickchick n i` numbers them. Theorem schedules are ranked by
   the active scorer, including BudgetAware and compiled Rocq policies, and

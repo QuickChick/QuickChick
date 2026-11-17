@@ -702,6 +702,14 @@ Declare Instance Dec_eq_list (A : Type)
    the goal. If lookup fails with a finite [Typeclasses Depth] limit, increase
    or unset the limit before requesting automatic derivation.
 
+   Instances a test needs and that do not exist are derived for it: generators
+   and enumerators for types, and [Dec_Eq] for types whose values a schedule
+   compares (with [dec_eq]). Each is reported by the warning
+   [quickchick-derived-instance]; declaring your own instance replaces it.
+   When [dec_eq] cannot build a [Dec_Eq], schedules that need it are skipped
+   and [quickchick-missing-instance] names it. [QuickChick Derive] behaves
+   the same way for the dependencies of the instance it declares.
+
    [quickchick n] tests with size [n]; [quickchick n i] runs the [i]-th best
    theorem schedule instead of the best ([i] = 0), and [quickchick_idx i]
    runs it at the default sizes. [quickchick_schedules]

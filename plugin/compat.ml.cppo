@@ -202,3 +202,14 @@ let is_class_type env sigma t =
   ignore env; Typeclasses.is_class_type sigma t
 #endif
 
+
+#if COQ_VERSION >= (8, 18, 0)
+let quickchick_category = CWarnings.create_category ~name:"quickchick" ()
+let warning ~name pp =
+  let warn = CWarnings.create ~name ~category:quickchick_category pp in
+  fun x -> warn x
+#else
+let warning ~name pp =
+  let warn = CWarnings.create ~name ~category:"quickchick" pp in
+  fun x -> warn x
+#endif

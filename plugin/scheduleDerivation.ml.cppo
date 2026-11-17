@@ -820,7 +820,76 @@ let register_schedule_instances ~local components =
 
 (* Dependencies precede their consumers. Register each SCC before elaborating
    the next one so external calls use the ordinary class projections. *)
-let define_schedule_components ~local components pieces =
+(* Declare the Dec_Eq instances the compiled schedules' equality checks
+   need and that QuickChick builds, before the helpers that use them, and
+   report every derived instance a user might prefer to write: those, and
+   unconstrained generators and enumerators for types other than the ones
+   requested. *)
+let declare_derived_instances ~local ?(requested = []) components =
+  let open GenericLib in
+  let rec typed_outputs = function
+    | [] -> []
+    | S_UC (v, SrcNonrec ty, _) :: rest -> (v, ty) :: typed_outputs rest
+    | S_ST (outputs, _, _) :: rest -> outputs @ typed_outputs rest
+    | _ :: rest -> typed_outputs rest in
+  let needed = ref [] in
+  let consider relation =
+    if not (has_schedule_instance relation [] D_Check true) then begin
+      let env, sigma, goal, _ = elaborate_obligation relation [] D_Check true in
+      match equality_plan env sigma goal with
+      | Some (_, Some _, typed) ->
+        List.iter (fun ((key, _) as entry) ->
+          if not (List.mem_assoc key !needed) then needed := !needed @ [entry]) typed
+      | _ -> ()
+    end in
+  let is_equality rel = is_rocq_path (ty_ctr_to_string rel) "Coq.Init.Logic.eq" ||
+    ty_ctr_to_string rel = "eq" in
+  List.iter (List.iter (fun ((_, inputs, _, base, recursive), _, _) ->
+    List.iter (fun ((steps, sort), _, binders, _, _) ->
+      (* Locals with a known type, once each; an untyped one would make every
+         obligation ambiguous. *)
+      let locals = List.fold_left (fun acc (v, t) ->
+        if t = MHole || List.mem_assoc v inputs || List.mem_assoc v acc then acc else acc @ [v, t]) []
+        (binders @ List.map (fun (v, t) -> v, product_free_rocq_type_to_mexp t) (typed_outputs steps)) in
+      with_schedule_inputs (inputs @ locals) (fun () ->
+        List.iter (function
+          | S_Check (SrcNonrec (DTyCtr (rel, _) as relation), _) when is_equality rel -> consider relation
+          | _ -> ()) steps;
+        match sort with
+        | TheoremSchedule (DTyCtr (rel, _) as concl, _) when is_equality rel -> consider concl
+        | _ -> ())) (base @ recursive))) components;
+  List.iter (fun (key, ty) ->
+    let env = schedule_env () in
+    let sigma = schedule_sigma env in
+    let base = String.map (fun c -> if Char.code c < 128 && (c = '_' || ('a' <= c && c <= 'z') ||
+      ('A' <= c && c <= 'Z') || ('0' <= c && c <= '9')) then c else '_') key in
+    let rec fresh i = let id = Names.Id.of_string ("qc_Dec_Eq_" ^ base ^ (if i = 0 then "" else string_of_int i)) in
+      if is_name_in_use id env then fresh (i + 1) else id in
+    let name = fresh 0 in
+    let body = Constrexpr_ops.mkAppC
+      (CAst.make (Constrexpr.CRef (Libnames.qualid_of_string "QuickChick.Decidability.qc_derive_dec_eq", None)),
+       [Compat.extern_constr env sigma ty]) in
+    define body name env sigma;
+    let reference = Nametab.locate (Libnames.qualid_of_ident (emitted_name name)) in
+    Compat.existing_instance (if local then Hints.Local else Hints.SuperGlobal)
+      reference (Some { Typeclasses.hint_priority = Some 42; hint_pattern = None });
+    report_once derived_instance_warning ("Dec_Eq " ^ parenthesize key)) !needed;
+  List.iter (List.iter (fun ((name, _, _, _, _), ds, constrained) ->
+    let ind, _, _, _ = parse_ind_schd_name name in
+    match ds, constrained with
+    | (D_Gen | D_Enum), false when not (List.mem (ty_ctr_to_string ind) requested) ->
+      (* A derived producer for a parameterized type is generic: list _. *)
+      let parameters = match ty_ctr_to_rocq_relation ind with
+        | (_, params, _, _) -> List.length params
+        | exception _ -> 0 in
+      let shown = if parameters = 0 then ty_ctr_to_string ind
+        else "(" ^ ty_ctr_to_string ind ^ String.concat "" (List.init parameters (fun _ -> " _")) ^ ")" in
+      report_once derived_instance_warning
+        ((if ds = D_Gen then "GenSized " else "EnumSized ") ^ shown)
+    | _ -> ())) components
+
+let define_schedule_components ~local ?requested components pieces =
+  declare_derived_instances ~local ?requested components;
   (match !public_declaration_names with
   | None -> ()
   | Some names -> List.iter (List.iter (fun (name, _) ->
@@ -874,6 +943,7 @@ let derive_schedule ind ois ds opt =
   match GenericLib.ind_reference_to_rocq_relations ind with
     | Some (idx, rs) ->
       reset_mode_memo ();
+      reset_derived_instances ();
       inductive_set := inductive_set_init;
       rocq_relation_memo := TyCtrMap.empty;
       (* inductive_dependency_map := StringMap.empty; *)
@@ -902,7 +972,8 @@ let derive_schedule ind ois ds opt =
 
       let schedules_pieces = inductive_schedules_to_def_constr_exprs components ind_schd_name in
 
-      define_schedule_components ~local:false components schedules_pieces;
+      let requested = List.map (fun (name, _, _, _) -> ty_ctr_to_string name) rs in
+      define_schedule_components ~local:false ~requested components schedules_pieces;
       msg_debug (int (List.length schedules_pieces) ++ str " Pieces defined" ++ fnl ())
 
     | None -> failwith "Failed to parse inductive type "

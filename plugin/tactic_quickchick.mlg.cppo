@@ -142,6 +142,7 @@ let quickchick_schedules =
       | None -> CErrors.user_err (str "quickchick_schedules: cannot read the goal as a property.")
       | Some dt ->
         reset_mode_memo ();
+        reset_derived_instances ();
         inductive_set := inductive_set_init;
         rocq_relation_memo := TyCtrMap.empty;
         let ranked = ranked_theorem_schedules dt in
@@ -171,6 +172,7 @@ let quickchick_it size idx =
         msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
         let open GenericLib in 
         reset_mode_memo ();
+        reset_derived_instances ();
         inductive_set := inductive_set_init;
         rocq_relation_memo := TyCtrMap.empty;
 

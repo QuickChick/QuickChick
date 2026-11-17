@@ -195,6 +195,21 @@ let relation_score ~grade rel output_idxs ds opt result_vars constructor_schedul
 let is_equality_relation rel =
   GenericLib.is_rocq_path (ty_ctr_to_string rel) "Coq.Init.Logic.eq" || ty_ctr_to_string rel = "eq"
 
+(* An equality check compiles to an existing DecOpt instance, usually from
+   Dec_Eq; code generation never derives a checker for eq. Without an
+   instance the check is available only if QuickChick can build the Dec_Eq
+   instances it needs, which code generation then declares. *)
+let require_equality_instance ty =
+  if not (has_schedule_instance ty [] D_Check true) then begin
+    let env, sigma, goal, _ = elaborate_obligation ty [] D_Check true in
+    match equality_plan env sigma goal with
+    | Some (_, Some _, _) -> ()
+    | Some (key, None, _) ->
+      report_once missing_instance_warning ("Dec_Eq " ^ parenthesize key);
+      raise (Unavailable_mode ("equality on " ^ key))
+    | None -> raise (Unavailable_mode ("equality " ^ rocq_constr_to_string ty))
+  end
+
 let rec grade_schedule neutral_prelude_steps schedule : schedule_with_density =
   let fixed step ds = match fixed_step_density ds step with
     | Some grade -> grade
@@ -210,8 +225,7 @@ let rec grade_schedule neutral_prelude_steps schedule : schedule_with_density =
        from Dec_Eq; code generation never derives one. Without an instance
        the step is unavailable. *)
     | S_Check (SrcNonrec (DTyCtr (rel, _) as ty), _) when is_equality_relation rel ->
-      if not (has_schedule_instance ty [] D_Check true) then
-        raise (Unavailable_mode ("equality " ^ rocq_constr_to_string ty));
+      require_equality_instance ty;
       fixed step ds
     | S_Check (SrcNonrec ty, _) ->
       (ignore (best_inductive_schedule_from_instance ty [] D_Check true);
@@ -239,6 +253,9 @@ let rec grade_schedule neutral_prelude_steps schedule : schedule_with_density =
   let (steps, sort) = schedule in
 
   let ds = match sort with
+    | TheoremSchedule (DTyCtr (rel, _) as concl, true) when is_equality_relation rel ->
+      require_equality_instance concl;
+      D_Thm
     | TheoremSchedule (concl,true) -> 
       ignore (best_inductive_schedule_from_instance concl [] D_Check true);
       D_Thm

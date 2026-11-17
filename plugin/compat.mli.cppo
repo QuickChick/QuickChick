@@ -39,3 +39,6 @@ val conv :
 #endif
 val is_class_type : Environ.env -> Evd.evar_map -> EConstr.types -> bool
 val unCNotation11 : constr_expr_r CAst.t -> (unit -> constr_expr) -> (constr_expr * constr_expr list) option
+(* A named warning in the "quickchick" category, on by default; [-w -name]
+   silences it. Create each warning once, at module initialisation. *)
+val warning : name:string -> ('a -> Pp.t) -> 'a -> unit
