@@ -169,12 +169,19 @@ entry is recorded with the entries it read and replayed wherever those reads
 see the same values. A candidate's score therefore does not depend on which
 candidates were scored before it.
 
-Selecting the best theorem schedule (`quickchick` with index 0) scores
-candidates lazily: once the grades seen so far show a candidate cannot beat
-the incumbent, its remaining dependencies are not derived. Other indices, the
-listing tactics and `try_all_quickchick_schedules` score every candidate. In
-`quickchick n i`, `n` is the test size and `i` a schedule index; indices range
-over the grouped combinations, and an out-of-range index is an error.
+Theorem schedules are ranked by the active scorer. BudgetAware and compiled
+policies score a theorem schedule as a generator of the hypotheses' values;
+cardinality ranks theorems by density. In `quickchick n i`, `n` is the test
+size and `i` a schedule index, counted from 0 for the best; indices range over
+the grouped combinations, and an out-of-range index is an error.
+`quickchick_schedules` lists the candidates with their scores in that order.
+
+Under the density family, `quickchick n i` scores candidates lazily: it keeps
+the `i+1` best scored so far, and once the grades seen so far show a
+candidate cannot beat the `i+1`-th of them, its remaining dependencies are not
+derived. Index 0 keeps only the incumbent. BudgetAware and compiled policies,
+and the listing, score every candidate. With `QC_SCHEDULE_SCORE_PRUNING=verify`
+the lazy ranking is checked against scoring every candidate.
 
 ## Constructor weights
 

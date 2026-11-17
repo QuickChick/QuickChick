@@ -451,7 +451,7 @@ let has_supplied_schedule_instance relation outputs ds constrained =
    otherwise. Recursive steps add no request; the policy sees their source
    category in the schedule. [terms] are further terms whose variables the
    scope must name. Returns the scope too, for quoting the schedule. *)
-let compiled_context ind_name result_vars output_vars ds ~constrained steps terms =
+let compiled_context ?(global = ScoringView.global_name) ind_name result_vars output_vars ds ~constrained steps terms =
   let names = List.map fst result_vars @
     List.concat_map ScoringView.step_variables steps @
     List.concat_map ScoringView.free_vars_term terms
@@ -502,7 +502,7 @@ let compiled_context ind_name result_vars output_vars ds ~constrained steps term
           if supplied then ScoringView.Supplied else ScoringView.Pending in
       acc @ [request, status]
     | _ -> acc) [] steps in
-  let context = ScoringView.quote_context ~global:ScoringView.global_name scope
+  let context = ScoringView.quote_context ~global scope
     ind_name result_vars local_types output_vars ds constrained dependencies in
   scope, context
 
@@ -516,12 +516,12 @@ let quoted_or_fail = function
   | Error message -> CErrors.user_err (str ("The Rocq scorer cannot see this schedule: " ^ message))
 
 (* Score a constructor candidate with a compiled Rocq policy. *)
-let compiled_schedule_score (policy : PolicyRegistry.compiled) ind_name
+let compiled_schedule_score ?(global = ScoringView.global_name) (policy : PolicyRegistry.compiled) ind_name
     result_vars output_vars ds ((steps, sort) : schedule_with_density) =
   let result, constrained = schedule_result_and_constrained sort in
-  let scope, context = compiled_context ind_name result_vars output_vars ds ~constrained
+  let scope, context = compiled_context ~global ind_name result_vars output_vars ds ~constrained
     (List.map fst steps) (match result with None -> [] | Some r -> [r]) in
-  let schedule = ScoringView.quote_schedule ~global:ScoringView.global_name
+  let schedule = ScoringView.quote_schedule ~global
     ~finite_pins:(derivation_finite_pins ()) ~grade:policy_grade scope steps result in
   policy.PolicyRegistry.score (quoted_or_fail context) (quoted_or_fail schedule)
 

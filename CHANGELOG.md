@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased] — 3.0 candidate
 
+- `quickchick_schedules` lists a goal's theorem schedules, best first, in
+  the order `quickchick n i` numbers them. Theorem schedules are ranked by
+  the active scorer, including BudgetAware and compiled Rocq policies, and
+  `quickchick n i` scores only as many candidates as it needs for index
+  `i`. The tactics `valid_schedules`, `schedules`, `theorem_dependencies`,
+  and `try_all_quickchick_schedules` are removed; `quickchick_idx i` runs
+  schedule `i` at the default sizes.
 - `QuickChick Derive Explain <class> for <target>` derives as usual and
   prints the schedule chosen for each constructor of every mode it compiles.
   It replaces the scheduler's debugging commands `Derive Inductive

@@ -129,6 +129,32 @@ let close_over_context env sigma goal =
   fst (List.fold_left close (goal, Termops.collect_vars sigma goal)
          (EConstr.named_context env))
 
+(* Print every theorem candidate for the goal, best first, numbered as
+   [quickchick n i] numbers them. Nothing is derived or declared. *)
+let quickchick_schedules =
+  Proofview.Goal.enter_one begin fun gl ->
+    let e = Proofview.Goal.env gl in
+    let evd = Proofview.Goal.sigma gl in
+    let c = close_over_context e evd (Proofview.Goal.concl gl) in
+    reject_abstract_types e evd c;
+    with_schedule_context e evd (fun () ->
+      match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
+      | None -> CErrors.user_err (str "quickchick_schedules: cannot read the goal as a property.")
+      | Some dt ->
+        reset_mode_memo ();
+        inductive_set := inductive_set_init;
+        rocq_relation_memo := TyCtrMap.empty;
+        let ranked = ranked_theorem_schedules dt in
+        let entry i (_, (schedule, _, _, _, _), score) =
+          str (Printf.sprintf "%d (%s):" i (theorem_score_to_string score)) ++ fnl () ++
+          str ("  " ^ String.concat "\n  "
+            (String.split_on_char '\n' (String.trim (GenericLib.schedule_to_string schedule)))) ++ fnl () in
+        Feedback.msg_notice (str (Printf.sprintf "%d theorem schedule%s, best first; run one with quickchick <size> <index>:"
+            (List.length ranked) (if List.length ranked = 1 then "" else "s")) ++ fnl () ++
+          prlist_with_sep fnl (fun x -> x) (List.mapi entry ranked)));
+    Proofview.tclUNIT ()
+  end
+
 let quickchick_it size idx =
   Proofview.Goal.enter_one begin fun gl ->
     let e = Proofview.Goal.env gl in
@@ -149,8 +175,8 @@ let quickchick_it size idx =
         rocq_relation_memo := TyCtrMap.empty;
 
 
-        (* Index 0 needs only the best schedule; other indices need the full ranking. *)
-        let theorem_schedules = all_theorem_schedules ~best_only:(idx = 0) dt in
+        (* Index i needs only the i+1 best schedules. *)
+        let theorem_schedules = all_theorem_schedules ~keep:(idx + 1) dt in
 
         let selected_schedule = 
           (match List.nth_opt theorem_schedules idx with
@@ -255,11 +281,10 @@ let quickchick_it size idx =
 (*This tactic uses the quickchick_it tactic to run all possible indices with size None, capturing the Message output and putting it into a file in the 
 current directory*)
 
-(* This tactic uses the quickchick_it tactic to run all possible indices with size None,
-   capturing the Message output and putting it into a file in the current directory *)
+(* capture_output tac runs tac and appends the messages it prints to
+   quickchick_run_output.txt in the current directory. *)
 
    open Proofview.Notations
-   open Proofview
    open Feedback
 
 let capture_output tac : unit Proofview.tactic =
@@ -286,81 +311,29 @@ let capture_output tac : unit Proofview.tactic =
   close_out file;
   Proofview.tclUNIT ()
 
-let try_all_quickchick_schedules : unit Proofview.tactic =
-   (* Storage for captured messages *)
-   let captured_output = ref [] in
-   
-
-    let feedback_hook fb =
-      match fb.contents with
-  #if COQ_VERSION >= (9, 0, 0)
-    | Feedback.Message (_lvl, _, _, ppcmds) ->
-#else
-    | Feedback.Message (_lvl, _, ppcmds) ->
-#endif
-          let s = Pp.string_of_ppcmds ppcmds in
-          (*Print captured message to file*)
-
-          captured_output := s :: !captured_output
-      | _ -> () in
-    
-
-    let run_all_quickchick_it (max_index : int) : unit Proofview.tactic =
-      (let id = Feedback.add_feeder feedback_hook in
-    
-      let rec loop i =
-        if i > max_index then tclUNIT ()
-        else
-          (* Call the existing tactic here *)
-          quickchick_it None i >>= fun () ->
-          (* Capture output *)
-          loop (i + 1)
-      in
-    
-      loop 0 >>= fun () ->
-      Feedback.del_feeder id; 
-      (
-        let oc = open_out "quickchick_run_output.txt" in
-        List.iter (fun s -> output_string oc (s ^ "\n")) (List.rev !captured_output);
-        close_out oc
-      ); 
-      Proofview.tclUNIT ())
-      in
-
-    run_all_quickchick_it 48 (* Adjust the max index as needed *)
  
 }
+TACTIC EXTEND capture_output 
+  | ["capture_output" tactic(tac)] -> { 
+    capture_output (Tacinterp.tactic_of_value (default_ist ()) tac) }
+END
+
+TACTIC EXTEND quickchick_schedules
+  | ["quickchick_schedules"] -> { quickchick_schedules }
+END
+
+(* quickchick_idx i runs the i-th theorem schedule at the default sizes, as
+   quickchick does for the best one; quickchick n i fixes the size at n. *)
+TACTIC EXTEND quickchick_idx
+  | ["quickchick_idx" int(idx)] -> { quickchick_it None idx }
+END
+
 TACTIC EXTEND quickchick
   | ["quickchick" int_list(ois)] -> { 
     match ois with
     | sz :: idx :: _ -> quickchick_it (Some sz) idx
     | x :: _ -> quickchick_it (Some x) 0
     | [] -> quickchick_it None 0}
-END
-
-TACTIC EXTEND quickchick_idx
-  | ["quickchick_idx" int(idx)] -> { quickchick_it None idx }
-END
-
-TACTIC EXTEND try_all_quickchick_schedules
-  | ["try_all_quickchick_schedules"] -> { try_all_quickchick_schedules }
-END
-
-TACTIC EXTEND capture_output 
-  | ["capture_output" tactic(tac)] -> { 
-    capture_output (Tacinterp.tactic_of_value (default_ist ()) tac) }
-END
-
-TACTIC EXTEND schedules 
-  | ["schedules"] -> { schedules }
-END
-
-TACTIC EXTEND theorem_dependencies
-  | ["theorem_dependencies"] -> { theorem_dependencies }
-END
-
-TACTIC EXTEND valid_schedules
-  | ["valid_schedules"] -> { valid_schedules }
 END
 
 (*type rocq_relation

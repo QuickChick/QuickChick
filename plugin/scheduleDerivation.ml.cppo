@@ -8,12 +8,66 @@ open ModeMemo
 open ScheduleScoring
 open ScheduleContext
 open ScheduleSelection
-let all_theorem_schedules ?(best_only = false) (thm : rocq_type) =
-  let rank ~lazy_best schedule_matches =
+(* A theorem candidate's score under the active ranking. The density family
+   ranks with ScheduleRanking features; BudgetAware and compiled policies
+   score the completed schedule as a generator of the hypotheses' values,
+   in the memo the candidate was derived in. Cardinality, which is
+   experimental, ranks theorems by density. *)
+type theorem_score =
+  | ThmDensity of ScheduleRanking.features
+  | ThmBudget of BudgetAwareScore.score
+  | ThmCompiled of PolicyRegistry.compiled * PolicyRegistry.score
+
+let theorem_key = { BudgetAwareScore.relation = ty_ctr_of_string "theorem";
+                    output_indices = []; derive_sort = D_Thm }
+
+let theorem_score id ((steps, sort) as scored : schedule_with_density) =
+  match compiled_ranking () with
+  | Some policy ->
+    (* The theorem is not a global relation; policies see it by this name. *)
+    let global name = if Libnames.string_of_qualid name = "theorem" then "QuickChick.theorem"
+      else ScoringView.global_name name in
+    ThmCompiled (policy, compiled_schedule_score ~global policy (ty_ctr_of_string "theorem") [] [] D_Thm scored)
+  | None when budget_aware_ranking () ->
+    (match BudgetAwareScore.score_schedule (budget_context []) theorem_key (List.map fst steps) with
+     | Ok score -> ThmBudget score
+     | Error message -> CErrors.user_err (str ("BudgetAware ranking cannot score the theorem: " ^ message)))
+  | None -> ThmDensity (scored_schedule_features D_Thm id (steps, sort))
+
+(* Negative when [a] ranks before [b]. Equal scores keep search order. *)
+let compare_theorem_scores (a, id_a) (b, id_b) =
+  let by_score = match a, b with
+    | ThmDensity fa, ThmDensity fb ->
+      ScheduleRanking.compare ~prefer_dense:true (schedule_ranking_policy ()) fa fb
+    | ThmBudget sa, ThmBudget sb -> BudgetAwareScore.compare sa sb
+    | ThmCompiled (policy, sa), ThmCompiled (_, sb) ->
+      (match policy.PolicyRegistry.compare sa sb with
+       | PolicyViews.Lt -> -1 | PolicyViews.Gt -> 1 | PolicyViews.Eq -> 0)
+    | _ -> invalid_arg "compare_theorem_scores" in
+  if by_score <> 0 then by_score else compare id_a id_b
+
+let theorem_score_to_string = function
+  | ThmDensity f -> Printf.sprintf "density %s, %d variable uses"
+      (density_to_string (match f.ScheduleRanking.density_rank with
+        | 0 -> Checking | 1 -> Backtracking | 2 -> Neutral | 3 -> Partial | _ -> Total))
+      f.ScheduleRanking.variable_uses
+  | ThmBudget score -> BudgetAwareScore.to_string score
+  | ThmCompiled _ -> "compiled policy score"
+
+(* The [keep] best theorem candidates, best first, each with its schedule,
+   score, and the memos it was derived in. Under the density family, a
+   candidate whose lower bound cannot beat the [keep]-th best scored so far
+   is skipped without being scored: with [keep] = 1 this is the incumbent
+   of plain [quickchick]. Other rankings score every candidate. *)
+let ranked_theorem_schedules ?(keep = max_int) (thm : rocq_type) =
+  let density_family = compiled_ranking () = None && not (budget_aware_ranking ()) in
+  let rank ~lazy_keep schedule_matches =
     let schedules = List.mapi (fun i ((steps, sort), ms, eqs) -> i,List.map (fun (v,p) -> S_Match (v,p)) ms, ((List.map check_eq eqs @ steps), sort)) schedule_matches in
     let initial_inductive_memo = !mode_memo in
     let initial_grade_memo = !grade_memo in
-    let incumbent = ref None in
+    (* The best [keep] density features so far, best first. *)
+    let top = ref [] in
+    let kth () = if List.length !top < keep then None else Some (List.nth !top (keep - 1)) in
     let scored = Fun.protect
       ~finally:(fun () ->
         mode_memo := initial_inductive_memo;
@@ -21,8 +75,8 @@ let all_theorem_schedules ?(best_only = false) (thm : rocq_type) =
       (fun () -> List.filter_map (fun (i, ms_steps, schd) ->
         mode_memo := with_stable_entries initial_inductive_memo;
         grade_memo := initial_grade_memo;
-        if lazy_best && (match !incumbent with
-            | Some best -> theorem_candidate_loses ~incumbent:best ms_steps schd
+        if lazy_keep && (match kth () with
+            | Some incumbent -> theorem_candidate_loses ~incumbent ms_steps schd
             | None -> false)
         then begin
           collect_stable_entries initial_inductive_memo;
@@ -31,17 +85,23 @@ let all_theorem_schedules ?(best_only = false) (thm : rocq_type) =
           None
         end else
         let result = grade_schedule ms_steps schd in
-        if lazy_best then begin
+        if lazy_keep then begin
           let features = scored_schedule_features D_Thm i result in
           if schedule_trace_enabled () then
             Feedback.msg_notice (str (Printf.sprintf
               "[theorem-lazy] candidate=%d scored density=%d uses=%d\n" i
               features.ScheduleRanking.density_rank features.ScheduleRanking.variable_uses)
               ++ str (schedule_to_string schd));
-          match !incumbent with
-          | Some best when ScheduleRanking.compare ~prefer_dense:true
-              (schedule_ranking_policy ()) features best >= 0 -> ()
-          | _ -> incumbent := Some features
+          match kth () with
+          | Some incumbent when ScheduleRanking.compare ~prefer_dense:true
+              (schedule_ranking_policy ()) features incumbent >= 0 -> ()
+          | _ ->
+            let better a b = ScheduleRanking.compare ~prefer_dense:true
+                (schedule_ranking_policy ()) a b < 0 in
+            let rec insert = function
+              | [] -> [features]
+              | x :: rest -> if better features x then features :: x :: rest else x :: insert rest in
+            top := List.filteri (fun j _ -> j < keep) (insert !top)
         end;
         collect_stable_entries initial_inductive_memo;
         let inductive_memo = !mode_memo in
@@ -49,41 +109,48 @@ let all_theorem_schedules ?(best_only = false) (thm : rocq_type) =
         if are_schedule_steps_valid i result then
           Some (i, result, inductive_memo, grade_memo_after)
         else None) schedules) in
-    let ranked = sort_schedules_by_density_and_var_uses
-      (List.map (fun (i, result, _, _) -> i, result) scored) D_Thm in
-    List.map (fun ((schd_steps_density, schd_sort) as scored_schedule, density, num_var_uses, id) ->
-      let (_, _, inductive_memo, grade_memo_after) =
-        List.find (fun (i, _, _, _) -> i = id) scored in
+    let with_scores = Fun.protect
+      ~finally:(fun () ->
+        mode_memo := initial_inductive_memo;
+        grade_memo := initial_grade_memo)
+      (fun () -> List.map (fun ((i, result, inductive_memo, grade_memo_after) as entry) ->
+        mode_memo := inductive_memo;
+        grade_memo := grade_memo_after;
+        (theorem_score i result, i), entry) scored) in
+    let ranked = List.sort (fun (a, _) (b, _) -> compare_theorem_scores a b) with_scores in
+    let ranked = if lazy_keep then List.filteri (fun j _ -> j < keep) ranked else ranked in
+    List.map (fun ((score, _), (_, ((steps_density, sort) as scored_schedule), inductive_memo, grade_memo_after)) ->
+      let density = representative_density D_Thm scored_schedule in
+      let num_var_uses = get_num_var_uses scored_schedule D_Thm in
       scored_schedule,
-      ((List.map fst schd_steps_density, schd_sort), density, num_var_uses,
-       inductive_memo, grade_memo_after)) ranked in
+      ((List.map fst steps_density, sort), density, num_var_uses,
+       inductive_memo, grade_memo_after), score) ranked in
   let matches select_groups =
     UnifyQC.type_to_schedules ?select_groups thm None None [] [] D_Thm true in
-  let lazy_best = best_only && theorem_lazy_scoring () in
-  let rank_exhaustive = rank ~lazy_best:false in
-  let rank = rank ~lazy_best in
-  let ranked = rank (matches (grouped_selector D_Thm)) in
-  if lazy_best && Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" = Some "verify" then begin
-    let best entries = match entries with
-      | (scored, _) :: _ -> Some (scored_schedule_features D_Thm 0 scored)
-      | [] -> None in
-    let exhaustive = rank_exhaustive (matches (grouped_selector D_Thm)) in
-    if best exhaustive <> best ranked then
-      failwith "lazy theorem scoring changed the selected schedule"
+  let lazy_keep = keep < max_int && density_family && theorem_lazy_scoring () in
+  let ranked = rank ~lazy_keep (matches (grouped_selector D_Thm)) in
+  let scores entries = List.map (fun (_, _, score) -> score) entries in
+  let same_scores a b = List.length a = List.length b &&
+    List.for_all2 (fun x y -> compare_theorem_scores (x, 0) (y, 0) = 0) a b in
+  if lazy_keep && Sys.getenv_opt "QC_SCHEDULE_SCORE_PRUNING" = Some "verify" then begin
+    let exhaustive = rank ~lazy_keep:false (matches (grouped_selector D_Thm)) in
+    if not (same_scores (scores ranked)
+              (List.filteri (fun j _ -> j < keep) (scores exhaustive))) then
+      failwith "lazy theorem scoring changed the selected schedules"
   end;
   if schedule_group_mode () = `Verify then begin
-    let best entries = match entries with
-      | (scored, _) :: _ -> Some { (scored_schedule_features D_Thm 0 scored)
-                                   with ScheduleRanking.candidate_id = 0 }
-      | [] -> None in
-    let joint = rank (matches None) in
-    if best joint <> best ranked then
+    let best entries = match scores entries with s :: _ -> [s] | [] -> [] in
+    let joint = rank ~lazy_keep (matches None) in
+    if not (same_scores (best joint) (best ranked)) then
       failwith "grouped theorem schedule search changed the best score"
   end;
-  List.map snd ranked
+  ranked
+
+let all_theorem_schedules ?keep thm =
+  List.map (fun (_, entry, _) -> entry) (ranked_theorem_schedules ?keep thm)
 
 let best_theorem_schedule (thm : rocq_type) : schedule =
-  match all_theorem_schedules ~best_only:true thm with
+  match all_theorem_schedules ~keep:1 thm with
   | (schedule, _, _, _, _) :: _ -> schedule
   | [] -> failwith "best_theorem_schedule: No valid schedules found"
 
@@ -549,95 +616,6 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
          | None -> ModeDone ((schedule, Checking), false, None) in
        mode_memo := InductiveScheduleKeyMap.add (ind, outputs, ds, constrained) entry !mode_memo)) components;
      components)
-
-let valid_schedules =
-  Proofview.Goal.enter begin fun gl ->
-    let c = Proofview.Goal.concl gl in
-    let e = Proofview.Goal.env gl in
-    let evd = Proofview.Goal.sigma gl in
-    with_schedule_context e evd (fun () -> with_fresh_mode_memo (fun () ->
-    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
-    | Some dt -> 
-      begin
-        let schedules = UnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
-          dt None None [] [] D_Thm false in
-        let schedules' = List.map (fun ((steps, sort), ms, eqs) -> (List.map (fun (v,p) -> S_Match (v,p)) ms, (List.map check_eq eqs @ steps, sort))) schedules in
-        let schedules_w_densities = List.mapi (fun i (ms_steps, schd) -> i, grade_schedule ms_steps schd) schedules' in
-        let sorted = sort_schedules_by_density_and_var_uses schedules_w_densities D_Thm in
-
-        if !GenericLib.debug_mode then begin
-          Feedback.msg_notice (str "Printing all bindings" ++ fnl ());
-          List.iteri (fun i ((steps_ds, sort), density, num_var_uses, id) ->
-            Feedback.msg_notice (str ("sorted id: " ^ string_of_int i ^ " orig id: " ^ string_of_int id ^ ":\n" ) ++ fnl ());
-            Feedback.msg_notice (str ("# var uses: " ^ string_of_int num_var_uses ^ "; density:" ^ density_to_string density ^ "\n") ++
-                                str (schedule_with_densities_to_string (steps_ds, sort) ^ "\n") (*++  *)
-                                (* str "\nconstrexpr: \n" ++  *)
-                                (* UnifyQC.match_schedule_as_pp_constr_expr (List.map fst steps_ds, sort) [] [] D_Thm *)
-                                                            ++ str "\n==============================================\n")) sorted
-        end;
-        Tacticals.tclIDTAC
-      end 
-    | None -> failwith "Failed to Parse type"))
-  end
-
-let theorem_dependencies = 
-  Proofview.Goal.enter begin fun gl ->
-    
-    (* Convert goal to a constr_expr *)
-    let c = Proofview.Goal.concl gl in
-    let e = Proofview.Goal.env gl in
-    let evd = Evd.from_env e in
-
-    match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
-    | Some dt ->
-      begin
-        msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
-        let open GenericLib in
-        let rec printlist : (var * (int * int list list) list) list -> unit = function
-          | [] -> ()
-          | (var, rels) :: rest ->
-            let path_to_string (is : int list) = "[" ^ String.concat ", " (List.map string_of_int is) ^ "]" in
-            let paths_to_string (iss : int list list) = "{" ^ String.concat "; " (List.map path_to_string iss) ^ "}" in
-            let tuple_to_string ((i : int), (j : int list list)) = "(" ^ string_of_int i ^ ", " ^ paths_to_string j ^ ")" in
-            msg_debug (str (var_to_string var) ++ str " : " ++ str (String.concat ", " (List.map (fun (i, j) -> (tuple_to_string (i, j))) rels)) ++ fnl ()); 
-            printlist rest in
-        
-        printlist (GenericLib.rocq_constr_var_relation_uses' dt);          
-        Tacticals.tclIDTAC
-      end
-    | None -> failwith "Failed to Parse type"
-  end
-
-  let schedules =
-    Proofview.Goal.enter begin fun gl ->
-    
-      (* Convert goal to a constr_expr *)
-      let c = Proofview.Goal.concl gl in
-      let e = Proofview.Goal.env gl in
-      let evd = Evd.from_env e in
-  
-      match GenericLib.parse_dependent_type (EConstr.to_constr evd c) with
-      | Some dt ->
-        begin
-          grade_memo := RelationInstMap.empty;
-          clear_inductive_name_cache ();
-          clear_schedule_instance_cache ();
-          msg_debug (str (GenericLib.rocq_constr_to_string dt) ++ fnl ());
-          let scheds = UnifyQC.type_to_schedules ?select_groups:(grouped_selector D_Thm)
-            dt None None [] [] D_Thm false in
-
-          List.iteri (fun i (sch,ms,eqs) -> Feedback.msg_notice (str (string_of_int i) 
-                                                          ++ str ":\n" 
-                                                          ++ str (UnifyQC.match_schedule_to_string sch ms eqs) 
-                                                          ++ str "\nconstrexpr: \n"
-                                                          ++ (UnifyQC.match_schedule_as_pp_constr_expr sch ms eqs D_Thm)
-                                                          ++ str "\n\n===================\n" 
-                                                          ++ fnl ())) scheds;
-          
-          Tacticals.tclIDTAC
-        end
-      | None -> failwith "Failed to Parse type"
-    end
 
 module VarSet = Set.Make(struct type t = var let compare = compare end)
   

@@ -19,14 +19,14 @@ QuickChick Derive Checker for (@scored_parent A x).
 Goal ScoreContext bool -> scored_parent bool true -> scored_parent bool true.
 Proof.
   intros local_dictionary h.
-  valid_schedules.
+  quickchick_schedules.
   exact h.
 Qed.
 
 Goal scored_parent bool true -> scored_parent bool true.
 Proof.
   intro h.
-  valid_schedules.
+  quickchick_schedules.
   exact h.
 Qed.
 

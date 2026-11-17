@@ -702,6 +702,11 @@ Declare Instance Dec_eq_list (A : Type)
    the goal. If lookup fails with a finite [Typeclasses Depth] limit, increase
    or unset the limit before requesting automatic derivation.
 
+   [quickchick n] tests with size [n]; [quickchick n i] runs the [i]-th best
+   theorem schedule instead of the best ([i] = 0), and [quickchick_idx i]
+   runs it at the default sizes. [quickchick_schedules]
+   lists the goal's schedules with their scores, numbered the same way.
+
    A failing test shrinks its counterexample. A variable that no hypothesis
    produces shrinks with its type's [Shrink] instance; a shrunk value that
    breaks a later hypothesis is discarded. The outputs of a producing
