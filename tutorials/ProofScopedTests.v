@@ -23,7 +23,7 @@ Fail Check reflexivity_test.
 (** Helpers and dictionaries are local definitions. They follow the proof
     context through undo and tactic backtracking and disappear when that
     context ends. A proof can retain their bodies without leaving global helper
-    names behind. Explicit [Derive Inductive Schedule] commands remain global.
+    names behind. Explicit [QuickChick Derive] commands remain global.
 
     A saved test keeps its original property, schedule, and selected instances.
     Changing the goal or registering another instance does not update it. Run

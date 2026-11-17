@@ -252,7 +252,8 @@ val c_theorem : Constrexpr.constr_expr
    entry for it, if any, else 1 for a base and size + 1 for a recursive
    constructor. *)
 type rule_weight = WDefault | WNum of int | WSize
-type rule_schedule = schedule * (var * pat) list * (var * mexp) list * rule_weight
+type rule_schedule = schedule * (var * pat) list * (var * mexp) list * rule_weight * string option
+(* The last component names the constructor the schedule implements, when it comes from one. *)
 type inductive_schedule = string * (var * mexp) list * (var * mexp list) list * rule_schedule list * rule_schedule list
 
 

@@ -158,7 +158,7 @@ let budget_aware_demo ~select_best_schedule ~ind_name ~ctr_name ~result_vars
        match entry with
        | Some (ModeDone (((_, inputs, _, base, recursive), _), true, _)) ->
          (match base @ recursive with
-          | [((steps, _), _, _, _)] ->
+          | [((steps, _), _, _, _, _)] ->
             let dependencies = B.required_dependencies key steps in
             let resolved = List.map (fun dependency ->
               dependency, selected_dependency memo (key :: seen) dependency)

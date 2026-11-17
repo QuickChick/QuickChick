@@ -71,6 +71,12 @@ let dispatch cn ind =
       | `Simpl cn -> SimplDriver.derive cn ind) classes
   | Dependent mode -> PublicDerive.derive_dependent ~mode ind
 
+(* Explain: derive as usual, and print the schedules the derivation selected. *)
+let explain_dispatch cn ind =
+  let flag = ScheduleDerivation.explain_derivations in
+  flag := true;
+  Fun.protect ~finally:(fun () -> flag := false) (fun () -> dispatch cn ind)
+
 let merge ind1 ind2 ind3 =
   MergeTypes.merge ind1 ind2 ind3
 
@@ -91,6 +97,10 @@ END
 (* QuickChick Derive and QC Derive: prefixed so they do not clash with the
    Derive commands of Stdlib or Equations. *)
 VERNAC COMMAND EXTEND QuickChickDerive CLASSIFIED AS SIDEFF
+   | ["QuickChick" "Derive" "Explain" constr(class_name) "for" constr(inductive)] ->
+     { explain_dispatch class_name inductive }
+   | ["QC" "Derive" "Explain" constr(class_name) "for" constr(inductive)] ->
+     { explain_dispatch class_name inductive }
    | ["QuickChick" "Derive" constr(class_name) "for" constr(inductive)] ->
      { dispatch class_name inductive }
    | ["QC" "Derive" constr(class_name) "for" constr(inductive)] ->

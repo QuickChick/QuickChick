@@ -19,9 +19,7 @@ Inductive bst : nat -> nat -> Tree -> Prop :=
 QuickChick Derive DecOpt for (le x y).
 
 QuickChick Derive ArbitrarySizedSuchThat for (fun x => le y x).
-QuickChick Derive ArbitrarySizedSuchThat for (fun t => bst lo hi t).
-Derive Valid Schedules bst 2 consnum 1 derive "Gen".
-Derive Inductive Schedule bst 2 derive "Gen" opt "true".
+QuickChick Derive Explain ArbitrarySizedSuchThat for (fun t => bst lo hi t).
 
 QuickChick Derive DecOpt for (bst lo hi t).
 

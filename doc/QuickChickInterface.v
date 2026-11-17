@@ -608,7 +608,6 @@ Declare Instance Dec_eq_list (A : Type)
    [From QuickChick Require Import LegacyDerive.]
    This enables a compatibility spelling for the same engine. It can conflict with Stdlib and other plugins' [Derive] commands.
    Prefer [QuickChick Derive] with the normal [QuickChick] import.
-   The schedule-specific [Derive] commands do not require the compatibility import.
 
    [QuickChick Derive] uses the scheduled engine for generation, enumeration, and
    checking, including [DecOpt] and its [Checker] alias. The old engines and
@@ -636,6 +635,13 @@ Declare Instance Dec_eq_list (A : Type)
     once as a whole argument, in any order; an output that occurs more than
     once or inside a term is unsupported and reported. See doc/DerivationDispatch.md for
     examples and compatibility details.
+
+    Adding [Explain] derives as usual and also prints, for every mode the
+    derivation compiles, the schedule chosen for each constructor: the order
+    in which its premises are generated or checked.
+[[
+     QuickChick Derive Explain ArbitrarySizedSuchThat for (fun x => P x1 ... x .... xn).
+]]
 *)
 
 (** ** Scheduled instances
@@ -645,15 +651,15 @@ Declare Instance Dec_eq_list (A : Type)
    [EnumSizedSuchThat], according to the selected mode. For example:
 [[
    Inductive accepted : bool -> Prop := Accepted : accepted true.
-   Derive Inductive Schedule accepted derive "Check" opt "true".
+   QuickChick Derive Checker for (accepted b).
    Example accepts_true : decOpt (P := accepted true) 3 = Some true.
    Proof. reflexivity. Qed.
 ]]
 
    Automatic testing resolves existing instances before deriving dependencies.
-   It respects local instances and their priorities. Explicit schedule commands
-   create persistent declarations; a repeated command with the same generated
-   name reports a name collision.
+   It respects local instances and their priorities. Explicit derivation
+   commands create persistent declarations; a repeated command declares
+   fresh names.
 
    A polymorphic helper receives the class arguments required by its selected
    schedule and dependencies. For example, a supplied checker requiring

@@ -16,9 +16,8 @@ Fail Definition no_reverse_generator {A : Type} `{Gen A} : GenSized A :=
 Fail Definition no_reverse_enumerator {A : Type} `{Enum A} : EnumSized A :=
   ltac:(typeclasses eauto).
 
-(* A scheduled helper can already exist when the public command is invoked. *)
+(* Repeating a derivation declares the instance under a fresh name. *)
 Inductive collision_box (A : Type) := CollisionBox : A -> collision_box A.
-Derive Inductive Schedule collision_box derive "Gen" opt "false".
 QuickChick Derive GenSized for collision_box.
 QuickChick Derive GenSized for collision_box.
 Check GenSizedcollision_box0.

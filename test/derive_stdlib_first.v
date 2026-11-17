@@ -11,8 +11,8 @@ QuickChick Derive (Arbitrary, Show, Sized) for qc_tree.
 Definition qc_generator : GenSized qc_tree := ltac:(typeclasses eauto).
 
 Inductive parser_accepts : bool -> Prop := ParserAccepts : parser_accepts true.
-Derive Inductive Schedule parser_accepts derive "Check" opt "true".
-Example parser_checker : DecOpt_parser_accepts_I 3 false = Some false.
+QuickChick Derive Checker for (parser_accepts b).
+Example parser_checker : decOpt (P := parser_accepts false) 3 = Some false.
 Proof. reflexivity. Qed.
 
 Inductive qc_short := QCShort | QCShortNode : qc_short -> qc_short.

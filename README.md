@@ -107,8 +107,12 @@ From QuickChick Require Import LegacyDerive.
 This compatibility import enables the old spelling, including class lists. It
 uses the same derivation engine as `QuickChick Derive`. It
 can still conflict with other plugins' `Derive` commands, so prefer
-`QuickChick Derive` when combining plugins. `Derive Inductive Schedule` and `Derive Valid Schedules` remain available
-with the normal import.
+`QuickChick Derive` when combining plugins.
+
+To see how a derived generator, enumerator, or checker works, add `Explain`:
+`QuickChick Derive Explain Generator for (fun x => between lo x hi).` derives
+as usual and prints, for every mode it compiles, the schedule chosen for each
+constructor.
 
 ### More resources
 

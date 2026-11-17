@@ -29,7 +29,9 @@ Fail Definition leaked_instance : DecOpt (missing true) := ltac:(typeclasses eau
 (* An unrelated constant must never be accepted as a generated checker. *)
 Inductive collision : bool -> Prop := Collision : collision true.
 Definition DecOpt_collision_I := 0.
-Fail Derive Inductive Schedule collision derive "Check" opt "true".
+QuickChick Derive Checker for (collision b).
+Example collision_checker : decOpt (P := collision true) 3 = Some true.
+Proof. reflexivity. Qed.
 
 (* Standard instances are reused too. *)
 Goal forall n : nat, n = n.

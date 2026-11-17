@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased] — 3.0 candidate
 
+- `QuickChick Derive Explain <class> for <target>` derives as usual and
+  prints the schedule chosen for each constructor of every mode it compiles.
+  It replaces the scheduler's debugging commands `Derive Inductive
+  Schedule`, `Derive Valid Schedules`, `Derive Schedules`, `Derive Density`,
+  `Derive Used Inds`, and `Print Typeclasses for`, which are removed; use
+  `QuickChick Derive` to derive a single mode. Plain `QuickChick Derive` no
+  longer prints coverage lines and piece counts.
 - `QCDerive` is replaced by `QuickChick Derive` and its short form
   `QC Derive`; `QC` is now a keyword. They use the scheduled engine for
   generators, enumerators, and checkers, and register their typeclass

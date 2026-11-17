@@ -47,9 +47,7 @@ prefer class methods or implicit instance applications.
 Default public names remain `GenSizedbox`, `EnumSizedbox`, and `DecOptrelated`.
 Simple derivations also retain `arbitrarySized_impl_box` and
 `enumSized_impl_box`, with size last. Repeated explicit derivations get fresh
-names. Automatic testing instead reuses suitable existing instances. Explicit
-`Derive Inductive Schedule` commands retain their size-first helpers, sized
-premises, and collision errors.
+names. Automatic testing instead reuses suitable existing instances.
 
 ## Syntax and compatibility
 

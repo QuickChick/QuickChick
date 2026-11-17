@@ -9,8 +9,8 @@ Inductive MyContains (A : Type) : A -> list A -> Prop :=
 | There : forall x y xs, MyContains A x xs -> MyContains A x (cons y xs).
 Inductive NotIn (A : Type) : A -> list A -> Prop :=
 | MkNotIn : forall x xs, ~ MyContains A x xs -> NotIn A x xs.
-Timeout 30 Derive Inductive Schedule MyContains derive "Check" opt "true".
-Timeout 30 Derive Inductive Schedule NotIn 1 derive "Gen" opt "true".
+Timeout 30 QuickChick Derive Checker for (MyContains A x xs).
+Timeout 30 QuickChick Derive Generator for (fun x => NotIn A x xs).
 Definition notin_requirements (A : Type) `{GenSized A} `{Dec_Eq A} (xs : list A) :
   GenSizedSuchThat A (fun x => NotIn A x xs) := ltac:(typeclasses eauto).
 Inductive AllEq (A : Type) : A -> list A -> Prop :=
@@ -18,16 +18,16 @@ Inductive AllEq (A : Type) : A -> list A -> Prop :=
 | AllEqCons : forall x xs, AllEq A x xs -> AllEq A x (cons x xs).
 Inductive HasAllEq (A : Type) : list A -> Prop :=
 | MkHasAllEq : forall x xs, AllEq A x xs -> HasAllEq A (cons x xs).
-Timeout 30 Derive Inductive Schedule AllEq derive "Check" opt "true".
-Timeout 30 Derive Inductive Schedule HasAllEq 1 derive "Gen" opt "true".
+Timeout 30 QuickChick Derive Checker for (AllEq A x xs).
+Timeout 30 QuickChick Derive Generator for (fun xs => HasAllEq A xs).
 Definition alleq_requirements (A : Type) `{GenSized A} `{Dec_Eq A} :
   GenSizedSuchThat (list A) (fun xs => HasAllEq A xs) := ltac:(typeclasses eauto).
 Inductive ListHead (A : Type) : A -> list A -> Prop :=
 | MkListHead : forall x xs, ListHead A x (cons x xs).
 Inductive HasHead (A : Type) : list A -> Prop :=
 | MkHasHead : forall xs x, ListHead A x xs -> HasHead A xs.
-Timeout 30 Derive Inductive Schedule ListHead derive "Check" opt "true".
-Timeout 30 Derive Inductive Schedule HasHead 1 derive "Gen" opt "true".
+Timeout 30 QuickChick Derive Checker for (ListHead A x xs).
+Timeout 30 QuickChick Derive Generator for (fun xs => HasHead A xs).
 Definition head_requirements (A : Type) `{GenSized A} `{Dec_Eq A} :
   GenSizedSuchThat (list A) (fun xs => HasHead A xs) := ltac:(typeclasses eauto).
 
@@ -39,10 +39,10 @@ Inductive Sums : nat -> nat -> nat -> Prop :=
   {| arbitrarySizeST := fun _ => returnGen (Some (n,0)) |}.
 Inductive HasSum10 : (nat * nat) -> Prop :=
 | MkHasSum10 : forall x y, Sums x y 10 -> HasSum10 (x,y).
-Derive Inductive Schedule HasSum10 0 derive "Gen" opt "true".
+QuickChick Derive Generator for (fun p => HasSum10 p).
 Fail Check GenSizedSuchThat_Sums_OOI.
 Goal True.
-  let body := eval unfold GenSizedSuchThat_HasSum10_O in GenSizedSuchThat_HasSum10_O in
+  let body := eval unfold GenSizedSuchThatHasSum10 in GenSizedSuchThatHasSum10 in
   lazymatch body with
   | context [custom_pair _] => exact I
   | _ => fail "Expected the supplied pair generator"
@@ -52,9 +52,9 @@ Qed.
 (* Explicit class parameters of a relation remain instance arguments. *)
 Inductive InstanceRel (A : Type) `{Dec_Eq A} : A -> nat -> Prop :=
 | MkInstanceRel : forall x, InstanceRel A x 0.
-Derive Inductive Schedule InstanceRel 3 derive "Gen" opt "true".
+QuickChick Derive Generator for (fun n => InstanceRel A x n).
 Definition instance_param_generic (A : Type) `{Dec_Eq A} (x : A) :
   GenSizedSuchThat nat (fun n => InstanceRel A x n) := ltac:(typeclasses eauto).
 Definition implicit_relation_dictionary (A : Type) `{Dec_Eq A} (x : A) :
   GenSizedSuchThat nat (fun n => InstanceRel A x n) :=
-  GenSizedSuchThat_InstanceRel_IIIO_instance x.
+  GenSizedSuchThatInstanceRel x.

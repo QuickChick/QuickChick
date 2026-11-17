@@ -1,16 +1,17 @@
 From QuickChick Require Import QuickChick.
 
-(* Exercise scheduled declarations with inferred typeclass arguments. *)
+(* A universe-polymorphic relation with a type parameter derives a checker
+   that works at each type. *)
 Set Universe Polymorphism.
 Inductive elaboration_accepts (A : Type) : A -> Prop :=
 | ElaborationAccepts : forall x, elaboration_accepts A x.
-Derive Inductive Schedule elaboration_accepts derive "Check" opt "true".
+QuickChick Derive Checker for (@elaboration_accepts A x).
 
 Example accepts_bool :
-  DecOpt_elaboration_accepts_II 3 bool true = Some true.
+  decOpt (P := elaboration_accepts bool true) 3 = Some true.
 Proof. reflexivity. Qed.
 Example accepts_nat :
-  DecOpt_elaboration_accepts_II 3 nat 2 = Some true.
+  decOpt (P := elaboration_accepts nat 2) 3 = Some true.
 Proof. reflexivity. Qed.
 
 (* Exercise theorem declaration and extraction through the tactic. *)

@@ -566,7 +566,7 @@ let print_pattern_leaves (ind : ty_ctr) (tree : pattern_coverage_tree) (ois : ou
   let insert_output_in_leaf = function | (PCtr (c, ps), cs) -> (PCtr (c, replace_at_indices ois (PCtr (constructor_of_string "OUT",[])) ps), cs)
                                        | (PWild, cs) -> Error.msg_debug (str "issue at " ++ str (ty_ctr_to_string ind) ++ fnl ()); (PWild, cs) in
   let annotate_densities (p, cs) = (p, List.map (fun c -> (c, List.assoc c densities)) cs) in
-  List.iter (fun (p, cs) -> Feedback.msg_notice (str (string_of_pattern_leaf (annotate_densities (insert_output_in_leaf (p, cs)))) ++ fnl ())) (collect_leaves tree)
+  List.iter (fun (p, cs) -> Error.msg_debug (str (string_of_pattern_leaf (annotate_densities (insert_output_in_leaf (p, cs)))) ++ fnl ())) (collect_leaves tree)
 
 let print_rule_densities (rs : (constructor * rule_density) list) : unit =
   List.iter (fun (c,d) -> Feedback.msg_notice (str (  constructor_to_string c ^ ": " ^ density_to_string d) ++ fnl ())) rs

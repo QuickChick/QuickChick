@@ -1,4 +1,6 @@
 From QuickChick Require Import QuickChick.
+(* A derived checker whose dependency needs a class instance: schedule
+   listing works with and without that instance in the proof context. *)
 
 Class ScoreContext (A : Type) := { score_context_value : bool }.
 
@@ -12,7 +14,7 @@ Inductive scored_child (A : Type) : A -> Prop :=
 Inductive scored_parent (A : Type) : A -> Prop :=
 | ScoredParent : forall x, scored_child A x -> scored_parent A x.
 
-Derive Inductive Schedule scored_parent derive "Check" opt "true".
+QuickChick Derive Checker for (@scored_parent A x).
 
 Goal ScoreContext bool -> scored_parent bool true -> scored_parent bool true.
 Proof.

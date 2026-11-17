@@ -211,12 +211,12 @@ let insert_mutrec_calls ?within ((schedule,matches) : schedule * (var * pat) lis
 let insert_mutrec_calls_inductive_schedule ?within (is : inductive_schedule) : inductive_schedule =
   let (name, result_vars, param_deps, nonrecursive_hyps, recursive_hyps) = is in
   Error.msg_debug (str ("Inserting mutrec calls for inductive schedule: " ^ name) ++ fnl ());
-  let update add_holes (schedule, matches, binders, weight) =
+  let update add_holes (schedule, matches, binders, weight, ctr) =
     let local_binders = List.filter (fun (v, _) -> not (List.mem_assoc v result_vars)) binders in
     with_schedule_inputs (result_vars @ local_binders) (fun () ->
       let updated = insert_mutrec_calls ?within (schedule, matches) in
       let schedule, matches = if add_holes then rec_calls_add_typeclass_holes updated param_deps else updated in
-      schedule, matches, binders, weight) in
+      schedule, matches, binders, weight, ctr) in
   let updated_nonrecursive_hyps = List.map (update false) nonrecursive_hyps in
   let updated_recursive_hyps = List.map (update true) recursive_hyps in
   (name, result_vars, param_deps, updated_nonrecursive_hyps, updated_recursive_hyps)
@@ -231,7 +231,7 @@ module InductiveSchedMap = Map.Make(struct type t = inductive_schedule * derive_
             | r -> r)
     | r -> r end)
 
-let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[],WDefault)], [(([],CheckerSchedule),[],[],WDefault)])
+let dec_eq_sched_phony = ("DecOpt_eq_III", [], [], [(([],CheckerSchedule),[],[],WDefault,None)], [(([],CheckerSchedule),[],[],WDefault,None)])
    
 let init_mode_memo = InductiveScheduleKeyMap.add (ty_ctr_of_string "Coq.Init.Logic.eq", [], D_Check, true) (ModeDone ((dec_eq_sched_phony, Checking), true, None)) InductiveScheduleKeyMap.empty
 
@@ -445,7 +445,7 @@ let propagate_schedule_requirements components =
           from_dependency relation (List.map fst outputs) (producer_sort_to_derive_sort ps) true
         | S_Check (SrcNonrec relation, _) -> from_dependency relation [] D_Check true
         | _ -> [] in
-      List.fold_left add [] (List.concat_map (fun ((steps,_),_,binders,_) ->
+      List.fold_left add [] (List.concat_map (fun ((steps,_),_,binders,_,_) ->
         let binders = List.filter (fun (v, _) -> not (List.mem_assoc v inputs)) binders in
         with_schedule_inputs (inputs @ binders) (fun () ->
           List.concat_map step_requirements steps)) (base @ recursive))) in
@@ -814,6 +814,47 @@ let define_schedule_components ~local components pieces =
     define_all [definitions];
     register_schedule_instances ~local [component]) components pieces
 
+(* QuickChick Derive Explain sets this: each derivation then prints the
+   schedule it selected for every constructor of every mode it compiles,
+   the requested mode first and then the modes it depends on. *)
+let explain_derivations = ref false
+
+let explain_modes root names inductive_dependency_map =
+  let ordinal i = match (i + 1) mod 100, (i + 1) mod 10 with
+    | (11 | 12 | 13), _ -> string_of_int (i + 1) ^ "th"
+    | _, 1 -> string_of_int (i + 1) ^ "st"
+    | _, 2 -> string_of_int (i + 1) ^ "nd"
+    | _, 3 -> string_of_int (i + 1) ^ "rd"
+    | _ -> string_of_int (i + 1) ^ "th" in
+  let describe name =
+    let ind, output_indices, ds, constrained = parse_ind_schd_name name in
+    let kind = match ds, constrained with
+      | D_Gen, true -> "Generator" | D_Enum, true -> "Enumerator"
+      | D_Gen, false -> "Unconstrained generator"
+      | D_Enum, false -> "Unconstrained enumerator"
+      | D_Check, _ -> "Checker" | D_Thm, _ -> "Theorem test" in
+    let outputs = match output_indices with
+      | [] -> ""
+      | _ -> " producing its " ^ String.concat ", " (List.map ordinal output_indices)
+             ^ (if List.length output_indices = 1 then " argument" else " arguments") in
+    let density = match InductiveScheduleKeyMap.find_opt (ind, output_indices, ds, constrained) !mode_memo with
+      | Some entry -> " (density: " ^ density_to_string (snd (mode_entry_value entry)) ^ ")"
+      | None -> "" in
+    kind ^ " for " ^ ty_ctr_to_string ind ^ outputs ^ density in
+  let explain_one name =
+    match StringMap.find_opt name !inductive_dependency_map with
+    | None -> mt ()
+    | Some (((_, _, _, base, recursive), _, _), _) ->
+      let rule recursive (schedule, _, _, _, ctr) =
+        str ("  " ^ Option.default "(no constructor)" ctr
+             ^ (if recursive then " (recursive)" else "") ^ ":") ++ fnl () ++
+        str ("    " ^ String.concat "\n    "
+          (String.split_on_char '\n' (String.trim (schedule_to_string schedule)))) ++ fnl () in
+      str (describe name ^ ":") ++ fnl () ++
+      prlist (rule false) base ++ prlist (rule true) recursive in
+  let others = List.filter (fun n -> n <> root) names in
+  Feedback.msg_notice (prlist_with_sep fnl explain_one (root :: others))
+
 let derive_schedule ind ois ds opt =
   match GenericLib.ind_reference_to_rocq_relations ind with
     | Some (idx, rs) ->
@@ -840,12 +881,14 @@ let derive_schedule ind ois ds opt =
       complete_stable_closures ();
       let dependents, inductive_dependency_map = collect_all_used_inductive_schd_names ind_schd_name in
 
+      if !explain_derivations then explain_modes ind_schd_name dependents inductive_dependency_map;
+
       let components = tarjan_schedules_by_name dependents inductive_dependency_map in
 
       let schedules_pieces = inductive_schedules_to_def_constr_exprs components ind_schd_name in
 
       define_schedule_components ~local:false components schedules_pieces;
-      Feedback.msg_notice (int (List.length schedules_pieces) ++ str " Pieces defined" ++ fnl ())
+      msg_debug (int (List.length schedules_pieces) ++ str " Pieces defined" ++ fnl ())
 
     | None -> failwith "Failed to parse inductive type "
 

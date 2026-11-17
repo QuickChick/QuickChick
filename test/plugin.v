@@ -74,23 +74,23 @@ Section ScheduledCheckerResults.
   Inductive checker_accepts : bool -> Prop :=
   | CheckerAcceptsTrue : checker_accepts true.
 
-  Derive Inductive Schedule checker_accepts derive "Check" opt "true".
+  QuickChick Derive Checker for (checker_accepts flag).
 
   Example checker_accepts_true :
-    DecOpt_checker_accepts_I 5 true = Some true.
+    decOpt (P := checker_accepts true) 5 = Some true.
   Proof. reflexivity. Qed.
 
   Example checker_accepts_false :
-    DecOpt_checker_accepts_I 5 false = Some false.
+    decOpt (P := checker_accepts false) 5 = Some false.
   Proof. reflexivity. Qed.
 
   Inductive checker_has_witness : unit -> Prop :=
   | CheckerHasWitness : forall b : bool, checker_has_witness tt.
 
-  Derive Inductive Schedule checker_has_witness derive "Check" opt "true".
+  QuickChick Derive Checker for (checker_has_witness u).
 
   Example checker_witness_found :
-    DecOpt_checker_has_witness_I 5 tt = Some true.
+    decOpt (P := checker_has_witness tt) 5 = Some true.
   Proof. reflexivity. Qed.
 
   Definition checker_bool_enum_with_none : E (option bool) :=

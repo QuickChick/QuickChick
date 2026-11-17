@@ -25,16 +25,6 @@ Proof. reflexivity. Qed.
 Example old_checker_rejects : decOpt (P := accepts false) 3 = Some false.
 Proof. reflexivity. Qed.
 
-Inductive scheduled_accepts : bool -> Prop :=
-| ScheduledAcceptsTrue : scheduled_accepts true.
-Derive Inductive Schedule scheduled_accepts derive "Check" opt "true".
-Example scheduled_checker_accepts :
-  DecOpt_scheduled_accepts_I 3 true = Some true.
-Proof. reflexivity. Qed.
-Example scheduled_checker_rejects :
-  DecOpt_scheduled_accepts_I 3 false = Some false.
-Proof. reflexivity. Qed.
-
 (* Master derives instances for both members of a mutual block. *)
 Inductive left_tree := LeftLeaf | LeftNode : right_tree -> left_tree
 with right_tree := RightLeaf | RightNode : left_tree -> right_tree.

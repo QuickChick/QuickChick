@@ -64,7 +64,7 @@ let initial_mode_grade ds opt = match ds with
   | D_Check | D_Enum -> Checking
   | D_Gen | D_Thm -> if opt then Partial else Total
 
-let schedule_is_recursive ((steps, _), _, _, _) =
+let schedule_is_recursive ((steps, _), _, _, _, _) =
   List.exists (function
     | S_UC (_, SrcRec _, _) | S_ST (_, SrcRec _, _) | S_Check (SrcRec _, _) -> true
     | _ -> false) steps
@@ -118,7 +118,7 @@ let coverage_grade rel output_idxs ds densities =
    conclusion of each constructor, for checks that read them later. *)
 let record_cardinality_count ind_name output_idxs ds ctrs constructor_schedules =
     let context = cardinality_context None in
-    let steps = List.map (fun ((steps, _), _, _, _) -> steps) constructor_schedules in
+    let steps = List.map (fun ((steps, _), _, _, _, _) -> steps) constructor_schedules in
     let count = CardinalityScore.mode_count_of context ds steps in
     match cardinality_count_key ind_name output_idxs ds with
     | Some key ->
@@ -152,7 +152,7 @@ let relation_score ~grade rel output_idxs ds opt result_vars constructor_schedul
       let score_of c = match List.assoc_opt c budget_scores with
         | Some (Some (PolicyScore score)) -> Some score | _ -> None in
       let names = List.map fst result_vars @
-        List.concat_map (fun ((steps, _), _, _, _) ->
+        List.concat_map (fun ((steps, _), _, _, _, _) ->
           List.concat_map ScoringView.step_variables steps) constructor_schedules
         |> List.sort_uniq Stdlib.compare in
       let scope = policy_scope names in
@@ -168,7 +168,7 @@ let relation_score ~grade rel output_idxs ds opt result_vars constructor_schedul
       let quoted () =
         let* spec = ScoringView.quote_spec ~global scope
           (DTyCtr (ind_name, List.map (fun (v, _) -> DTyVar v) result_vars)) output_idxs ds opt in
-        let* constructors = ScoringView.map_result (fun (((steps, sort), _, _, _) as schedule, (ctr_name, _)) ->
+        let* constructors = ScoringView.map_result (fun (((steps, sort), _, _, _, _) as schedule, (ctr_name, _)) ->
           let result, _ = schedule_result_and_constrained sort in
           let* view = ScoringView.quote_schedule ~global ~finite_pins:(derivation_finite_pins ())
             ~grade:policy_grade scope (fst (grade [] (steps, sort))) result in
@@ -660,7 +660,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
         | Some (Weightmap.WNum n) -> GenericLib.WNum n
         | Some Weightmap.WSize -> GenericLib.WSize
         | None -> GenericLib.WDefault in
-      Some ((schd, [], binders, weight), (ctr_name, density), (ctr_name, budget))) ctrs in
+      Some ((schd, [], binders, weight, Some (constructor_to_string ctr_name)), (ctr_name, density), (ctr_name, budget))) ctrs in
 
   let constructor_schedules = List.map (fun (s, _, _) -> s) constructor_schedules_with_density in
   let densities = List.map (fun (_, d, _) -> d) constructor_schedules_with_density in

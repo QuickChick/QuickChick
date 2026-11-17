@@ -757,7 +757,8 @@ type pat_map = pat VM.t
    entry for it, if any, else 1 for a base and size + 1 for a recursive
    constructor. *)
 type rule_weight = WDefault | WNum of int | WSize
-type rule_schedule = schedule * (var * pat) list * (var * mexp) list * rule_weight
+type rule_schedule = schedule * (var * pat) list * (var * mexp) list * rule_weight * string option
+(* The last component names the constructor the schedule implements, when it comes from one. *)
 type inductive_schedule = string * (var * mexp) list * (var * mexp list) list * rule_schedule list * rule_schedule list
 
 type mutual_inductive_chain = inductive_schedule list list
@@ -767,8 +768,8 @@ type inductive_schedule_with_dependencies = inductive_schedule list * string
 let inductive_schedule_to_string (is : inductive_schedule) : string =
   let (name, inputs, param_deps, base_scheds, rec_scheds) = is in
   let inputs_str = String.concat ", " (List.map (fun (v, ty) -> var_to_string v ^ " : " ^ mexp_to_string ty) inputs) in
-  let base_scheds_str = String.concat " \n|\n\n " (List.map (fun (s, _, _, _) -> schedule_to_string s) base_scheds) in
-  let rec_scheds_str = String.concat " \n|\n\n " (List.map (fun (s, _, _, _) -> schedule_to_string s) rec_scheds) in
+  let base_scheds_str = String.concat " \n|\n\n " (List.map (fun (s, _, _, _, _) -> schedule_to_string s) base_scheds) in
+  let rec_scheds_str = String.concat " \n|\n\n " (List.map (fun (s, _, _, _, _) -> schedule_to_string s) rec_scheds) in
   Printf.sprintf "Inductive %s (%s) :=\n  Base:\n %s\n  Rec: %s" name inputs_str base_scheds_str rec_scheds_str
 
 let filter_mapi (f : int -> 'a -> 'b option) (l : 'a list) : 'b list =
@@ -816,7 +817,7 @@ let schedule_with_dependents (s : schedule) : (schedule_step * (rocq_constr * in
 
 let inductive_schedule_dependents (is : inductive_schedule) : (rocq_constr * int list * derive_sort * bool) list =
   let (_, _, param_deps, base_scheds, rec_scheds) = is in
-  List.concat (List.map (fun (schd,_,_,_) -> schedule_dependents schd) (base_scheds @ rec_scheds))
+  List.concat (List.map (fun (schd,_,_,_,_) -> schedule_dependents schd) (base_scheds @ rec_scheds))
 
 let rec_count_step = function
   | S_UC (_, SrcRec _, _)
@@ -874,7 +875,7 @@ let inductive_schedule_to_mexp ?fuel_zero_body (is : inductive_schedule) (ds : d
   if ds = D_Thm && name = "theorem" then begin
     let thm_mexp = 
       (match base_scheds with
-      | [(s, _, _, _)] -> schedule_to_mexp s fuel_max fuel_size fuel_size
+      | [(s, _, _, _, _)] -> schedule_to_mexp s fuel_max fuel_size fuel_size
       | _ -> failwith "Expected a single base schedule for the theorem") in
     MFun ([PVar (var_of_string "size"), Some (MConst "Coq.Init.Datatypes.nat")], thm_mexp) 
     end 
@@ -909,15 +910,15 @@ let inductive_schedule_to_mexp ?fuel_zero_body (is : inductive_schedule) (ds : d
   let rec_count = rec_count_schedule in
   let base_backtrack = 
     let add_on = if is_constrained && (ds = D_Check || ds = D_Enum) && rec_scheds <> [] then [backtrack_decoration ds Base (MOutOfFuel)] else [] in
-    List.map (fun (s, inp_pats, _, weight) ->
+    List.map (fun (s, inp_pats, _, weight, _) ->
       let k = rec_count s in
       let sz' = child_size (MId (var_of_string "size")) k in
       backtrack_decoration ~weight ds Base (match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s (MId fuel_var) fuel_init_size sz')))) base_scheds @ add_on in
-  let base_backtrack_for_all = List.map (fun (s, inp_pats, _, weight) ->
+  let base_backtrack_for_all = List.map (fun (s, inp_pats, _, weight, _) ->
     let k = rec_count s in
     let sz' = child_size (MId (var_of_string "size")) k in
     backtrack_decoration ~weight ds Base (match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s (MId fuel_var) fuel_init_size sz')))) base_scheds in
-  let rec_backtrack = List.map (fun (s, inp_pats, _, weight) ->
+  let rec_backtrack = List.map (fun (s, inp_pats, _, weight, _) ->
     let k = rec_count s in
     let sz' = child_size (MId (var_of_string "size")) k in
     backtrack_decoration ~weight ds Rec (match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s fuel_sizem fuel_init_size sz')))) rec_scheds in
@@ -933,7 +934,7 @@ let inductive_schedule_to_mexp ?fuel_zero_body (is : inductive_schedule) (ds : d
     match base_scheds, fuel_zero_body with
     | [], Some body -> body
     | [], None -> schedule_failure name ds is_constrained
-    | (s, inp_pats, _, _) :: _, _ ->
+    | (s, inp_pats, _, _, _) :: _, _ ->
       let k = rec_count s in
       let sz' = child_size (MId (var_of_string "size")) k in
       match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s (MId fuel_var) fuel_init_size sz')) in
@@ -966,11 +967,11 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
       let params = inputs @ List.concat_map (fun (v, classes) ->
         List.map (fun ty -> fresh_name ("H" ^ var_to_string v), ty) classes) param_deps in
       if ds = D_Gen && not c then Some (name, params, base, recs) else None) ind_schds in
-    let sched_body (s, inp_pats, _, _) =
+    let sched_body (s, inp_pats, _, _, _) =
       let k = rec_count_schedule s in
       let sz' = child_size (MId (var_of_string "size")) k in
       match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s fuel_zero fuel_init_size sz')) in
-    let calls ((steps, _), _, _, _) = List.filter_map (function
+    let calls ((steps, _), _, _, _, _) = List.filter_map (function
       | S_UC (_, (SrcRec (f, _) | SrcMutrec (f, _)), _)
       | S_ST (_, (SrcRec (f, _) | SrcMutrec (f, _)), _)
       | S_Check ((SrcRec (f, _) | SrcMutrec (f, _)), _) -> Some (var_to_string f)
@@ -1002,7 +1003,7 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
         if List.mem_assoc name known then None else
         match base with
         | _ :: _ -> Some (name, (inputs, MBacktrack (sched_body (List.hd base),
-            List.map (fun ((_, _, _, weight) as r) -> backtrack_decoration ~weight D_Gen Base (sched_body r)) base,
+            List.map (fun ((_, _, _, weight, _) as r) -> backtrack_decoration ~weight D_Gen Base (sched_body r)) base,
             false, D_Gen)))
         | [] ->
           let ready = List.filter (fun r ->
@@ -1010,7 +1011,7 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
           match ready with
           | [] -> None
           | r :: _ -> Some (name, (inputs, MBacktrack (inline known (sched_body r),
-              List.map (fun ((_, _, _, weight) as r) ->
+              List.map (fun ((_, _, _, weight, _) as r) ->
                 backtrack_decoration ~weight D_Gen Base (inline known (sched_body r))) ready,
               false, D_Gen)))) members in
       if step = [] then known else resolve (known @ step) in
@@ -1026,7 +1027,7 @@ let inductive_schedule_with_dependencies_to_mexp unconstrained_inds (ind_schds :
       match base_scheds, fuel_zero_body with
       | [], Some body -> body
       | [], None -> schedule_failure ind_schd_name ds is_constrained
-      | (s, inp_pats, _, _) :: _, _ ->
+      | (s, inp_pats, _, _, _) :: _, _ ->
         let k = rec_count_schedule s in
         let sz' = child_size (MId (var_of_string "size")) k in
         match_pats inp_pats (MLet (var_of_string "size'", sz', schedule_to_mexp s fuel_zero fuel_init_size sz')) in
@@ -1086,12 +1087,12 @@ let turn_def_calls_into_mutrec_calls (ind_schd : inductive_schedule) names : ind
     let new_steps = List.map turn_def_calls_step steps in
     new_steps, final in
 
-  let new_scheds scheds = List.map (fun (s, inp_pats, binders, weight) -> turn_def_calls_sched s, inp_pats, binders, weight) scheds in
+  let new_scheds scheds = List.map (fun (s, inp_pats, binders, weight, ctr) -> turn_def_calls_sched s, inp_pats, binders, weight, ctr) scheds in
 
   let new_rec_scheds = new_scheds rec_scheds in
 
   let (new_mutrec_scheds, new_base_scheds) = List.partition 
-    (fun ((steps,_),_,_,_) -> List.exists (function
+    (fun ((steps,_),_,_,_,_) -> List.exists (function
     | S_UC (_, SrcMutrec _, _)
     | S_ST (_, SrcMutrec _, _)
     | S_Check (SrcMutrec _, _) -> true
