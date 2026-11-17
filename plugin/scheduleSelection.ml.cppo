@@ -192,6 +192,9 @@ let relation_score ~grade rel output_idxs ds opt result_vars constructor_schedul
 (* Grade each step of a schedule (Total, Partial, Checking and so on),
    deriving the modes its dependencies call. Every scorer reads these grades;
    density is only one of them. *)
+let is_equality_relation rel =
+  GenericLib.is_rocq_path (ty_ctr_to_string rel) "Coq.Init.Logic.eq" || ty_ctr_to_string rel = "eq"
+
 let rec grade_schedule neutral_prelude_steps schedule : schedule_with_density =
   let fixed step ds = match fixed_step_density ds step with
     | Some grade -> grade
@@ -203,6 +206,13 @@ let rec grade_schedule neutral_prelude_steps schedule : schedule_with_density =
       (if ds <> D_Thm || ps <> PS_G || not (has_theorem_generator ty) then
          ignore (best_inductive_schedule_from_instance ty [] (producer_sort_to_derive_sort ps) false);
       fixed step ds)
+    (* An equality check compiles to an existing DecOpt instance, usually
+       from Dec_Eq; code generation never derives one. Without an instance
+       the step is unavailable. *)
+    | S_Check (SrcNonrec (DTyCtr (rel, _) as ty), _) when is_equality_relation rel ->
+      if not (has_schedule_instance ty [] D_Check true) then
+        raise (Unavailable_mode ("equality " ^ rocq_constr_to_string ty));
+      fixed step ds
     | S_Check (SrcNonrec ty, _) ->
       (ignore (best_inductive_schedule_from_instance ty [] D_Check true);
       fixed step ds)
@@ -763,7 +773,10 @@ let theorem_candidate_loses ~incumbent ms_steps ((steps, sort) : schedule) =
         ~bound:(ScheduleRanking.prefix_bound ~prefer_dense:true
           ~known_grades:known ~variable_uses)
       || visit known rest in
-  visit [] (fixed @ derived)
+  (* A step with no usable mode makes the candidate invalid: it is dropped
+     whether or not it is scored. *)
+  try visit [] (fixed @ derived)
+  with Unavailable_mode _ | Noninductive_dependency _ -> true
 
 let theorem_lazy_scoring () =
   Sys.getenv_opt "QC_THEOREM_LAZY_SCORING" <> Some "0"

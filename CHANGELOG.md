@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased] — 3.0 candidate
 
+- Schedule selection no longer picks schedules that cannot be compiled. An
+  equality check needs an existing decidable-equality instance (usually
+  `Dec_Eq`); without one, the check is unavailable. A generator or
+  enumerator derived for a type argument, such as the element type of a
+  list, is now compiled along with the producer that needs it. Before,
+  `quickchick` and derivations could stop with "cannot propagate a
+  dependency requirement" or unresolved implicit arguments.
 - `quickchick_schedules` lists a goal's theorem schedules, best first, in
   the order `quickchick n i` numbers them. Theorem schedules are ranked by
   the active scorer, including BudgetAware and compiled Rocq policies, and

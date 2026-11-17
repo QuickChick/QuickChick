@@ -84,7 +84,11 @@ let ranked_theorem_schedules ?(keep = max_int) (thm : rocq_type) =
             Feedback.msg_notice (str (Printf.sprintf "[theorem-lazy] candidate=%d skipped\n" i));
           None
         end else
-        let result = grade_schedule ms_steps schd in
+        match grade_schedule ms_steps schd with
+        | exception (Unavailable_mode _ | Noninductive_dependency _) ->
+          (* Some step has no usable mode: not a candidate. *)
+          None
+        | result ->
         if lazy_keep then begin
           let features = scored_schedule_features D_Thm i result in
           if schedule_trace_enabled () then
@@ -410,9 +414,15 @@ let collect_all_used_inductive_schd_names ind_schd_name : string list * (((induc
       match rocq with
       | DTyCtr (ind_name, args) ->
         (ind_name, List.length args, output_idxs, ds, opt) ::
+        (* A type argument of a derived producer, such as RequestType in an
+           unconstrained enumeration of list RequestType, gets its own
+           derived producer during selection when it has no instance. The
+           producer of the applied type requires it, so emit it too. Only
+           modes present in the memo are kept below. *)
         List.concat_map (fun arg ->
           match arg with
-          (* | DTyCtr (applied_ind_name, applied_args) -> extract_type_applications (arg, [], (match ds with D_Gen | D_Thm -> D_Gen | D_Enum | D_Check -> D_Enum), false) *)
+          | DTyCtr _ when not opt && (ds = D_Gen || ds = D_Enum) ->
+            extract_type_applications (arg, [], ds, false)
           | _ -> []) args
       | DNot r -> extract_type_applications (r, output_idxs, ds, opt)
       | _ -> [] in
@@ -479,6 +489,32 @@ let propagate_schedule_requirements components =
         let env, sigma, goal, names = elaborate_obligation relation outputs sort constrained in
         match instance_requirements ~allow_root:(match relation with DTyParam _ -> true | _ -> false)
           env sigma goal names with Some requirements -> requirements | None -> [] in
+      (* A closed requirement such as EnumSized RequestType, which an
+         unconstrained producer derived in this compilation provides once
+         its component is registered. *)
+      let derived_in_component env sigma goal =
+        let goal = Reductionops.nf_betaiotazeta env sigma goal in
+        let locate name = try Some (Nametab.locate (Libnames.qualid_of_string name))
+          with Not_found -> None in
+        match Typeclasses.dest_class_app env sigma goal with
+        | exception _ -> false
+        | ((cls, _), [ty]) ->
+          let is_class name = match locate name with
+            | Some r -> Names.GlobRef.CanOrd.equal r cls.Typeclasses.cl_impl
+            | None -> false in
+          let sort = if is_class "QuickChick.Classes.EnumSized" then Some D_Enum
+            else if is_class "QuickChick.Classes.GenSized" then Some D_Gen else None in
+          let head, _ = EConstr.decompose_app sigma (EConstr.of_constr ty) in
+          (match sort, EConstr.kind sigma head with
+           | Some sort, Constr.Ind (ind, _) ->
+             List.exists (fun ((n,_,_,_,_), _, _) ->
+               let dep_ind, outputs, dep_sort, constrained = parse_ind_schd_name n in
+               outputs = [] && dep_sort = sort && not constrained &&
+               (match locate (ty_ctr_to_string dep_ind) with
+                | Some (Names.GlobRef.IndRef i) -> Names.Ind.CanOrd.equal i ind
+                | _ -> false)) !all
+           | _ -> false)
+        | _ -> false in
       let from_dependency relation outputs sort constrained =
         let existing = from_obligation relation outputs sort constrained in
         if has_schedule_instance relation outputs sort constrained then existing else
@@ -502,6 +538,7 @@ let propagate_schedule_requirements components =
                 (List.concat_map obligation_variables input_args) [] sort expression in
               match instance_requirements ~allow_root:true env sigma goal names with
               | Some needed -> needed
+              | None when derived_in_component env sigma goal -> []
               | None -> CErrors.user_err (str ("QuickChick cannot propagate a dependency requirement into " ^ name)))
               (List.concat_map snd requirements))
         | _ -> existing in
