@@ -6,11 +6,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased] — 3.0 candidate
 
-- Modes of a relation that call each other in a cycle are now derived once
-  and solved as a fixed point, instead of being derived again for every
-  candidate schedule of every mode around them. A generator for a relation
-  merged from three copies of an evaluator previously exhausted memory; it
-  now derives in seconds.
+- Modes that call each other in a cycle are now derived once and solved as
+  a fixed point on their full scores, instead of being derived again for
+  every candidate schedule around them; BudgetAware and compiled policies
+  see the scores of a cycle's modes instead of treating them as unknown.
+  A generator for a relation merged from three copies of an evaluator
+  previously exhausted memory; it now derives in seconds. BudgetAware counts
+  that grow around a cycle are widened to unbounded and then settle at
+  their exact value; a cycle that does not settle is reported by the
+  warning `quickchick-fixed-point-unsettled`.
 - Schedule selection no longer picks schedules that cannot be compiled. An
   equality check needs a decidable-equality instance (usually `Dec_Eq`);
   when one is missing, QuickChick derives it with `dec_eq`, for the type or

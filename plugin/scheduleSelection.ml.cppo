@@ -192,6 +192,10 @@ let relation_score ~grade rel output_idxs ds opt result_vars constructor_schedul
 (* Grade each step of a schedule (Total, Partial, Checking and so on),
    deriving the modes its dependencies call. Every scorer reads these grades;
    density is only one of them. *)
+let fixed_point_warning = Compat.warning ~name:"quickchick-fixed-point-unsettled" (fun cycle ->
+  str ("QuickChick's scores for the cycle rooted at " ^ cycle
+       ^ " did not settle within the round limit; the last round's choices are used."))
+
 let is_equality_relation rel =
   GenericLib.is_rocq_path (ty_ctr_to_string rel) "Coq.Init.Logic.eq" || ty_ctr_to_string rel = "eq"
 
@@ -658,6 +662,9 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
   | None -> begin
   let memo_at_start = !mode_memo in
   let grade_at_start = !grade_memo in
+  (* Seeds belong to the root that set them; a cycle completed inside a
+     round must not drop an enclosing root's seeds. *)
+  let seeds_at_start = !seeds in
   let depth, saved_low = enter_mode_derivation memo_key in
   let epoch = push_epoch depth memo_key in
   Fun.protect ~finally:(fun () ->
@@ -695,10 +702,10 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
   Error.msg_debug (str "Parameters classes are: " ++ str (String.concat ", " (List.map (fun (p,cs) -> ty_param_to_string p ^ ": " ^ String.concat ", " (List.map mexp_to_string cs)) parameters_classes)) ++ fnl ());
 
   (* In a later round of a cycle, the placeholder is the previous result. *)
-  let placeholder = match Hashtbl.find_opt seeds memo_key with
+  let placeholder = match InductiveScheduleKeyMap.find_opt memo_key !seeds with
     | Some seeded -> seeded
-    | None -> ((schedule_name,[],parameters_classes,[],[]), init_density) in
-  mode_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (ModeInProgress placeholder) !mode_memo;
+    | None -> (((schedule_name,[],parameters_classes,[],[]), init_density), None) in
+  mode_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (ModeInProgress (fst placeholder, snd placeholder)) !mode_memo;
 
   let constructor_schedules_with_density = List.filter_map (fun ctr ->
     match constructor_best_valid_schedule ind_name ctr result_vars output_vars ds opt with
@@ -740,42 +747,73 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
      by their previous results, until no member's grade changes. *)
   let max_rounds = match Sys.getenv_opt "QC_SCHEDULE_FIXED_POINT_ROUNDS" with
     | Some n -> (try int_of_string n with Failure _ -> 10) | None -> 10 in
-  let member_grade m = match m.member_entry with
-    | ModeDone ((_, d), _, _) | ModeInProgress (_, d) -> d in
-  let rec rounds n previous =
+  (* A mode's state as its readers see it: its grade and its relation score
+     (the score of the selected scorer, or none under density). *)
+  let member_state m = match m.member_entry with
+    | ModeDone ((_, d), _, score) -> d, score
+    | ModeInProgress ((_, d), score) -> d, score in
+  let same_state (d, s) (d', s') = d = d' && (try Stdlib.compare s s' = 0 with _ -> false) in
+  (* What a mode's readers saw this round: its seed, or the initial value. *)
+  let seen_state ((_, _, k_ds, k_opt) as k) = match InductiveScheduleKeyMap.find_opt k !seeds with
+    | Some ((_, d), score) -> d, score
+    | None -> initial_mode_grade k_ds k_opt, None in
+  let widened = ref InductiveScheduleKeyMap.empty in
+  let rec rounds n =
     let (frame, inductive_schedule, overall_density, cycle_independent, budget_score) as result =
       derive_round () in
     let members = if cycle_independent && fixed_point_enabled () then members_of memo_key epoch else [] in
     if members = [] then result, members, true else
-    let grades = List.sort compare
-      ((memo_key, overall_density) :: List.map (fun (k, m) -> k, member_grade m) members) in
-    (* A round is a fixed point when every member's grade is the grade its
-       placeholder had: the seed of the previous round, or the initial grade. *)
-    let placeholder_grade ((_, _, k_ds, k_opt) as k) = match Hashtbl.find_opt seeds k with
-      | Some (_, d) -> d
-      | None -> initial_mode_grade k_ds k_opt in
-    let converged = previous = Some grades ||
-      List.for_all (fun (k, g) -> g = placeholder_grade k) grades in
+    let states = (memo_key, (overall_density, budget_score)) ::
+      List.map (fun (k, m) -> k, member_state m) members in
+    (* A round is a fixed point when every mode's grade and score are the ones
+       its readers saw. *)
+    let changed = List.filter (fun (k, st) -> not (same_state st (seen_state k))) states in
+    if schedule_trace_enabled () then begin
+      Feedback.msg_notice (str (Printf.sprintf "[fixed-point] %s round %d: %d re-derived, %d changed\n"
+        (ty_ctr_to_string ind_name) n (List.length states) (List.length changed)));
+      let show (d, score) = density_to_string d ^ (match score with
+        | Some (BudgetScore b) -> " " ^ BudgetAwareScore.to_string b
+        | Some (PolicyScore _) -> " policy" | None -> "") in
+      List.iter (fun (((ki, ko, _, _) as k), st) ->
+        Feedback.msg_notice (str (Printf.sprintf "[fixed-point]   %s(%s): %s -> %s\n"
+          (ty_ctr_to_string ki) (String.concat "," (List.map string_of_int ko))
+          (show (seen_state k)) (show st)))) changed
+    end;
+    let converged = changed = [] in
+    if not converged && n >= max_rounds then
+      fixed_point_warning (Printf.sprintf "%s (%s)" (ty_ctr_to_string ind_name)
+        (String.concat ", " (List.map (fun ((ki, ko, _, _), _) ->
+          ty_ctr_to_string ki ^ "(" ^ String.concat "," (List.map string_of_int ko) ^ ")") changed)));
     if converged || n >= max_rounds then result, members, converged else begin
-      if schedule_trace_enabled () then
-        Feedback.msg_notice (str (Printf.sprintf "[fixed-point] %s round %d: %d members\n"
-          (ty_ctr_to_string ind_name) n (List.length members)));
-      Hashtbl.replace seeds memo_key (inductive_schedule, overall_density);
+      List.iter (fun (k, _) -> shared_members := InductiveScheduleKeyMap.remove k !shared_members) members;
+      (* Widening: a count that grew past what its readers saw is seeded as
+         unbounded, once per mode. Later rounds recompute every count from the
+         seeds, so where a cheaper schedule exists the count settles back down
+         to its exact value (narrowing); where none does, it stays unbounded. *)
+      let seed k (value, score) =
+        let score = match score, snd (seen_state k) with
+          | Some (BudgetScore s), Some (BudgetScore seen)
+            when s.BudgetAwareScore.fabrication > seen.BudgetAwareScore.fabrication
+                 && not (InductiveScheduleKeyMap.mem k !widened) ->
+            widened := InductiveScheduleKeyMap.add k () !widened;
+            Some (BudgetScore { s with BudgetAwareScore.fabrication = BudgetAwareScore.unbounded })
+          | _ -> score in
+        seeds := InductiveScheduleKeyMap.add k (value, score) !seeds in
+      seed memo_key ((inductive_schedule, overall_density), budget_score);
       List.iter (fun (k, m) ->
-        Hashtbl.remove shared_members k;
         match m.member_entry with
-        | ModeDone (value, _, _) | ModeInProgress value -> Hashtbl.replace seeds k value) members;
+        | ModeDone (value, _, score) -> seed k (value, score)
+        | ModeInProgress (value, score) -> seed k (value, score)) members;
       mode_memo := memo_at_start;
       grade_memo := grade_at_start;
       ignore frame;
-      rounds (n + 1) (Some grades)
+      rounds (n + 1)
     end in
   let (frame, inductive_schedule, overall_density, cycle_independent, budget_score), members, converged =
-    rounds 1 None in
-  Hashtbl.remove seeds memo_key;
+    rounds 1 in
+  seeds := seeds_at_start;
   List.iter (fun (k, m) ->
-    Hashtbl.remove seeds k;
-    Hashtbl.remove shared_members k;
+    shared_members := InductiveScheduleKeyMap.remove k !shared_members;
     (* The settled members are determined by this root: share them like any
        completed, cycle-independent entry, and keep them for code generation. *)
     let entry = match m.member_entry with

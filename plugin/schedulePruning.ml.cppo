@@ -262,7 +262,7 @@ let budget_pruner ctx ~key ~prepared_inputs =
       + check_floor.GenericLib.future_variable_uses in
     Option.map (fun score ->
       let score = { score with BudgetAwareScore.var_deps =
-        score.BudgetAwareScore.var_deps + future_var_deps } in
+        BudgetAwareScore.add_count score.BudgetAwareScore.var_deps future_var_deps } in
       if check_floor.GenericLib.forced_checks > 0 then
         BudgetAwareScore.combine score
           { BudgetAwareScore.empty with BudgetAwareScore.density = BudgetAwareScore.Checking }

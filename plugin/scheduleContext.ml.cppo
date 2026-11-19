@@ -606,6 +606,11 @@ let compiled_context ?(global = ScoringView.global_name) ind_name result_vars ou
             entry in
           (match find constrained with
            | Some (ModeDone (_, true, Some (PolicyScore score))) -> Some (ScoringView.Completed score)
+           (* A fellow member of a cycle, at its current score; a provisional read. *)
+           | Some ((ModeDone (_, false, Some (PolicyScore score))
+                   | ModeInProgress (_, Some (PolicyScore score))) as e) ->
+             ignore (read_mode_entry (name, indices, mode, constrained) e);
+             Some (ScoringView.Completed score)
            | Some (ModeInProgress _) -> Some ScoringView.InProgress
            | _ -> None)
         | _ -> None in

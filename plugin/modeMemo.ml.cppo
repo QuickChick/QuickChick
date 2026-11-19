@@ -33,12 +33,14 @@ let grade_memo : rule_density RelationInstMap.t ref = ref RelationInstMap.empty
 
 (* Constrained and unconstrained scheduling take different construction paths.
    They cannot share a cached inductive schedule or its density. *)
+let compare_mode_key (ty, outputs, ds, constrained)
+    (ty', outputs', ds', constrained') =
+  let c = RelationInstOrd.compare (ty, outputs, ds) (ty', outputs', ds') in
+  if c = 0 then Stdlib.compare constrained constrained' else c
+
 module InductiveScheduleKeyMap = Map.Make(struct
   type t = ty_ctr * output_index list * derive_sort * bool
-  let compare (ty, outputs, ds, constrained)
-      (ty', outputs', ds', constrained') =
-    let c = RelationInstOrd.compare (ty, outputs, ds) (ty', outputs', ds') in
-    if c = 0 then Stdlib.compare constrained constrained' else c
+  let compare = compare_mode_key
 end)
 
 (* A recursive lookup deliberately sees the seed score used by the existing
@@ -49,8 +51,10 @@ type relation_score =
   | BudgetScore of BudgetAwareScore.score
   | PolicyScore of PolicyRegistry.score
 
+(* An in-progress mode holds a placeholder value and, in a later round of a
+   cycle, the score its previous round computed. *)
 type mode_entry =
-  | ModeInProgress of (inductive_schedule * rule_density)
+  | ModeInProgress of (inductive_schedule * rule_density) * relation_score option
   | ModeDone of (inductive_schedule * rule_density) * bool * relation_score option
 
 (* A completed entry is cycle-independent only if its computation never read
@@ -64,7 +68,7 @@ let mode_memo :
   ref InductiveScheduleKeyMap.empty
 
 let mode_entry_value = function
-  | ModeInProgress value ->
+  | ModeInProgress (value, _) ->
     incr provisional_reads; value
   | ModeDone (value, cycle_independent, _) ->
     if not cycle_independent then incr provisional_reads;
@@ -274,10 +278,13 @@ type shared_member = {
   member_epoch : int;
 }
 
-let shared_members : (InductiveScheduleKeyMap.key, shared_member) Hashtbl.t = Hashtbl.create 64
+(* Keyed by the memo's own order: relation names are compared by the
+   inductive they resolve to, not structurally. *)
+let shared_members : shared_member InductiveScheduleKeyMap.t ref = ref InductiveScheduleKeyMap.empty
 
 (* Placeholders seeded by the previous round of a root being iterated. *)
-let seeds : (InductiveScheduleKeyMap.key, inductive_schedule * rule_density) Hashtbl.t = Hashtbl.create 64
+let seeds : ((inductive_schedule * rule_density) * relation_score option) InductiveScheduleKeyMap.t ref =
+  ref InductiveScheduleKeyMap.empty
 
 let fixed_point_enabled () = Sys.getenv_opt "QC_SCHEDULE_FIXED_POINT" <> Some "0"
 
@@ -290,21 +297,21 @@ let share_member key entry low =
   if fixed_point_enabled () then
   match root_at_depth low with
   | Some (_, root, epoch) ->
-    Hashtbl.replace shared_members key
-      { member_entry = entry; member_low = low; member_root = root; member_epoch = epoch }
+    shared_members := InductiveScheduleKeyMap.add key
+      { member_entry = entry; member_low = low; member_root = root; member_epoch = epoch } !shared_members
   | None -> ()
 
 (* A shared member whose root is still in the same derivation. *)
 let find_member key =
-  match Hashtbl.find_opt shared_members key with
+  match InductiveScheduleKeyMap.find_opt key !shared_members with
   | Some m when List.exists (fun (d, r, e) ->
-      d = m.member_low && e = m.member_epoch && r = m.member_root) !in_progress_epoch -> Some m
+      d = m.member_low && e = m.member_epoch && compare_mode_key r m.member_root = 0) !in_progress_epoch -> Some m
   | _ -> None
 
 let members_of root epoch =
-  Hashtbl.fold (fun key m acc ->
-    if m.member_root = root && m.member_epoch = epoch then (key, m) :: acc else acc)
-    shared_members []
+  InductiveScheduleKeyMap.fold (fun key m acc ->
+    if compare_mode_key m.member_root root = 0 && m.member_epoch = epoch then (key, m) :: acc else acc)
+    !shared_members []
 
 let push_epoch depth key =
   incr epoch_counter;
@@ -315,5 +322,5 @@ let pop_epoch depth =
   in_progress_epoch := List.filter (fun (d, _, _) -> d <> depth) !in_progress_epoch
 
 let reset_fixed_point () =
-  Hashtbl.reset shared_members; Hashtbl.reset seeds;
+  shared_members := InductiveScheduleKeyMap.empty; seeds := InductiveScheduleKeyMap.empty;
   in_progress_epoch := []; epoch_counter := 0

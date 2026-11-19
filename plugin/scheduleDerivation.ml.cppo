@@ -649,8 +649,8 @@ let tarjan_schedules_by_name (schedules : string list) inductive_dependency_map
        let entry = match InductiveScheduleKeyMap.find_opt (ind, outputs, ds, constrained) !mode_memo with
          | Some (ModeDone ((_, density), cycle_independent, budget)) ->
            ModeDone ((schedule, density), cycle_independent, budget)
-         | Some (ModeInProgress (_, density)) ->
-           ModeInProgress (schedule, density)
+         | Some (ModeInProgress ((_, density), score)) ->
+           ModeInProgress ((schedule, density), score)
          | None -> ModeDone ((schedule, Checking), false, None) in
        mode_memo := InductiveScheduleKeyMap.add (ind, outputs, ds, constrained) entry !mode_memo)) components;
      components)

@@ -169,6 +169,22 @@ entry is recorded with the entries it read and replayed wherever those reads
 see the same values. A candidate's score therefore does not depend on which
 candidates were scored before it.
 
+Modes that call each other form cycles: a mode's search may need the score
+of a mode still being derived further up. It then reads a placeholder for
+that mode, and the mode at the bottom of the cycle is its root. While the root
+is in progress, each mode of the cycle is derived once and shared by every
+candidate. When the root completes, the cycle is solved as a fixed point:
+the root is derived again, each in-progress mode now reading the grade and
+score its previous round computed, until a round reproduces every grade and
+score its readers saw. BudgetAware's counts can grow without bound around a
+cycle; a count that grows is seeded as unbounded for the next round, and
+later rounds recompute it, so it settles at its exact value or stays
+unbounded when nothing cheaper exists. Cycles that do not settle within ten
+rounds (`QC_SCHEDULE_FIXED_POINT_ROUNDS`) keep their last round and are
+reported by the warning `quickchick-fixed-point-unsettled`. With
+`QC_SCHEDULE_TRACE=1` each round prints how many modes it re-derived and
+which changed; `QC_SCHEDULE_FIXED_POINT=0` turns cycle solving off.
+
 Theorem schedules are ranked by the active scorer. BudgetAware and compiled
 policies score a theorem schedule as a generator of the hypotheses' values;
 cardinality ranks theorems by density. In `quickchick n i`, `n` is the test

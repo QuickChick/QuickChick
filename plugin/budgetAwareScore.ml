@@ -29,6 +29,12 @@ let empty = {
   locality = Internal; input_check_deps = 0; var_deps = 0;
 }
 
+(* Counts are natural numbers or [unbounded], which a fixed point uses when
+   a count keeps growing around a cycle; addition saturates there. *)
+let unbounded = max_int
+let add_count a b = if a = unbounded || b = unbounded then unbounded else a + b
+let count_to_string n = if n = unbounded then "unbounded" else string_of_int n
+
 let density_rank = function
   | Total -> 0 | Partial -> 1 | Backtracking -> 2 | Checking -> 3
 
@@ -43,20 +49,20 @@ let to_string score =
     | Internal -> "Internal" | External -> "External"
     | SameIndExt -> "SameIndExt" in
   Printf.sprintf
-    "selectivity=%d density=%s fabrication=%d locality=%s inputCheckDeps=%d varDeps=%d"
-    score.selectivity density score.fabrication locality
-    score.input_check_deps score.var_deps
+    "selectivity=%s density=%s fabrication=%s locality=%s inputCheckDeps=%s varDeps=%s"
+    (count_to_string score.selectivity) density (count_to_string score.fabrication) locality
+    (count_to_string score.input_check_deps) (count_to_string score.var_deps)
 
 let max_density a b = if density_rank a >= density_rank b then a else b
 let max_locality a b = if locality_rank a >= locality_rank b then a else b
 
 let combine a b = {
-  selectivity = a.selectivity + b.selectivity;
+  selectivity = add_count a.selectivity b.selectivity;
   density = max_density a.density b.density;
-  fabrication = a.fabrication + b.fabrication;
+  fabrication = add_count a.fabrication b.fabrication;
   locality = max_locality a.locality b.locality;
-  input_check_deps = a.input_check_deps + b.input_check_deps;
-  var_deps = a.var_deps + b.var_deps;
+  input_check_deps = add_count a.input_check_deps b.input_check_deps;
+  var_deps = add_count a.var_deps b.var_deps;
 }
 
 let compare a b = Stdlib.compare

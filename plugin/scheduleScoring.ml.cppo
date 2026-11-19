@@ -30,10 +30,21 @@ let budget_dependency_score (request : BudgetAwareScore.dependency_request) =
     let entry = InductiveScheduleKeyMap.find_opt memo_key !mode_memo in
     record_mode_read memo_key entry;
     entry in
-  match find true, find false with
-  | Some (ModeDone (_, true, Some (BudgetScore score))), _ -> Some score
-  | _, Some (ModeDone (_, true, Some (BudgetScore score))) -> Some score
-  | _ -> None
+  (* A mode in a cycle reads its fellow members at their current scores: the
+     seed of the previous round while one is in progress, or its result in
+     this round. Such a read is provisional, like reading its placeholder. *)
+  let usable constrained entry =
+    let memo_key = (key.BudgetAwareScore.relation, key.BudgetAwareScore.output_indices,
+      key.BudgetAwareScore.derive_sort, constrained) in
+    match entry with
+    | Some (ModeDone (_, true, Some (BudgetScore score))) -> Some score
+    | Some ((ModeDone (_, false, Some (BudgetScore score))
+            | ModeInProgress (_, Some (BudgetScore score))) as e) ->
+      ignore (read_mode_entry memo_key e); Some score
+    | _ -> None in
+  match usable true (find true) with
+  | Some score -> Some score
+  | None -> usable false (find false)
 
 (* [QuickChick Scorer <policy>] ranks constructor schedules by a compiled
    Rocq policy. *)
