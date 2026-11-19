@@ -7,6 +7,10 @@ type density = Total | Partial | Backtracking | Checking
 type locality = Internal | External | SameIndExt
 
 type score = {
+  (* Guesses a checker or enumerator makes over a type it cannot enumerate
+     completely: the size bound cuts them short, so the result can be
+     unknown. Ranked first. *)
+  incomplete : int;
   selectivity : int;
   density : density;
   fabrication : int;
@@ -25,6 +29,7 @@ type context = {
 }
 
 let empty = {
+  incomplete = 0;
   selectivity = 0; density = Total; fabrication = 0;
   locality = Internal; input_check_deps = 0; var_deps = 0;
 }
@@ -49,14 +54,15 @@ let to_string score =
     | Internal -> "Internal" | External -> "External"
     | SameIndExt -> "SameIndExt" in
   Printf.sprintf
-    "selectivity=%s density=%s fabrication=%s locality=%s inputCheckDeps=%s varDeps=%s"
-    (count_to_string score.selectivity) density (count_to_string score.fabrication) locality
+    "incomplete=%s selectivity=%s density=%s fabrication=%s locality=%s inputCheckDeps=%s varDeps=%s"
+    (count_to_string score.incomplete) (count_to_string score.selectivity) density (count_to_string score.fabrication) locality
     (count_to_string score.input_check_deps) (count_to_string score.var_deps)
 
 let max_density a b = if density_rank a >= density_rank b then a else b
 let max_locality a b = if locality_rank a >= locality_rank b then a else b
 
 let combine a b = {
+  incomplete = add_count a.incomplete b.incomplete;
   selectivity = add_count a.selectivity b.selectivity;
   density = max_density a.density b.density;
   fabrication = add_count a.fabrication b.fabrication;
@@ -66,9 +72,9 @@ let combine a b = {
 }
 
 let compare a b = Stdlib.compare
-  (a.selectivity, density_rank a.density, a.fabrication,
+  (a.incomplete, a.selectivity, density_rank a.density, a.fabrication,
    locality_rank a.locality, a.input_check_deps, a.var_deps)
-  (b.selectivity, density_rank b.density, b.fabrication,
+  (b.incomplete, b.selectivity, density_rank b.density, b.fabrication,
    locality_rank b.locality, b.input_check_deps, b.var_deps)
 
 let best_of = function
@@ -78,6 +84,7 @@ let best_of = function
 
 (* The fieldwise worst of two scores. *)
 let worst a b = {
+  incomplete = max a.incomplete b.incomplete;
   selectivity = max a.selectivity b.selectivity;
   density = max_density a.density b.density;
   fabrication = max a.fabrication b.fabrication;
@@ -202,6 +209,12 @@ let output_indices args outputs =
 
 let is_checker key = key.derive_sort = D_Check || key.derive_sort = D_Enum
 
+(* Whether a type's enumeration is complete. The scheduler installs the
+   environment's test; without one every type counts as complete. A type the
+   test cannot decide counts as incomplete. *)
+let complete_type : (rocq_constr -> bool) ref = ref (fun _ -> true)
+let type_complete ty = try !complete_type ty with _ -> false
+
 let step_dependencies key = function
   | S_ST (outputs, src, _) ->
     (match source_relation src with
@@ -240,7 +253,10 @@ let step_score context key = function
      | Error _ as error -> error
      | Ok _ -> Ok { empty with density = Total;
          locality = source_locality key src;
-         fabrication = if is_checker key then 1 else 0 })
+         fabrication = if is_checker key then 1 else 0;
+         incomplete = (match src with
+           | SrcNonrec ty when is_checker key && not (type_complete ty) -> 1
+           | _ -> 0) })
   | S_Match _ -> Ok { empty with density = Backtracking }
   | S_Check (src, _) ->
     (match count_var_deps context.input_vars src,
@@ -255,8 +271,8 @@ let step_score context key = function
      | Error _ as error -> error
      | Ok var_deps ->
        let locality = source_locality key src in
-       let density, fabrication = match source_relation src with
-         | None -> Partial, 0
+       let density, (fabrication, incomplete) = match source_relation src with
+         | None -> Partial, (0, 0)
          | Some (name, args) ->
            let indices = output_indices args names in
            let dep_key = { relation = name; output_indices = indices;
@@ -265,13 +281,13 @@ let step_score context key = function
            let density = if dep_key = key then Partial else
              match context.completed_dependency (request dep_key) with
              | Some score -> score.density | None -> Partial in
-           let fabrication = if is_checker key then
+           let fabrication, incomplete = if is_checker key then
              match context.completed_dependency
                (request { dep_key with derive_sort = D_Enum }) with
-             | Some score -> score.fabrication | None -> 0
-             else 0 in
-           density, fabrication in
-       Ok { empty with density; fabrication; locality; var_deps })
+             | Some score -> score.fabrication, score.incomplete | None -> 0, 0
+             else 0, 0 in
+           density, (fabrication, incomplete) in
+       Ok { empty with density; fabrication; incomplete; locality; var_deps })
   | S_Let _ -> Error "BudgetAware: let steps have no Specimen counterpart"
 
 let score_schedule context key steps =
@@ -328,6 +344,7 @@ let group_policy : score GroupedScore.policy =
   let field kind project = kind, (fun a b -> Stdlib.compare (project a) (project b)) in
   { unit = empty; combine;
     fields = [
+      field Additive (fun s -> s.incomplete);
       field Additive (fun s -> s.selectivity);
       field Extremal (fun s -> density_rank s.density);
       field Additive (fun s -> s.fabrication);

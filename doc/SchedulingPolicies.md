@@ -64,12 +64,18 @@ of that relation's mode, derived on demand. *Variable uses* counts how often
 already bound variables are read, which favours schedules that produce
 values rather than test them.
 
-**BudgetAware.** `budget_aware` ports Specimen's completed score: selectivity,
+**BudgetAware.** `budget_aware` extends Specimen's completed score. Its
+fields, compared lexicographically, are incomplete guesses, selectivity,
 density, fabrication, locality, input-check dependencies and variable
-dependencies, compared lexicographically. A relation's score combines, over
-its input-pattern coverage leaves, the best score among each leaf's
-constructors. An uncovered leaf, a recursive call, or a dependency that is
-not yet derived scores Partial. A schedule the score cannot represent (one
+dependencies. Incomplete guesses, which Specimen does not have, count the
+values a checker or enumerator guesses from a type whose enumeration is not
+complete, so that the size bound can cut the guess short and the answer be
+unknown; they include those of the enumerators a schedule uses. Fabrication
+counts every guess. A relation's score, as a caller sees it, is the worst
+over its input-pattern coverage leaves of the best score among each leaf's
+constructors, since one call follows one leaf (Specimen sums over leaves).
+An uncovered leaf, a recursive call, or a dependency that is not yet derived
+scores Partial. A schedule the score cannot represent (one
 with a `let` step) is an error rather than a fallback.
 
 **Cardinality** (experimental) reads a schedule as a query plan. Counts are

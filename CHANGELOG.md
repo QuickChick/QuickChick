@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased] — 3.0 candidate
 
+- BudgetAware ranks first a new count, `incomplete`: the guesses a checker
+  or enumerator makes over a type it cannot enumerate completely (an
+  infinite type, cut short by the size bound, so the result can be
+  unknown), including those of the enumerators it uses. Fabrication still
+  counts every guess.
 - BudgetAware scores a relation, as its callers see it, by the worst
   coverage leaf instead of the sum over leaves: a call follows one leaf.
   Summing charged a caller for every path of the relation, growing with its

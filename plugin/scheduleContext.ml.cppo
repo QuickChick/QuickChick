@@ -757,6 +757,9 @@ let budget_key ind_name result_vars output_vars ds = {
     if List.mem v output_vars then Some i else None) result_vars;
   derive_sort = ds }
 
+(* BudgetAware counts a guess over a type whose enumeration is incomplete. *)
+let () = BudgetAwareScore.complete_type := GenericLib.enumeration_complete
+
 (* Finite pins depend on relation definitions and naming, so they are shared
    by every context of one derivation and reset with the name cache. *)
 let budget_context inputs = {

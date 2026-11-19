@@ -192,6 +192,13 @@ let relation_score ~grade rel output_idxs ds opt result_vars constructor_schedul
 (* Grade each step of a schedule (Total, Partial, Checking and so on),
    deriving the modes its dependencies call. Every scorer reads these grades;
    density is only one of them. *)
+(* Widened count fields, per mode. *)
+module WidenedSet = Set.Make (struct
+  type t = InductiveScheduleKeyMap.key * string
+  let compare (k, f) (k', f') =
+    let c = compare_mode_key k k' in if c = 0 then String.compare f f' else c
+end)
+
 let fixed_point_warning = Compat.warning ~name:"quickchick-fixed-point-unsettled" (fun cycle ->
   str ("QuickChick's scores for the cycle rooted at " ^ cycle
        ^ " did not settle within the round limit; the last round's choices are used."))
@@ -757,7 +764,7 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
   let seen_state ((_, _, k_ds, k_opt) as k) = match InductiveScheduleKeyMap.find_opt k !seeds with
     | Some ((_, d), score) -> d, score
     | None -> initial_mode_grade k_ds k_opt, None in
-  let widened = ref InductiveScheduleKeyMap.empty in
+  let widened = ref WidenedSet.empty in
   let rec rounds n =
     let (frame, inductive_schedule, overall_density, cycle_independent, budget_score) as result =
       derive_round () in
@@ -791,12 +798,21 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
          seeds, so where a cheaper schedule exists the count settles back down
          to its exact value (narrowing); where none does, it stays unbounded. *)
       let seed k (value, score) =
+        (* The counts that flow between modes: fabrication and incomplete
+           guesses. Each is widened on its own, once per mode. *)
         let score = match score, snd (seen_state k) with
-          | Some (BudgetScore s), Some (BudgetScore seen)
-            when s.BudgetAwareScore.fabrication > seen.BudgetAwareScore.fabrication
-                 && not (InductiveScheduleKeyMap.mem k !widened) ->
-            widened := InductiveScheduleKeyMap.add k () !widened;
-            Some (BudgetScore { s with BudgetAwareScore.fabrication = BudgetAwareScore.unbounded })
+          | Some (BudgetScore s), Some (BudgetScore seen) ->
+            let widen name grew value s =
+              if grew && not (WidenedSet.mem (k, name) !widened) then begin
+                widened := WidenedSet.add (k, name) !widened; value s end
+              else s in
+            let s = widen "fabrication"
+              (s.BudgetAwareScore.fabrication > seen.BudgetAwareScore.fabrication)
+              (fun s -> { s with BudgetAwareScore.fabrication = BudgetAwareScore.unbounded }) s in
+            let s = widen "incomplete"
+              (s.BudgetAwareScore.incomplete > seen.BudgetAwareScore.incomplete)
+              (fun s -> { s with BudgetAwareScore.incomplete = BudgetAwareScore.unbounded }) s in
+            Some (BudgetScore s)
           | _ -> score in
         seeds := InductiveScheduleKeyMap.add k (value, score) !seeds in
       seed memo_key ((inductive_schedule, overall_density), budget_score);

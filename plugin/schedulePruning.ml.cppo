@@ -292,16 +292,15 @@ let budget_pruner ctx ~key ~prepared_inputs =
     end else match !incumbent with
       | None -> false
       | Some best ->
-        (* The bound without derived dependencies is already admissible.
-           Deriving them cannot change selectivity, the first field, so it
-           is worth doing only when selectivity ties. *)
+        (* The bound without derived dependencies is already admissible;
+           deriving them can raise it. The first field, incomplete guesses,
+           can grow with derived dependencies, so there is no shortcut on
+           the earlier fields. *)
         let cut bound = let c = BudgetAwareScore.compare best bound <= 0 in
           if c then incr ctx.stats.pruned_prefixes; c in
         (match attempt (fun () -> prefix_bound check_floor triple) with
          | None -> false
          | Some cheap when cut cheap -> true
-         | Some cheap when cheap.BudgetAwareScore.selectivity
-                           < best.BudgetAwareScore.selectivity -> false
          | Some _ -> (match attempt (fun () -> derived_bound check_floor triple) with
            | None -> false
            | Some bound -> cut bound)) in

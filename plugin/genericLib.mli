@@ -189,6 +189,8 @@ val possible_schedules_with_advanced_pruning : ?max_schedules:int -> ?reduce_ord
 val schedule_step_to_string : schedule_step -> string
 val schedule_sort_to_string : schedule_sort -> string
 val schedule_to_string : schedule -> string
+(* Whether every value of the type is enumerated at any size. *)
+val enumeration_complete : rocq_type -> bool
 
 type monad_sort =
   | MG 

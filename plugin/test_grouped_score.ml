@@ -83,7 +83,7 @@ let () =
 let densities = [B.Total; B.Partial; B.Backtracking; B.Checking]
 let localities = [B.Internal; B.External; B.SameIndExt]
 let random_budget () = {
-  B.selectivity = next 3; density = List.nth densities (next 4);
+  B.incomplete = next 3; selectivity = next 3; density = List.nth densities (next 4);
   fabrication = next 3; locality = List.nth localities (next 3);
   input_check_deps = next 3; var_deps = next 3 }
 
