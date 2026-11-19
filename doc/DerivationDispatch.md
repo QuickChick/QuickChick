@@ -82,9 +82,8 @@ that member at fuel zero.
 
 ## Validation
 
-`test/derivation_contracts.v` checks the preserved public contracts.
-`test/public_derivation.v` covers implicit and explicit type arguments, pair
-outputs, custom checker dictionaries, missing requirements, mutual datatypes,
+`test/derived_instance_types.v` checks the preserved public contracts and
+covers implicit and explicit type arguments, pair outputs, custom checker dictionaries, missing requirements, mutual datatypes,
 universe polymorphism, fresh names, the bare `Derive` spelling, and
 generator/checker/enumerator requirement propagation with dictionary-dependent
 results. `test/enum_constraint_chain.v` covers the generator/checker/enumerator

@@ -1,4 +1,6 @@
 From QuickChick Require Import LegacyDerive.
+(* The bare Derive spelling, enabled by importing LegacyDerive, uses the same
+   engine as QuickChick Derive, with class lists and single classes. *)
 
 Inductive legacy_tree :=
 | LegacyLeaf
@@ -25,7 +27,7 @@ Proof. reflexivity. Qed.
 Example old_checker_rejects : decOpt (P := accepts false) 3 = Some false.
 Proof. reflexivity. Qed.
 
-(* Master derives instances for both members of a mutual block. *)
+(* Instances are derived for every member of a mutual block. *)
 Inductive left_tree := LeftLeaf | LeftNode : right_tree -> left_tree
 with right_tree := RightLeaf | RightNode : left_tree -> right_tree.
 QuickChick Derive (Arbitrary, EnumSized, Show, Sized) for left_tree.

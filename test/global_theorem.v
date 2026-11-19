@@ -1,4 +1,5 @@
 From QuickChick Require Import QuickChick.
+(* quickchick on top-level theorems, including one that uses a definition. *)
 
 Definition twice (n : nat) := n + n.
 

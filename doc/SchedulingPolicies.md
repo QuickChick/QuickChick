@@ -149,7 +149,7 @@ only one of them can produce it. A dependency's grade enters a bound only
 when its derivation read no provisional grade; otherwise the bound uses the
 best possible grade, which keeps it admissible.
 
-`test/bound_proofs/` proves these bounds admissible and the cuts exact, for a
+`test/proofs/` proves these bounds admissible and the cuts exact, for a
 model of the OCaml code: `DensityPrefixBound.v` for every density ranking,
 `BudgetAwarePrefixBound.v` for BudgetAware, and `DensityLookahead.v` for the
 look-ahead. Their premises are that committed steps and forced checks keep

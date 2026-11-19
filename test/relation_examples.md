@@ -1,6 +1,6 @@
-# Dependent derivation regressions
+# Relation examples
 
-`dependent_regressions.v` ports the active relation cases from the former
+`relation_examples.v` ports the active relation cases from the former
 `examples/other/DependentTest.v` to public scheduled derivations. Dune compiles
 it as part of the normal testing theory and CI's `@runtest` build.
 
@@ -23,7 +23,7 @@ Constructor weights have a dedicated existing regression in constructor_weights.
 
 The previously commented parameterized Bar example is now active. Added cases
 also cover fixed/repeated inputs, reordered outputs, and rejection of repeated
-or nested generated outputs. public_derivation.v covers both pair-lambda
+or nested generated outputs. derived_instance_types.v covers both pair-lambda
 spellings and their instance types; function_conclusion.v covers function
 applications in conclusions. Other focused tests cover instance reuse, full
 applied prerequisites, proof-local lifecycle, and custom scorer selection.

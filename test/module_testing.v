@@ -1,4 +1,6 @@
 From QuickChick Require Import QuickChick.
+(* Tests and derivations inside modules, including a module named quickchick,
+   functor parameters and applied functors. *)
 Extract Constant defNumTests => "3".
 Module Outer.
   Module quickchick.

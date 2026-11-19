@@ -784,7 +784,7 @@ let () =
   check_conservative_model true N.D_Gen;
   check_conservative_model false N.D_Check;
   (* Give each typed relation mode a fixed synthetic recursive-call grade.
-     The proof in test/pruning_bounds.v then predicts that the committed
+     The proof in test/proofs/pruning_bounds.v then predicts that the committed
      density/count/use key is no worse than every completed descendant. *)
   let counted_key schedule =
     let modes, unconstrained = mode_signature schedule in

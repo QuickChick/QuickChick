@@ -1,3 +1,4 @@
+(* QuickChick and Stdlib's Derive commands coexist in either import order. *)
 From Coq Require Import derive.Derive.
 From QuickChick Require Import QuickChick.
 

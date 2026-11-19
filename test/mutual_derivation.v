@@ -1,4 +1,6 @@
 From QuickChick Require Import QuickChick Classes.
+(* The simple derivers (GenSized, EnumSized, Shrink, Arbitrary, Show) on a
+   mutually inductive pair of types. *)
 
 Inductive a :=
   | A1 : a
