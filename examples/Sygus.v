@@ -277,6 +277,15 @@ Fixpoint partial_eval (e : exp) : exp :=
       end
   end.
 
+(* eval is deterministic and evalc computes it, so its checker can evaluate
+   and compare instead of searching for the values of subterms. QuickChick
+   uses this instance instead of deriving a checker. *)
+#[local] Instance Dec_Eq_res : Dec_Eq res. dec_eq. Defined.
+#[local] Instance DecOpt_eval_by_evalc e x y r : DecOpt (eval e x y r) :=
+  {| decOpt := fun _ => Some (match evalc e x y with
+                              | Some r' => (r' = r)?
+                              | None => false end) |}.
+
 Theorem partial_eval_correct : forall e x y r, eval e x y r -> eval (partial_eval e) x y r.
 quickchick.
 
