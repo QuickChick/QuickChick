@@ -504,8 +504,9 @@ let rec dec_eq_plan env sigma assumed ty =
     let sigma, cls = Evd.fresh_global env sigma (dec_eq_class ()) in
     let id = Namegen.next_ident_away (Names.Id.of_string "qc_assumed_dec_eq")
       (Environ.ids_of_named_context_val (Environ.named_context_val env)) in
-    EConstr.push_named (Context.Named.Declaration.LocalAssum
-      (Context.make_annot id Compat.relevant, EConstr.mkApp (cls, [| t |]))) env) env tys in
+    Compat.push_named (Context.Named.Declaration.LocalAssum
+      (Context.make_annot id Sorts.Relevant,
+       EConstr.to_constr sigma (EConstr.mkApp (cls, [| t |])))) env) env tys in
   let env' = assume env sigma assumed in
   if dec_eq_resolvable env' sigma ty then Some []
   else if dec_eq_derivable env' sigma ty then Some [ty]
