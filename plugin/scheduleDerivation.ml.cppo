@@ -318,6 +318,7 @@ let reset_mode_memo () =
   stable_mode_entries := InductiveScheduleKeyMap.empty;
   stable_merge := None;
   Hashtbl.reset contextual_derivations;
+  reset_fixed_point ();
   mode_memo := init_mode_memo
 
 (* Diagnostic scoring must not consume or leave behind entries from another

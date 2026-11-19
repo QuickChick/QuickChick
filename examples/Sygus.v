@@ -288,6 +288,7 @@ Fixpoint partial_eval (e : exp) : exp :=
 
 Theorem partial_eval_correct : forall e x y r, eval e x y r -> eval (partial_eval e) x y r.
 quickchick.
+Abort.
 
 Compute partial_eval ((Lt One (P One Y))).
 Definition stuck (e : exp) : bool := (e = (partial_eval e)) ? . 

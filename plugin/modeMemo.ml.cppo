@@ -251,3 +251,69 @@ let replay_contextual_derivation key record =
       | _ -> ()
     end) record.context_delta;
   record.context_value
+
+(* Cycles as fixed points. A derivation whose result read an in-progress
+   ancestor's placeholder depends on that ancestor; all such derivations below
+   the lowest ancestor they read form a cycle whose root is that ancestor.
+   While the root is in progress, each member is derived once and its result
+   shared by every candidate that asks for it again, instead of being derived
+   anew for each context. When the root completes, it is derived again with
+   every member's placeholder seeded by the member's previous result, until a
+   round changes no member's grade or score. *)
+
+(* The ancestor in progress at each depth, with the epoch of that derivation:
+   a member shared under one derivation of its root is not valid under the
+   next one. *)
+let epoch_counter = ref 0
+let in_progress_epoch : (int * InductiveScheduleKeyMap.key * int) list ref = ref []
+
+type shared_member = {
+  member_entry : mode_entry;
+  member_low : int;
+  member_root : InductiveScheduleKeyMap.key;
+  member_epoch : int;
+}
+
+let shared_members : (InductiveScheduleKeyMap.key, shared_member) Hashtbl.t = Hashtbl.create 64
+
+(* Placeholders seeded by the previous round of a root being iterated. *)
+let seeds : (InductiveScheduleKeyMap.key, inductive_schedule * rule_density) Hashtbl.t = Hashtbl.create 64
+
+let fixed_point_enabled () = Sys.getenv_opt "QC_SCHEDULE_FIXED_POINT" <> Some "0"
+
+let root_at_depth depth =
+  List.find_opt (fun (d, _, _) -> d = depth) !in_progress_epoch
+
+(* Share a completed derivation that read the placeholder of the ancestor at
+   depth [low]. *)
+let share_member key entry low =
+  if fixed_point_enabled () then
+  match root_at_depth low with
+  | Some (_, root, epoch) ->
+    Hashtbl.replace shared_members key
+      { member_entry = entry; member_low = low; member_root = root; member_epoch = epoch }
+  | None -> ()
+
+(* A shared member whose root is still in the same derivation. *)
+let find_member key =
+  match Hashtbl.find_opt shared_members key with
+  | Some m when List.exists (fun (d, r, e) ->
+      d = m.member_low && e = m.member_epoch && r = m.member_root) !in_progress_epoch -> Some m
+  | _ -> None
+
+let members_of root epoch =
+  Hashtbl.fold (fun key m acc ->
+    if m.member_root = root && m.member_epoch = epoch then (key, m) :: acc else acc)
+    shared_members []
+
+let push_epoch depth key =
+  incr epoch_counter;
+  in_progress_epoch := (depth, key, !epoch_counter) :: !in_progress_epoch;
+  !epoch_counter
+
+let pop_epoch depth =
+  in_progress_epoch := List.filter (fun (d, _, _) -> d <> depth) !in_progress_epoch
+
+let reset_fixed_point () =
+  Hashtbl.reset shared_members; Hashtbl.reset seeds;
+  in_progress_epoch := []; epoch_counter := 0

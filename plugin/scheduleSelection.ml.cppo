@@ -645,14 +645,31 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
       (Stdlib.Option.value ~default:[] (Hashtbl.find_opt contextual_derivations memo_key)) in
   match reusable with
   | Some record -> replay_contextual_derivation memo_key record
+  | None ->
+  match (if fixed_point_enabled () then find_member memo_key else None) with
+  | Some m ->
+    (* A member of a cycle whose root is still in progress: derived once and
+       shared, so it reads as a provisional entry of that root. *)
+    record_mode_read memo_key (Some m.member_entry);
+    mode_memo := InductiveScheduleKeyMap.add memo_key m.member_entry !mode_memo;
+    cycle_low := InductiveScheduleKeyMap.add memo_key m.member_low !cycle_low;
+    lowest_provisional_read := min !lowest_provisional_read m.member_low;
+    mode_entry_value m.member_entry
   | None -> begin
-  let frame = Hashtbl.create 16 in
   let memo_at_start = !mode_memo in
-  derivation_frames := frame :: !derivation_frames;
+  let grade_at_start = !grade_memo in
   let depth, saved_low = enter_mode_derivation memo_key in
+  let epoch = push_epoch depth memo_key in
   Fun.protect ~finally:(fun () ->
-    derivation_frames := List.tl !derivation_frames;
+    pop_epoch depth;
     leave_mode_derivation memo_key depth saved_low) (fun () ->
+  (* One derivation of this mode, returning its result and whether it read
+     a placeholder of an ancestor. *)
+  let derive_round () =
+  let frame = Hashtbl.create 16 in
+  derivation_frames := frame :: !derivation_frames;
+  lowest_provisional_read := max_int;
+  Fun.protect ~finally:(fun () -> derivation_frames := List.tl !derivation_frames) (fun () ->
   Error.msg_debug (str "Inductive name: " 
   ++ str (ty_ctr_to_string ind_name)
   ++ str "\n Parameters: "
@@ -677,7 +694,11 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
 
   Error.msg_debug (str "Parameters classes are: " ++ str (String.concat ", " (List.map (fun (p,cs) -> ty_param_to_string p ^ ": " ^ String.concat ", " (List.map mexp_to_string cs)) parameters_classes)) ++ fnl ());
 
-  mode_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (ModeInProgress ((schedule_name,[],parameters_classes,[],[]), init_density)) !mode_memo;
+  (* In a later round of a cycle, the placeholder is the previous result. *)
+  let placeholder = match Hashtbl.find_opt seeds memo_key with
+    | Some seeded -> seeded
+    | None -> ((schedule_name,[],parameters_classes,[],[]), init_density) in
+  mode_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (ModeInProgress placeholder) !mode_memo;
 
   let constructor_schedules_with_density = List.filter_map (fun ctr ->
     match constructor_best_valid_schedule ind_name ctr result_vars output_vars ds opt with
@@ -709,22 +730,73 @@ and inductive_best_valid_schedule (rel : rocq_relation) (output_idxs : int list)
   let covered_patterns, overall_density = coverage_grade rel output_idxs ds densities in
 
   let cycle_independent = !lowest_provisional_read >= depth in
-  if not cycle_independent then
-    cycle_low := InductiveScheduleKeyMap.add memo_key !lowest_provisional_read !cycle_low;
   (* Specimen's inductive score: combine, over coverage leaves, the best
      score among the leaf's constructors; an uncovered leaf scores Partial. *)
   if cardinality_ranking () then record_cardinality_count ind_name output_idxs ds ctrs constructor_schedules;
   let budget_score = relation_score ~grade:grade_schedule rel output_idxs ds opt result_vars
     constructor_schedules densities budget_scores covered_patterns in
-  mode_memo := InductiveScheduleKeyMap.add (ind_name, output_idxs, ds, opt) (ModeDone ((inductive_schedule, overall_density), cycle_independent, budget_score)) !mode_memo;
-  Error.msg_debug (str (Printf.sprintf "%s: %s Done, Density: %s, cycle-independent: %b\n" (schedule_name) (String.concat ", " (List.map string_of_int output_idxs)) (density_to_string overall_density) cycle_independent));
+  frame, inductive_schedule, overall_density, cycle_independent, budget_score)) in
+  (* A mode at the root of a cycle is derived again, with its members seeded
+     by their previous results, until no member's grade changes. *)
+  let max_rounds = match Sys.getenv_opt "QC_SCHEDULE_FIXED_POINT_ROUNDS" with
+    | Some n -> (try int_of_string n with Failure _ -> 10) | None -> 10 in
+  let member_grade m = match m.member_entry with
+    | ModeDone ((_, d), _, _) | ModeInProgress (_, d) -> d in
+  let rec rounds n previous =
+    let (frame, inductive_schedule, overall_density, cycle_independent, budget_score) as result =
+      derive_round () in
+    let members = if cycle_independent && fixed_point_enabled () then members_of memo_key epoch else [] in
+    if members = [] then result, members, true else
+    let grades = List.sort compare
+      ((memo_key, overall_density) :: List.map (fun (k, m) -> k, member_grade m) members) in
+    (* A round is a fixed point when every member's grade is the grade its
+       placeholder had: the seed of the previous round, or the initial grade. *)
+    let placeholder_grade ((_, _, k_ds, k_opt) as k) = match Hashtbl.find_opt seeds k with
+      | Some (_, d) -> d
+      | None -> initial_mode_grade k_ds k_opt in
+    let converged = previous = Some grades ||
+      List.for_all (fun (k, g) -> g = placeholder_grade k) grades in
+    if converged || n >= max_rounds then result, members, converged else begin
+      if schedule_trace_enabled () then
+        Feedback.msg_notice (str (Printf.sprintf "[fixed-point] %s round %d: %d members\n"
+          (ty_ctr_to_string ind_name) n (List.length members)));
+      Hashtbl.replace seeds memo_key (inductive_schedule, overall_density);
+      List.iter (fun (k, m) ->
+        Hashtbl.remove shared_members k;
+        match m.member_entry with
+        | ModeDone (value, _, _) | ModeInProgress value -> Hashtbl.replace seeds k value) members;
+      mode_memo := memo_at_start;
+      grade_memo := grade_at_start;
+      ignore frame;
+      rounds (n + 1) (Some grades)
+    end in
+  let (frame, inductive_schedule, overall_density, cycle_independent, budget_score), members, converged =
+    rounds 1 None in
+  Hashtbl.remove seeds memo_key;
+  List.iter (fun (k, m) ->
+    Hashtbl.remove seeds k;
+    Hashtbl.remove shared_members k;
+    (* The settled members are determined by this root: share them like any
+       completed, cycle-independent entry, and keep them for code generation. *)
+    let entry = match m.member_entry with
+      | ModeDone (value, _, score) when converged -> ModeDone (value, true, score)
+      | entry -> entry in
+    if converged then cycle_low := InductiveScheduleKeyMap.remove k !cycle_low;
+    mode_memo := InductiveScheduleKeyMap.add k entry !mode_memo) members;
+  if not cycle_independent then
+    cycle_low := InductiveScheduleKeyMap.add memo_key !lowest_provisional_read !cycle_low;
+  let entry = ModeDone ((inductive_schedule, overall_density), cycle_independent, budget_score) in
+  mode_memo := InductiveScheduleKeyMap.add memo_key entry !mode_memo;
+  Error.msg_debug (str (Printf.sprintf "%s: %s Done, Density: %s, cycle-independent: %b\n" (ty_ctr_to_string ind_name) (String.concat ", " (List.map string_of_int output_idxs)) (density_to_string overall_density) cycle_independent));
   if cycle_independent then
     Hashtbl.replace stable_closures memo_key
       (List.filter (fun (k, _) -> k <> memo_key) (memo_delta memo_at_start))
-  else
+  else begin
+    share_member memo_key entry !lowest_provisional_read;
     remember_contextual_derivation memo_key frame memo_at_start
-      (inductive_schedule, overall_density);
-  inductive_schedule, overall_density))
+      (inductive_schedule, overall_density)
+  end;
+  inductive_schedule, overall_density)
 end
 
 and best_inductive_schedule_from_instance (ind_instance : rocq_type) (output_vars : var list) (ds : derive_sort) (opt : bool) : inductive_schedule * rule_density =
