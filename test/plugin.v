@@ -10,7 +10,7 @@ Inductive foo {A : Type} :=
 | baz : foo
 .
 
-QCDerive (Arbitrary, Show) for foo.
+QuickChick Derive (Arbitrary, Show) for foo.
 Sample (arbitrary : G foo).
 
 Section Sanity.
@@ -68,3 +68,38 @@ QuickChick
 Definition int := nat.
 Definition teh := fun x : int => Nat.eqb x x.
 QuickChick teh.
+
+Section ScheduledCheckerResults.
+
+  Inductive checker_accepts : bool -> Prop :=
+  | CheckerAcceptsTrue : checker_accepts true.
+
+  QuickChick Derive Checker for (checker_accepts flag).
+
+  Example checker_accepts_true :
+    decOpt (P := checker_accepts true) 5 = Some true.
+  Proof. reflexivity. Qed.
+
+  Example checker_accepts_false :
+    decOpt (P := checker_accepts false) 5 = Some false.
+  Proof. reflexivity. Qed.
+
+  Inductive checker_has_witness : unit -> Prop :=
+  | CheckerHasWitness : forall b : bool, checker_has_witness tt.
+
+  QuickChick Derive Checker for (checker_has_witness u).
+
+  Example checker_witness_found :
+    decOpt (P := checker_has_witness tt) 5 = Some true.
+  Proof. reflexivity. Qed.
+
+  Definition checker_bool_enum_with_none : E (option bool) :=
+    enumerate
+      (returnEnum None ::
+       bindEnum (enumSized 5) (fun b => returnEnum (Some b)) :: nil).
+
+  Example checker_search_inconclusive :
+    enumeratingOpt checker_bool_enum_with_none (fun _ => Some false) 5 = None.
+  Proof. reflexivity. Qed.
+
+End ScheduledCheckerResults.

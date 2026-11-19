@@ -8,7 +8,7 @@ From Coq Require Import
      ZArith
      ssreflect
      ssrbool.
-From QuickChick Require Import Checker Generators Producer.
+From QuickChick Require Import Checker Generators Producer Show Classes.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -20,8 +20,31 @@ Set Bullet Behavior "Strict Subproofs".
 Class DecOpt (P : Prop) := { decOpt : nat -> option bool }.
 
 
+(* A theorem test shrinks the outputs of a producing hypothesis only when
+   an existing checker confirms the hypothesis for each shrunk value. Without
+   one the outputs are not shrunk. *)
+Class TheoremHypCheck (P : Prop) := { theoremHypCheck : nat -> option bool }.
+
+#[global] Instance TheoremHypCheckOfDecOpt {P} `{DecOpt P} : TheoremHypCheck P | 10 :=
+  {| theoremHypCheck := decOpt |}.
+
+#[global] Instance TheoremHypCheckNone {P} : TheoremHypCheck P | 100 :=
+  {| theoremHypCheck := fun _ => None |}.
+
+(* Bind a hypothesis's outputs, shrinking them on failure to values that
+   [snd gc] confirms still satisfy the hypothesis. *)
+Definition theoremForAllST {A} `{Show A} `{TheoremShrink A}
+           (gc : G (option A) * (A -> option bool)) (pf : A -> Checker) : Checker :=
+  forAllShrinkMaybe (fst gc)
+    (fun x => List.filter (fun x' => match snd gc x' with
+                                     | Some true => true
+                                     | _ => false
+                                     end) (theoremShrink x))
+    pf.
+
 Axiom checkable_size_limit : nat.
 Extract Constant checkable_size_limit => "10000".
+Definition mutual_fuel : nat := 10000.
 
 (* Discard tests that run further than the limit *)
 (* For proofs, the size parameter will need to be taken into account
@@ -97,6 +120,19 @@ Proof.
       right; intro; destruct H; contradiction.
 Defined.
 
+#[global] Instance Dec_iff {P Q} {H : Dec P} {I : Dec Q} : Dec (P <-> Q).
+Proof.
+  constructor. unfold decidable.
+  destruct H as [D]; destruct D;
+    destruct I as [D]; destruct D; tauto.
+Defined.
+
+#[global] Instance Dec_True : Dec True.
+Proof. constructor. left. exact I. Defined.
+
+#[global] Instance Dec_False : Dec False.
+Proof. constructor. right. auto. Defined.
+
 (* BCP: Not clear this is a good idea, but... *)
 (* Leo: Should be ok with really low priority *)
 #[global] Instance Dec_impl {P Q} {H : Dec P} {I : Dec Q} : Dec (P -> Q) | 100.
@@ -141,6 +177,10 @@ Ltac dec_eq :=
              | [ |- _ ] => decide equality
            end
          end.
+
+(* A Dec_Eq instance for [A] built by [dec_eq]. Automatic testing uses it to
+   derive an instance that an equality check needs and that is missing. *)
+Notation qc_derive_dec_eq A := (ltac:(dec_eq) : Dec_Eq A) (only parsing).
 
 #[global] Instance Dec_Eq_implies_DecEq {A} `{H : Dec_Eq A} (x y : A) : Dec (x = y).
 Proof.
@@ -249,6 +289,19 @@ Notation "x ==>? y" :=
   (implicationOpt x (fun tt => y))
     (at level 55, right associativity).
 
+Definition andBind (a b : option bool) : option bool :=
+  match a with
+  | Some true => b
+  | _ => a
+  end.
+
+Definition negbOpt (a : option bool) : option bool :=
+  match a with
+  | Some true => Some false
+  | Some false => Some true
+  | None => None
+  end.
+
 #[global] Hint Resolve Dec_eq_unit : eq_dec.
 #[global] Hint Resolve Dec_eq_bool : eq_dec.
 #[global] Hint Resolve Dec_eq_nat : eq_dec.
@@ -260,3 +313,25 @@ Notation "x ==>? y" :=
 #[global] Hint Resolve Dec_eq_list : eq_dec.
 #[global] Hint Resolve Dec_eq_ascii : eq_dec.
 #[global] Hint Resolve Dec_eq_string : eq_dec.
+
+Class Implies (A B : Type) := implies : A -> B -> option bool.
+Notation "A -=> B" := (implies A B) (at level 199, left associativity).
+
+#[global] Instance impliesOO : Implies (option bool) (option bool) :=
+    fun p1 p2 => 
+        match p1 with
+        | None | Some false => None
+        | Some true => p2
+        end.
+
+#[global] Instance impliesBB : Implies bool bool := 
+    fun p1 p2 => 
+        impliesOO (Some p1) (Some p2).
+
+#[global] Instance impliesOB : Implies (option bool) bool := 
+    fun p1 p2 =>
+        impliesOO p1 (Some p2).
+
+#[global] Instance impliesBO : Implies bool (option bool) :=
+    fun p1 p2 =>
+        impliesOO (Some p1) p2.

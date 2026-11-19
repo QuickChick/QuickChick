@@ -1,0 +1,10 @@
+(library
+ (name quickchick_legacy_plugin)
+ (public_name coq-quickchick.legacy)
+ (flags :standard -rectypes -w -27)
+ (libraries coq-quickchick.plugin))
+
+(rule
+ (target legacy_derive.ml)
+ (deps (:source legacy_derive.mlg))
+ (action (run coqpp %{source})))

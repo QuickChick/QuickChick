@@ -14,7 +14,7 @@ Inductive exp : Type :=
   | AMinus : exp -> exp -> exp
   | AMult : exp -> exp -> exp.
 
-QCDerive Show for exp.
+QuickChick Derive Show for exp.
 (* Print Showexp. *)
 (*
 Showexp = 
@@ -42,7 +42,7 @@ show := fun x : exp =>
  *)
 
 (* We can also derive a generator for expressions. *)
-QCDerive Arbitrary for exp.
+QuickChick Derive Arbitrary for exp.
 
 (* Sample (@arbitrary exp _). *)
 

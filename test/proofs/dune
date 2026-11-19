@@ -1,0 +1,16 @@
+; Rocq proofs about the scheduler, checked by compiling them; none loads the
+; plugin. DensityPrefixBound, BudgetAwarePrefixBound and DensityLookahead
+; prove that the built-in scorers' prefix bounds are admissible and that
+; pruning with them is exact; they model plugin/scheduleRanking.ml and
+; plugin/budgetAwareScore.ml, and verification mode checks the premises at
+; run time. pruning_bounds, prefix_adapter_laws and dependency_cycle_laws
+; model the prefix search, its step conversion and dependency cycles.
+
+(alias
+  (name runtest)
+  (deps (alias_rec all)))
+
+(coq.theory
+  (name QuickChick.TestingProofs)
+  (modules DensityPrefixBound BudgetAwarePrefixBound DensityLookahead
+           pruning_bounds prefix_adapter_laws dependency_cycle_laws))
