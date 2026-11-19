@@ -8,7 +8,7 @@ Inductive type :=
 | TBool : type
 | TFun  : type -> type -> type.
 
-Derive Show for type.
+QuickChick Derive Show for type.
 #[export] Instance dec_type (t1 t2 : type) : Dec (t1 = t2).
 Proof. dec_eq. Defined.
 
@@ -24,9 +24,9 @@ Inductive sorted_le : list nat -> Prop :=
       sorted_le (y :: l) ->
       sorted_le (x :: y :: l).
 
-Derive Inductive Schedule sorted_le 0 derive "Gen" opt "true".
+QuickChick Derive Generator for (fun l => sorted_le l).
 
-Sample (GenSizedSuchThat_sorted_le_O 5). Check true.
+Sample (@arbitrarySizeST _ (fun l => sorted_le l) _ 5). Check true.
 
 Inductive term :=
 | Var   : nat -> term
@@ -34,13 +34,13 @@ Inductive term :=
 | Abs   : type -> term -> term
 | App   : term -> term -> term.
 
-Derive Show for term.
+QuickChick Derive Show for term.
 #[export] Instance dec_expr (e1 e2 : term) : Dec (e1 = e2).
 Proof. dec_eq. Defined.
 
 (*Inductive Ctx A := Empty | Bind  (c : Ctx).
 
-Derive Show for Ctx.*)
+QuickChick Derive Show for Ctx.*)
 
 (*Inductive list (A : Type) :=
 | nil : list A
@@ -130,8 +130,8 @@ Definition substTop (s: term) (e: term) : term :=
 .
 
 
-Derive GenSized for type.
-Derive GenSized for term.
+QuickChick Derive GenSized for type.
+QuickChick Derive GenSized for term.
 
 (*Theorem shift_unshift : forall s n, shift (-n) (shift n s) = s.
 Proof.  Locate opp.
@@ -178,11 +178,10 @@ Inductive bind {A : Type} : list A -> nat -> A -> Prop :=
 | Now   : forall τ Γ, bind (@cons _ τ Γ) 0 τ
 | Later : forall τ τ' Γ x ,
     bind Γ x τ -> bind (@cons _ τ' Γ) (S x) τ.
-QuickChickDebug Debug On.
 
-Derive GenSized for list.
-Derive GenSized for type.
-(*Derive Inductive Schedule bind 1 2 derive "Gen" opt "true".*)
+QuickChick Derive GenSized for list.
+QuickChick Derive GenSized for type.
+(*QuickChick Derive Generator for (fun '(x, t) => bind G x t).*)
 
 Inductive typing : list type -> term -> type -> Prop :=
 | TyVar :
@@ -204,21 +203,19 @@ Inductive typing : list type -> term -> type -> Prop :=
 
 #[export] Instance Dec_Eq_type : Dec_Eq type. dec_eq. Defined.
 
-Derive Valid Schedules typing 2 consnum 3 derive "Check".
-
-Derive Inductive Schedule typing derive "Check" opt "true".
+QuickChick Derive Explain Checker for (typing g e t).
 
 Inductive isSome A : option A -> Prop :=
 | isSomeSome a : isSome A (Some a).
 
-Derive Inductive Schedule isSome 1 derive "Gen" opt "true".
+QuickChick Derive Generator for (fun o => isSome A o).
 
 Theorem checker_backtrack_one : forall p, checker_backtrack [p] = p tt.
 Proof. intros. unfold checker_backtrack. destruct (p tt); auto. destruct b; auto. Qed.
 
-Derive GenSized for option.
-Derive GenSized for type.
-Derive GenSized for term.
+QuickChick Derive GenSized for option.
+QuickChick Derive GenSized for type.
+QuickChick Derive GenSized for term.
 #[export] Instance Dec_Eq_option A `{Dec_Eq A} : Dec_Eq (option A).
 Proof. dec_eq. Defined.
 
@@ -249,23 +246,27 @@ Instance SizeTerm : Size term :=
 Instance SizeEnv : Size (list type) :=
   {size := @length _}.
 
+QuickChick Derive Generator for (fun '(g, e, t) => typing g e t).
+QuickChick Derive Generator for (fun '(e, t) => typing g e t).
+QuickChick Derive Generator for (fun e' => bigstep e e').
+
 Theorem preservation : forall g e τ e',
     typing g e τ -> pstep e = Some e' ->
     typing g e' τ.
 Proof. QuickChickDebug Debug Off.
 
        Extract Constant defNumTests => "10".
-       valid_schedules. quickchick_idx 0.
+       quickchick_schedules. quickchick_idx 0.
        Extract Constant defNumTests => "100000".
        QuickChick (sized (fun size' : nat =>
-forAllMaybeChecker (GenSizedSuchThat_typing_OOO size')
+forAllMaybeChecker (@arbitrarySizeST _ (fun '(g, e, t) => typing g e t) _ size')
   (fun '(g, e, τ) =>
-   forAllMaybeChecker (GenSizedSuchThat_eq_IIO size' (option term) (pstep e) GenSizedoption (Dec_Eq_option term))
+   forAllMaybeChecker (returnGen (Some (pstep e)))
      (fun ve'1945_ : option term =>
       match ve'1945_ with
       | Some e' =>
           (collect (size e')
-          match DecOpt_typing_III (3 * size') g e' τ with
+          match @decOpt (typing g e' τ) _ (3 * size') with
           | Some true =>  checker (Some true)
           | Some false => checker (Some false)
           | None => checker tt
@@ -281,14 +282,14 @@ quickchick_idx 1.
 QuickChick (sized (fun size' : nat =>
 forAllChecker (arbitrarySized size')
   (fun g : list type =>
-   forAllMaybeChecker (GenSizedSuchThat_typing_IOO size' g)
+   forAllMaybeChecker (@arbitrarySizeST _ (fun '(e, t) => typing g e t) _ size')
      (fun '(e, τ) =>
-      forAllMaybeChecker (GenSizedSuchThat_eq_IIO size' (option term) (pstep e) GenSizedoption (Dec_Eq_option term))
+      forAllMaybeChecker (returnGen (Some (pstep e)))
         (fun ve'3991_ : option term =>
          match ve'3991_ with
          | Some e' =>
              collect (size e')
-            ( match DecOpt_typing_III (3 * size') g e' τ with
+            ( match @decOpt (typing g e' τ) _ (3 * size') with
              | Some true => checker (Some true)
              | Some false => checker (Some false)
              | None => checker tt
@@ -298,29 +299,25 @@ forAllChecker (arbitrarySized size')
 
 
 
-try_all_quickchick_schedules. quickchick_idx 40.
+quickchick_schedules.
                                                                   
-  schedules. valid_schedules. Abort.
+  Abort.
 
 
 Theorem preservation' : forall g e τ e',
     typing g e τ -> bigstep e e' ->
-    typing g e' τ. valid_schedules. quickchick_idx 0.
+    typing g e' τ. quickchick_schedules. quickchick_idx 0.
    
                    
                    QuickChick (sized (fun size : nat =>
                                  let double {A : Set} (g : nat -> G (option A)) := bindGen (g size) (fun r =>  match r with | None => g (2 * (size + 1)) | _ => returnGen r end) in 
-forAllMaybeChecker (double (fun size => GenSizedSuchThat_typing_OOO size) )
+forAllMaybeChecker (double (fun size => @arbitrarySizeST _ (fun '(g, e, t) => typing g e t) _ size))
   (fun '(g, e, τ) =>
-   forAllMaybeChecker ( double (fun size => GenSizedSuchThat_bigstep_IO ( size)  e))
+   forAllMaybeChecker (double (fun size => @arbitrarySizeST _ (fun e' => bigstep e e') _ size))
      (fun e' : term =>
-      match DecOpt_typing_III (2 * (size + 1)) g e' τ with
+      match @decOpt (typing g e' τ) _ (2 * (size + 1)) with
       | Some true => checker (Some true)
       | Some false => checker (Some false)
       | None => checker false
       end))) ).
-
-Derive Density typing 1 derive "Gen".                   
-                   
-    
-                   
+Abort.

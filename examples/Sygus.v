@@ -15,7 +15,7 @@ Inductive exp :=
 | And (e1 e2 : exp)
 | Or (e1 e2 : exp)
 | Lt (e1 e2 : exp).
-Derive (Arbitrary, Show) for exp.
+QuickChick Derive (Arbitrary, Show) for exp.
 Inductive even : nat -> Prop :=
 | even0 : even 0
 | evenS n : odd n -> even (S n)
@@ -24,20 +24,20 @@ with odd : nat -> Prop :=
 | oddS n : even n -> odd (S n)
 .
 
-Derive Inductive Schedule even 0 derive "Gen" opt "true".
+QuickChick Derive Generator for (fun n => even n).
 
-Print GenSizedSuchThat_even_O.
+Print GenSizedSuchThateven.
 Print sizedGen. Print run.
 
 Theorem even_SS : forall n, even n -> even (S (S n)).
 (*quickchick.*)
 (*Print theorem.
 
-Print DecOpt_even_I.
+Print DecOpteven.
 QuickChick (sized (fun n => theorem (S (S n)))).
 
 
-Sample (sized (fun n => GenSizedSuchThat_even_O (4 * (n + 10)))).
+Sample (sized (fun n => @arbitrarySizeST _ (fun k => even k) _ (4 * (n + 10)))).
  *)
 Abort.
 Inductive res :=
@@ -49,7 +49,6 @@ Inductive plus : nat -> nat -> nat -> Prop :=
 | plusS n m npm : plus n m npm -> plus (S n) m (S npm)
 .
 
-QuickChickDebug Debug On.
 
 Theorem plus_is_positive : forall n m npm, plus n m npm -> npm <= m.
 Proof.
@@ -58,7 +57,7 @@ Proof.
   Extract Constant defNumTests => "100000".*)
   Abort.
 
-(*Derive Inductive Schedule plus 2 derive "Enum" opt "true".*)
+(*QuickChick Derive Enumerator for (fun p => plus n m p).*)
 
 Inductive notR : bool -> bool -> Prop :=
 | notT : notR true false
@@ -122,32 +121,32 @@ Inductive eval : exp -> nat -> nat -> res -> Prop :=
     eval (Or e1 e2) x y (B ba).
        
 
-Derive Show for res.
+QuickChick Derive Show for res.
 
 QuickChickDebug Debug Off.
 
-Derive Valid Schedules eval 0 consnum 11 derive "Gen".
-Derive Generator for (fun p => plus n m p).
-Derive Checker for (plus n m p).
-Derive Checker for (notR n m).
-Derive Generator for (fun m => le n m).
-Derive Generator for (fun n => le n m).
-Derive Checker for (le n m).
-Derive Checker for (andR a b c).
-Derive Checker for (orR a b c).
-Derive Checker for (eval a b c d).
+QuickChick Derive Explain Generator for (fun e => eval e x y r).
+QuickChick Derive Generator for (fun p => plus n m p).
+QuickChick Derive Checker for (plus n m p).
+QuickChick Derive Checker for (notR n m).
+QuickChick Derive Generator for (fun m => le n m).
+QuickChick Derive Generator for (fun n => le n m).
+QuickChick Derive Checker for (le n m).
+QuickChick Derive Checker for (andR a b c).
+QuickChick Derive Checker for (orR a b c).
+QuickChick Derive Checker for (eval a b c d).
 
-Derive Inductive Schedule eval derive "Check" opt "true".
+QuickChick Derive Checker for (eval e x y r).
 
-Derive Inductive Schedule eval 0 derive "Gen" opt "true".
+QuickChick Derive Generator for (fun e => eval e x y r).
 
-Derive Inductive Schedule eval 1 derive "Gen" opt "true".
+QuickChick Derive Generator for (fun x => eval e x y r).
 
-Derive Show for exp.
+QuickChick Derive Show for exp.
 
 
 
-Sample ( GenSizedSuchThat_eval_OIII (3) 0 0 (N 4)).
+Sample (@arbitrarySizeST _ (fun e => eval e 0 0 (N 4)) _ 3).
 
 
 Definition test_cases : list (nat * nat * res) :=
@@ -159,14 +158,13 @@ Inductive Elem {A} : A -> list A -> Prop :=
                                           
 
 
-Print GenSizedSuchThat_le_IO.
+Print GenSizedSuchThatle.
 (*Derive Generator for (fun y => le x y).
-Derive Generator for (fun e => eval e x y r).*)
+QuickChick Derive Generator for (fun e => eval e x y r).*)
 
 (*
-QuickChickDebug Debug On.
-Derive Enumerator for (fun r => eval e x y r).
-Derive Checker for (eval e x y r).
+QuickChick Derive Enumerator for (fun r => eval e x y r).
+QuickChick Derive Checker for (eval e x y r).
  *)
 Fixpoint evalc (e : exp) (x y : nat) : option res :=
   match e with
@@ -305,17 +303,17 @@ Definition forAllShrinkMaybe {A prop : Type} {_ : Checkable prop} `{Show A}
                  end
               ).
 
-Derive Inductive Schedule eval derive "Check" opt "true".
+QuickChick Derive Checker for (eval e x y r).
 
-Derive Show for exp.
+QuickChick Derive Show for exp.
 
 Definition prop (ts : list (nat * nat * res)) :=
   let genSize := 5 in
   let defElemIgnore := (0,0, N 0) in
   forAll (elems_ defElemIgnore ts) (fun '(x,y,r) =>
-  forAllShrinkMaybe (GenSizedSuchThat_eval_OIII genSize x y r) shrinker (fun e => 
+  forAllShrinkMaybe (@arbitrarySizeST _ (fun e => eval e x y r) _ genSize) shrinker (fun e => 
   negb (forallb (fun '(x,y,r) => 
-   match DecOpt_eval_IIII 100000 e x y r
+   match @decOpt (eval e x y r) _ 100000
                 with
   | Some true => true
   | Some false => false
@@ -339,9 +337,9 @@ Compute partial_eval (ite (Lt (P (P X One) (P One X)) (P X (P (P X X) One))) X Y
 Compute evalc (ite (Lt (P (P X One) (P One X)) (P X (P (P X X) One))) X Y) 6 7.
 
 
-Print DecOpt_eval_IIII.
+Print DecOpteval.
 
-Derive Inductive Schedule eval 0 3 derive "Gen" opt "true".
+QuickChick Derive Generator for (fun '(e, r) => eval e x y r).
 (*
 
 Compute (DecOpteval_IIII 10 ( (Lt One Zero)) 4 2 (B false)).
@@ -350,24 +348,24 @@ Print andBind.*)
 
 Merge (fun e => eval e x y r) With (fun e => eval e x' y' r') As EVAL.
 
-Derive Inductive Schedule EVAL 6 derive "Gen" opt "true".
+QuickChick Derive Generator for (fun e => EVAL x y r x' y' r' e).
 Check shrinking.
-Sample (GenSizedSuchThat_EVAL_IIIIIIO 3 1 0 (N 1) 1 2 (N 2)).
+Sample (@arbitrarySizeST _ (fun e => EVAL 1 0 (N 1) 1 2 (N 2) e) _ 3).
 
-Derive Valid  Schedules EVAL 6 consnum 5 derive "Gen".
+QuickChick Derive Explain Generator for (fun e => EVAL x y r x' y' r' e).
  
 
 Merge (fun e => EVAL x y r x' y' r' e) With (fun e => eval e x'' y'' r'') As EVAL'.
 
 Print EVAL'.
 
-Derive EnumSized for exp.
+QuickChick Derive EnumSized for exp.
 
-Time Derive Inductive Schedule EVAL' 9  derive "Gen" opt "true".
+Time QuickChick Derive Generator for (fun e => EVAL' x y r x' y' r' x'' y'' r'' e).
 
-Sample (GenSizedSuchThat_EVAL'_IIIIIIIIIO 3 4 2 (N 4) 2 5 (N 5) 1 1 (N 1)).
+Sample (@arbitrarySizeST _ (fun e => EVAL' 4 2 (N 4) 2 5 (N 5) 1 1 (N 1) e) _ 3).
 
-Derive Inductive Schedule eval derive "Check" opt "true".
+QuickChick Derive Checker for (eval e x y r).
 
 Definition prop' (ts : list (nat * nat * res)) :=
   let genSize := 3 in
@@ -376,9 +374,9 @@ Definition prop' (ts : list (nat * nat * res)) :=
   forAll (elems_ defElemIgnore ts) (fun '(x',y',r') =>
   forAll (elems_ defElemIgnore ts) (fun '(x'',y'',r'') =>                                                                      
                                                                           
-  forAllShrinkMaybe (GenSizedSuchThat_EVAL'_IIIIIIIIIO genSize x y r x' y' r' x'' y'' r'') shrinker (fun e => 
+  forAllShrinkMaybe (@arbitrarySizeST _ (fun e => EVAL' x y r x' y' r' x'' y'' r'' e) _ genSize) shrinker (fun e => 
   negb (forallb (fun '(x,y,r) => 
-  match DecOpt_eval_IIII 100 e x y r
+  match @decOpt (eval e x y r) _ 100
                 with
   | Some true => true
   | _ => false
@@ -391,15 +389,14 @@ Extract Constant defNumTests => "100000".
 QuickChick ( (prop' test_cases'')).
 
 
-Time Compute (DecOpt_eval_IIII 10000 (ite (Lt One Zero) (Or One (ite T (Or F X) One)) (ite T Y X)) 4 2 (N 4)).
+Time Compute (@decOpt (eval (ite (Lt One Zero) (Or One (ite T (Or F X) One)) (ite T Y X)) 4 2 (N 4)) _ 10000).
 (*QuickChick (prop' [(1,1,B true); (3,3,B true); (0,1,B false); (0,2,B false); (0,0,B true); (2,0,B false)]).*)
 
-Derive Inductive Schedule eval 1 2 3 derive "Gen" opt "true".
+QuickChick Derive Generator for (fun '(x, y, r) => eval e x y r).
 
 
-Derive Valid Schedules EVAL' 9 consnum 8 derive "Gen".
+QuickChick Derive Explain Generator for (fun e => EVAL' x y r x' y' r' x'' y'' r'' e).
 
-Derive Density EVAL 6 derive "Gen".
 
 Compute (evalc (ite (Lt X Y) Y X) 1 1).
 Definition eqe x y := ite (Lt x y) F (ite (Lt y x) F T).

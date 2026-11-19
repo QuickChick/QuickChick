@@ -103,26 +103,23 @@ Inductive typing : env -> term -> typ -> Prop :=
 Instance DecEq_typ : Dec_Eq typ. dec_eq. Defined.
 Instance DeqEq_term : Dec_Eq term. dec_eq. Defined.
 
-Derive Show for typ.
-Derive Show for term.
-Derive Show for env. Check prod.
+QuickChick Derive Show for typ.
+QuickChick Derive Show for term.
+QuickChick Derive Show for env.
 
-Derive GenSized for prod.
-Derive GenSized for typ.
-Derive GenSized for term.
-Derive GenSized for env.
+QuickChick Derive GenSized for typ.
+QuickChick Derive GenSized for term.
+QuickChick Derive GenSized for env.
 
 Inductive blah  (A : Type) : list A -> Prop :=
   | blah_1 : forall l a, blah A (a :: l).
 
-(*Derive Inductive Schedule blah 1 derive "Gen" opt "true".*)
+QuickChick Derive Explain Generator for (fun l => blah A l).
 
 
 Theorem preservation : forall e ty e', typing enil e ty -> bigstep e e' -> typing enil e' ty.
 Proof.
-QuickChickDebug Debug On.  
-schedules.
-valid_schedules. 
+quickchick_schedules.
 quickchick.
 (*QuickChick (theorem 5).
 QuickChick (sized theorem).*)

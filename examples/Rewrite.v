@@ -4,15 +4,15 @@ Inductive Foo (X : Type) :=
 | A : X -> Foo X
 | B : X -> Foo X.
 
-Derive GenSized for Foo. Print GenSizedFoo. Check @freq_. 
-Derive EnumSized for Foo. Print EnumSizedFoo. Locate oneOf_.
+QuickChick Derive GenSized for Foo. Print GenSizedFoo. Check @freq_. 
+QuickChick Derive EnumSized for Foo. Print EnumSizedFoo. Locate oneOf_.
 Check @oneOf_.
 
 Check @freq_. 
 
 Arguments A {X}.
 Arguments B {X}.
-Derive Show for Foo.
+QuickChick Derive Show for Foo.
 
 Set Printing All.
 
@@ -27,14 +27,14 @@ Definition f :=
 
 Locate oneof.
 
-Derive GenSized for nat.
+QuickChick Derive GenSized for nat.
 Print GenSizednat.
 
 Inductive Fooish {T} : Foo T -> Foo T -> Prop :=
 | AS : forall x, Fooish (A x) (A x)
 | BS : forall x y, Fooish (B x) (B y). Locate GenSized.
  Locate EnumSizedSuchThat.
-Derive Checker for (Fooish a b).
+QuickChick Derive Checker for (Fooish a b).
 
 Check @DecOptFooish. Search Dec. Print GenSized.
 
@@ -48,11 +48,11 @@ Instance GenSizedSuchThat_foo :
 
 Sample (@arbitraryST _ (fun '(x,y) => Fooish x y) _).
  *)
-QuickChickDebug Debug On. Check @forAll.
+Check @forAll.
 
-Derive Generator for (fun ft => Fooish ft ft'). Print Coq.Init.Nat.one.
-Derive Checker for (Fooish a b).
-Derive Enumerator for (fun ft => Fooish ft ft').
+QuickChick Derive Generator for (fun ft => Fooish ft ft'). Print Coq.Init.Nat.one.
+QuickChick Derive Checker for (Fooish a b).
+QuickChick Derive Enumerator for (fun ft => Fooish ft ft').
 (**
 
 Definition a := (@QuickChick.Checker.forAllMaybe _ _ _ _ (@QuickChick.DependentClasses.arbitraryST _ (fun 'e' => @bigstep' e e') _)
@@ -114,21 +114,19 @@ Inductive bind : list type -> nat -> type -> Prop :=
         typing G e1 (Arrow t1 t2) ->
         typing G (App e1 e2) t2.
 
-Print Typeclasses for typing.
 
 Theorem wgwrg : forall g e n t, typing (t :: g) e t -> bind g n t -> True.
 Proof.
-  theorem_dependencies.
-  schedules.
+  quickchick_schedules.
 Abort.
   
   
   
 #[global] Instance Dec_Eqtype (t t' : type) : Dec (t = t').
 Proof. dec_eq. Defined.
-Derive DecOpt for (bind env x t).
-Derive EnumSized for type.
-Derive Enumerator for (fun ty => typing env e ty).
+QuickChick Derive DecOpt for (bind env x t).
+QuickChick Derive EnumSized for type.
+QuickChick Derive Enumerator for (fun ty => typing env e ty).
 
 
 
@@ -218,9 +216,8 @@ Check check_typing.
 
 Print check_typing.
 
-Derive Checker for (typing G e ty).
+QuickChick Derive Checker for (typing Gamma e ty).
 
-Compute check_typing.
 
 Compute (check_typing 100 100 nil (Const 0) N).
 
@@ -314,9 +311,8 @@ Definition gen_bind' := (let bind_iooGen :=
 
 Check gen_bind'. Locate nat.
 
-QuickChickDebug Debug On.
 
-Print Typeclasses for Fooish.
+
 
        
  
