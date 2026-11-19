@@ -1,4 +1,4 @@
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat eqtype seq.
 From QuickChick Require Import Classes DependentClasses Checker Show Producer Generators Sets.

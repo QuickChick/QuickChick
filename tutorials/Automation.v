@@ -36,7 +36,7 @@ ShowTree is defined
 
 (* Importing ssreflect yields a bunch of "notation overridden" warnings, which 
    we can suppress with the following line. *)
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 From mathcomp Require Import ssrbool.
 Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)
 

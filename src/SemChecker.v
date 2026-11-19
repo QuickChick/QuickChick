@@ -1,4 +1,4 @@
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 
 From Coq Require Import ssreflect ssrbool.
 From mathcomp Require Import ssrnat eqtype.

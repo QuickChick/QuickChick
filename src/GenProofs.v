@@ -2,7 +2,7 @@ From Coq Require Import String Lia List ssreflect ssrfun ssrbool.
 Import ListNotations.
 From Ltac2 Require Import Ltac2.
 
-Set Warnings "-notation-overwritten, -parsing".
+Set Warnings "-notation-overwritten".
 From mathcomp Require Import ssrnat eqtype seq.
 Set Bullet Behavior "Strict Subproofs".
 Set SsrOldRewriteGoalsOrder.  (* change Set to Unset when porting the file, then remove the line when requiring MathComp >= 2.6 *)

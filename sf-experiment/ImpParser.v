@@ -23,7 +23,7 @@
 (* ################################################################# *)
 (** * Internals *)
 
-Set Warnings "-notation-overridden,-parsing,-deprecated-implicit-arguments".
+Set Warnings "-notation-overridden,-deprecated-implicit-arguments".
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Arith.

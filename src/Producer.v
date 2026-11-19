@@ -4,7 +4,7 @@
    tries to follow this code organization/abstraction. We need to
    expose quite a bit on the proof side for this to work though. *)
 
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 
 Require Import ZArith List Lia.
 From mathcomp Require Import ssreflect ssrfun ssrbool ssrnat seq eqtype.
@@ -465,7 +465,7 @@ Section ProducerProofs.
         `{Hf : forall a, SizeMonotonicOpt (f a)} :
     s1 \subset semProd g ->
     (forall x, Some @: (fs x) \subset semProd (f x)) ->
-    (Some @: \bigcup_(a in s1) (fs a)) \subset semProd (bind g f).
+    (Some @: (\bigcup_(a in s1) (fs a))) \subset semProd (bind g f).
   Proof.
     move => H1 H2 y [y' [[x [Hs1 Hfs2]] Heq]];
     inversion Heq; subst; clear Heq.

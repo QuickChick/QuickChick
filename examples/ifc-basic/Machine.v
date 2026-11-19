@@ -53,7 +53,7 @@ Infix "@" := Atm (no associativity, at level 50).
 
 Definition pc_lab (pc : Atom) : Label :=
   let (_,l) := pc in l.
-Notation "'∂' pc" := (pc_lab pc) (at level 0).
+Notation "'∂' pc" := (pc_lab pc) (at level 0, pc at level 0).
 
 Inductive Stack :=
   | Mty                         (* empty stack *)

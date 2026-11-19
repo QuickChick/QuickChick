@@ -1,6 +1,6 @@
 (** * IndProp: Inductively Defined Propositions *)
 
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 Require Export Logic.
 Require Coq.omega.Omega.
 

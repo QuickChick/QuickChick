@@ -2,7 +2,7 @@
 
 (** "_Algorithms are the computational content of proofs_."  --Robert Harper *)
 
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 Require Export IndProp.
 
 (** We have seen that Coq has mechanisms both for _programming_,

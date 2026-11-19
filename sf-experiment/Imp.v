@@ -18,7 +18,7 @@
     used logic for reasoning about imperative programs. *)
 
 (* IMPORTS *)
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 Require Import Coq.Bool.Bool.
 Require Import Coq.Arith.Arith.
 Require Import Coq.Arith.EqNat.

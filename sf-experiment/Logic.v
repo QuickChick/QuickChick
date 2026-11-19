@@ -1,6 +1,6 @@
 (** * Logic: Logic in Coq *)
 
-Set Warnings "-notation-overridden,-parsing".
+Set Warnings "-notation-overridden".
 Require Export Tactics.
 
 (** In previous chapters, we have seen many examples of factual

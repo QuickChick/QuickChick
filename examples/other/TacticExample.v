@@ -381,7 +381,7 @@ where "t '-->' t'" := (step t t').
 QuickChick Derive DecOpt for (step before after).
 
 Reserved Notation "Gamma '|--' t '\in' T"
-            (at level 101,
+            (at level 98,
              t custom stlc, T custom stlc at level 0).
 (* Print Grammar constr. *)
 
