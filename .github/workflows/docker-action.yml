@@ -26,6 +26,9 @@ jobs:
           - 'coqorg/coq:8.19'
           - 'coqorg/coq:8.20'
           - 'rocq/rocq-prover:9.0'
+          - 'rocq/rocq-prover:9.1'
+          - 'rocq/rocq-prover:9.2'
+          - 'rocq/rocq-prover:9.3'
           - 'rocq/rocq-prover:dev'
       fail-fast: false
     steps:
@@ -37,6 +40,8 @@ jobs:
           opam_file: 'coq-quickchick.opam'
           custom_image: ${{ matrix.image }}
           before_install: |
+            # The default 60-second solver limit is too short for Rocq 9.0's repository.
+            export OPAMSOLVERTIMEOUT=300
             startGroup "Setup and print opam config"
               opam config list; opam repo list; opam list
             endGroup
