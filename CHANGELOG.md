@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased] — 3.0 candidate
 
+- BudgetAware scores a relation, as its callers see it, by the worst
+  coverage leaf instead of the sum over leaves: a call follows one leaf.
+  Summing charged a caller for every path of the relation, growing with its
+  number of constructors.
 - Modes that call each other in a cycle are now derived once and solved as
   a fixed point on their full scores, instead of being derived again for
   every candidate schedule around them; BudgetAware and compiled policies

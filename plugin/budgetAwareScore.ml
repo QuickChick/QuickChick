@@ -76,8 +76,23 @@ let best_of = function
   | first :: rest -> List.fold_left (fun best score ->
       if compare score best < 0 then score else best) first rest
 
+(* The fieldwise worst of two scores. *)
+let worst a b = {
+  selectivity = max a.selectivity b.selectivity;
+  density = max_density a.density b.density;
+  fabrication = max a.fabrication b.fabrication;
+  locality = max_locality a.locality b.locality;
+  input_check_deps = max a.input_check_deps b.input_check_deps;
+  var_deps = max a.var_deps b.var_deps;
+}
+
+(* A relation's score as one call to it sees it: a call follows one coverage
+   leaf, so each field is the worst over the leaves of the best constructor
+   covering that leaf. Specimen sums the counts over leaves instead, which
+   charges a caller for every path of the relation at once and grows with the
+   relation's size. *)
 let inductive_score leaves = List.fold_left (fun total alternatives ->
-  combine total (best_of alternatives)) empty leaves
+  worst total (best_of alternatives)) empty leaves
 
 (* Specimen's varsInConstructorExpr preserves repeated occurrences. The
    existing variables_in_hypothesis helper removes duplicates, so it cannot
