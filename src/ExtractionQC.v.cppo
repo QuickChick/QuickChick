@@ -23,11 +23,11 @@ Extraction Blacklist String List Nat.
 Extract Inductive Hexadecimal.int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> Obj.t) (* Hexadecimal.int *)"
   [ "(fun x pos _ -> pos (Obj.magic x))"
     "(fun y _ neg -> neg (Obj.magic y))"
-  ] "(fun i pos neg -> Obj.magic i pos neg)".
+  ] "(fun pos neg i -> Obj.magic i pos neg)".
 Extract Inductive Number.int => "((Obj.t -> Obj.t) -> (Obj.t -> Obj.t) -> Obj.t) (* Number.int *)"
   [ "(fun x dec _ -> dec (Obj.magic x))"
     "(fun y _ hex -> hex (Obj.magic y))"
-  ] "(fun i dec hex -> Obj.magic i dec hex)".
+  ] "(fun dec hex i -> Obj.magic i dec hex)".
 
 (** Temporary fix for https://github.com/coq/coq/issues/7017. *)
 (** Scott encoding of [Decimal.int] as [forall r. (uint -> r) -> (uint -> r) -> r]. *)
