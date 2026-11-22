@@ -115,7 +115,7 @@ Extract Inlined Constant eqn => "(=)".
 
 Extract Inlined Constant Nat.add => "(+)".
 Extract Inlined Constant Nat.mul => "( * )".
-Extract Inlined Constant Nat.sub => "(-)".
+Extract Inlined Constant Nat.sub => "(fun n m -> max 0 (n-m))".
 Extract Constant Nat.log2 => "(let rec log2 x = if x <= 1 then 0 else 1 + log2 (x / 2) in log2)".
 Extract Inlined Constant Nat.eqb => "(=)".
 Extract Inlined Constant Coq.Init.Nat.eqb => "(=)".
