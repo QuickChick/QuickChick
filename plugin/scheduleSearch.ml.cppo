@@ -1,0 +1,841 @@
+(* Search over hypothesis orders and modes: pre-schedules, the prefix
+   explorer, partial-order reduction and score bounds. *)
+open Pp
+open RocqRelation
+open ScheduleCode
+
+(* Helper functions for dependency-aware ordering *)
+type 'a chunks = {
+  before_anchor : 'a list;
+  anchors : ('a list) list;
+  num_anchors : int;
+}
+
+module SCC = struct
+  type 'a graph = ('a * 'a list) list
+  
+  let compute (graph : 'a graph) : 'a list list =
+    let module H = Hashtbl in
+    let index_tbl = H.create 16 in
+    let lowlink_tbl = H.create 16 in
+    let on_stack_tbl = H.create 16 in
+    let index = ref 0 in
+    let stack = ref [] in
+    let sccs = ref [] in
+    
+    let rec strongconnect v neighbors =
+      H.add index_tbl v !index;
+      H.add lowlink_tbl v !index;
+      index := !index + 1;
+      stack := v :: !stack;
+      H.add on_stack_tbl v true;
+      
+      List.iter (fun w ->
+        if not (H.mem index_tbl w) then begin
+          let w_neighbors = try List.assoc w graph with Not_found -> [] in
+          strongconnect w w_neighbors;
+          let v_lowlink = H.find lowlink_tbl v in
+          let w_lowlink = H.find lowlink_tbl w in
+          H.replace lowlink_tbl v (min v_lowlink w_lowlink)
+        end else if H.mem on_stack_tbl w then begin
+          let v_lowlink = H.find lowlink_tbl v in
+          let w_index = H.find index_tbl w in
+          H.replace lowlink_tbl v (min v_lowlink w_index)
+        end
+      ) neighbors;
+      
+      if H.find lowlink_tbl v = H.find index_tbl v then begin
+        let rec pop_scc acc =
+          match !stack with
+          | [] -> acc
+          | w :: rest ->
+            stack := rest;
+            H.remove on_stack_tbl w;
+            if w = v then w :: acc
+            else pop_scc (w :: acc)
+        in
+        sccs := pop_scc [] :: !sccs
+      end
+    in
+    
+    List.iter (fun (v, neighbors) ->
+      if not (H.mem index_tbl v) then
+        strongconnect v neighbors
+    ) graph;
+    
+    List.rev !sccs
+end
+
+(* Compute SCCs from hypothesis-variable pairs *)
+let rec list_bind (l : 'a list) (f : 'a -> 'b list) : 'b list =
+  match l with
+  | [] -> []
+  | x :: xs -> f x @ list_bind xs f
+
+let (>>=:) = list_bind
+
+let para_list_bind (l : 'a list) (f : 'a -> 'a list -> 'b list) : 'b list =
+  let rec aux before l =
+    match l with
+    | [] -> []
+    | now :: after -> f now (List.rev before @ after) @ aux (now :: before) after in
+  aux [] l
+
+let (>>=*) = para_list_bind 
+
+let list_bindi (l : 'a list) (f : int -> 'a -> 'b list) : 'b list =
+  let rec aux i l =
+    match l with
+    | [] -> []
+    | now :: after -> (f i now) @ aux (i + 1) after in
+  aux 0 l
+
+let (>>=:+) = list_bindi 
+
+let guard (b : bool) : unit list =
+  if b then [()] else []
+
+let (>>:) (l : 'a list) (next : 'b list) : 'b list =
+  l >>=: (fun _ -> next)
+
+(* Helper to find index of element *)
+type hypothesis_classification = {
+  hyp : rocq_constr * bool;  (* hypothesis and polarity *)
+  potential_indices : var list list;  (* Variables that could be outputs *)
+  always_bound : var list;  (* Variables that must be bound before using this hyp *)
+}
+
+let is_defined_function head =
+  match Nametab.locate head with
+  | Names.GlobRef.ConstRef _ -> true
+  | _ -> false
+  | exception Not_found -> false
+
+let rec construct_hypothesis (type_vars : var list) (hyp : rocq_constr) (hyp_vars : var list list) (polarity : bool) : hypothesis_classification =
+  let collect_repeated_names lists =
+    let all_names = List.concat lists in
+    let counts = List.fold_left (fun acc name ->
+      let count = try List.assoc name acc with Not_found -> 0 in
+      (name, count + 1) :: List.remove_assoc name acc
+    ) [] all_names in
+    List.filter_map (fun (name, count) ->
+      if count > 1 then Some name else None
+    ) counts
+  in
+  
+  let repeated_names = collect_repeated_names hyp_vars in
+  
+  match hyp with
+  (* A premise defined by a function, such as [List.In x l], has no derived
+     producer: its variables are bound first and it is checked. *)
+  | DTyCtr (head, _) when is_defined_function head ->
+    { hyp = (hyp, polarity); potential_indices = [];
+      always_bound = List.concat hyp_vars |> List.sort_uniq compare }
+  | DTyCtr (_, args) ->
+    let hyp_indices = List.combine args hyp_vars in
+    let (must_bind, all_safe) = List.partition (fun (ctr_expr, vars) ->
+      contains_function_call ctr_expr ||
+      ty_ctor_constrains_variable ctr_expr ||
+      (List.exists (fun v -> List.mem v repeated_names && not (List.mem v type_vars)) vars)
+    ) hyp_indices in
+    { hyp = (hyp, polarity);
+      potential_indices = List.map snd all_safe;
+      always_bound = List.concat (List.map snd must_bind) |> List.sort_uniq compare }
+  | _ -> { hyp = (hyp, polarity); potential_indices = []; always_bound = [] }
+
+and ty_ctor_constrains_variable = function
+  | DTyCtr (_, args) when args <> [] ->
+    let rec has_vars = function
+      | DTyVar _ -> true
+      | DCtr (_, args) | DTyCtr (_, args) | DApp (_, args) -> List.exists has_vars args
+      | _ -> false
+    in
+    has_vars (DTyCtr (ty_ctr_of_string "dummy", args))
+  | DCtr (_, args) | DApp (_, args) -> List.exists ty_ctor_constrains_variable args
+  | _ -> false
+
+and contains_function_call = function
+  | DApp (_, _) | DLambda _ | DMatch _ -> true
+  | DCtr (_, args) | DTyCtr (_, args) -> List.exists contains_function_call args
+  | _ -> false
+
+(* Pre-schedule scoring for pruning *)
+type pre_schedule_score = {
+  checks : int;
+  length : int;
+  unconstrained : int;
+}
+
+let prune_empties (steps : 'hyp pre_schedule_step list) : 'hyp pre_schedule_step list =
+  List.fold_right (fun step acc ->
+    match step with
+    | PS_Checks [] -> acc
+    | PS_InstVars [] -> acc
+    | PS_Produce ([], h) -> PS_Checks [h] :: acc
+    | _ -> step :: acc
+  ) steps []
+
+(* Enumerate dependency-satisfying orderings using chunked insertion *)
+let rec split3 = function
+  | [] -> ([], [], [])
+  | (a,b,c) :: xs -> let (as', bs', cs') = split3 xs in (a :: as', b :: bs', c :: cs')
+
+(* Helper: Extract hypothesis polarity *)
+let rec hyp_polarity (h : rocq_constr) : rocq_constr * bool =
+  match h with
+  | DNot h -> let (h', p) = hyp_polarity h in (h', not p)
+  | DTyCtr (ind, args) -> (DTyCtr (ind, args), true)
+  | _ -> failwith @@ "Hypothesis is not a type constructor" ^ rocq_constr_to_string h
+
+(* Helper: Check if variables are under the same constructor with mixed bound/unbound *)
+let constrained_output_cache = Hashtbl.create 64
+let clear_constrained_output_cache () = Hashtbl.reset constrained_output_cache
+
+let rec handle_constrained_outputs_advanced (hyp : rocq_constr) (output_vars : var list) : schedule_step list * rocq_constr * var list =
+  let key = (hyp, output_vars) in
+  match Hashtbl.find_opt constrained_output_cache key with
+  | Some result -> result
+  | None ->
+    let result = handle_constrained_outputs_uncached hyp output_vars in
+    Hashtbl.add constrained_output_cache key result;
+    result
+
+and handle_constrained_outputs_uncached (hyp : rocq_constr) (output_vars : var list) : schedule_step list * rocq_constr * var list =
+  match hyp with
+  | DTyCtr (ind, args) ->
+    let (matches, args', new_outputs) = split3 (List.map (fun arg -> 
+      let variables = variables_in_hypothesis arg in
+      match arg with
+      | DCtr (ctr_name,_) when variables <> [] && List.for_all (fun v -> List.mem v output_vars) variables -> 
+        let new_name = make_up_name_str ("v" ^ String.concat "_" (List.map var_to_string variables)) in
+        let new_match = S_Match (new_name, rocq_constr_to_pat arg) in
+        (Some new_match, DTyVar new_name, Some new_name)
+      | DTyVar v when List.mem v output_vars -> (None, arg, Some v)
+      | _ -> (None, arg, None)
+      ) args) in
+    (List.filter_map (fun x -> x) matches, DTyCtr (ind, args'), List.filter_map (fun x -> x) new_outputs)
+  | _ -> failwith @@ "Hypothesis is not a type constructor 4" ^ rocq_constr_to_string hyp
+
+(* Helper: Normalize schedule by sorting unconstrained blocks *)
+let normalize_schedule_advanced (steps : schedule_step list) : schedule_step list =
+  let rec normalize steps u_block =
+    match steps with
+    | [] -> List.sort compare u_block
+    | S_UC (v, src, ps) :: steps -> normalize steps (S_UC (v, src, ps) :: u_block)
+    | step :: steps -> List.sort compare u_block @ step :: normalize steps [] in
+  normalize steps []
+
+(* Helper: Collect hypotheses ready to check given bound variables *)
+let rec seq_take n seq () =
+  if n <= 0 then Seq.Nil else
+  match seq () with
+  | Seq.Nil -> Seq.Nil
+  | Seq.Cons (x, rest) -> Seq.Cons (x, fun () -> seq_take (n - 1) rest ())
+
+(* Wrapper that materializes top schedules from lazy enumeration *)
+let is_rec_call_advanced (binding : var list)
+                         (type_vars : var list)
+                         (hyp : rocq_constr)
+                         (rec_call : ty_ctr * int list) : bool =
+  match hyp with
+  | DTyCtr (ctor, args) ->
+    let output_positions = filter_mapi (fun i arg ->
+      let vars = variables_in_hypothesis arg in
+      if vars = [] then None else
+      let vars_subset_binding = List.for_all (fun v -> List.mem v binding) vars in
+      let vars_subset_type_vars = List.for_all (fun v -> List.mem v type_vars) vars in
+      if vars_subset_binding && not vars_subset_type_vars then Some i
+      else if (not vars_subset_binding) && List.exists (fun v -> List.mem v binding) vars then
+        let v_in = match List.find_opt (fun v -> List.mem v binding) vars with Some v -> var_to_string v | None -> "?" in
+        let v_out = match List.find_opt (fun v -> not (List.mem v binding)) vars with Some v -> var_to_string v | None -> "?" in
+        failwith ("Hypothesis arguments contain both fixed and yet-to-be-bound variables: " ^ v_in ^ " bound, " ^ v_out ^ " unbound")
+      else None
+    ) args in
+    ty_ctr_eq ctor (fst rec_call) && List.sort compare output_positions = List.sort compare (snd rec_call)
+  | _ -> false
+
+(* A self-recursive step keeps only its input arguments. Its full request is
+   recovered by placing the step's outputs, in order, at the recursive
+   output positions: handle_constrained_outputs_advanced leaves exactly one
+   output variable at each such position. Checkers keep every argument. *)
+let recursive_request ((relation, output_positions) : ty_ctr * int list) step =
+  let rebuild outputs inputs =
+    let arity = List.length outputs + List.length inputs in
+    let rec go i outputs inputs =
+      if i = arity then Some [] else
+      if List.mem i output_positions then
+        (match outputs with
+         | o :: rest -> Option.map (fun tail -> DTyVar o :: tail) (go (i + 1) rest inputs)
+         | [] -> None)
+      else match inputs with
+        | a :: rest -> Option.map (fun tail -> a :: tail) (go (i + 1) outputs rest)
+        | [] -> None in
+    Option.map (fun args -> DTyCtr (relation, args)) (go 0 outputs inputs) in
+  match step with
+  | S_ST (outputs, SrcRec (_, inputs), _) -> rebuild (List.map fst outputs) inputs
+  | S_Check (SrcRec (_, args), _) | S_UC (_, SrcRec (_, args), _) ->
+    Some (DTyCtr (relation, args))
+  | _ -> None
+
+let check_recursive_requests =
+  match Sys.getenv_opt "QC_CHECK_RECURSIVE_REQUESTS" with
+  | Some ("1" | "true" | "yes") -> true
+  | _ -> false
+
+(* Helper: Convert pre-schedule to schedule for advanced pruning *)
+let pre_to_schedule_advanced (variables : (var * rocq_type) list)
+                             (type_vars : var list)
+                             (rec_call : ty_ctr * int list)
+                             (ds : derive_sort)
+                             (prod_sort : producer_sort) : (int * rocq_constr * bool) pre_schedule_step list -> schedule_step list =
+  fun pre_steps ->
+    List.concat_map (fun step ->
+      match step with
+      | PS_Checks hyps ->
+        List.map (fun (_, h, polarity) ->
+          let src = if ds = D_Check && snd rec_call = [] then
+            (match h with
+            | DTyCtr (ind, args) when ty_ctr_eq (fst rec_call) ind -> SrcRec (var_of_string "rec", args)
+            | _ -> SrcNonrec h)
+          else SrcNonrec h in
+          S_Check (src, polarity)
+        ) hyps
+      | PS_InstVars vars ->
+        List.map (fun v ->
+          let ty = try List.assoc v variables with Not_found -> failwith "Var type not found" in
+          let src = match ty with
+            | DTyCtr (ind, args) when ty_ctr_eq ind (fst rec_call) -> SrcRec (var_of_string "rec", args)
+            | _ -> SrcNonrec ty
+          in
+          S_UC (v, src, prod_sort)
+        ) vars
+      | PS_Produce (output_vars, (_, hyp, _)) ->
+        let (matches, hyp', new_outputs) = handle_constrained_outputs_advanced hyp output_vars in
+        let typed_outputs = List.map (fun v -> (v, try List.assoc v variables with Not_found -> DHole)) new_outputs in
+        let is_rec = is_rec_call_advanced output_vars type_vars hyp rec_call in
+        if !debug_mode then
+          Printf.printf "[DEBUG pre_to_sched] PS_Produce: hyp=%s, output_vars=[%s], is_rec=%b\n%!"
+            (rocq_constr_to_string hyp)
+            (String.concat ", " (List.map var_to_string output_vars))
+            is_rec;
+        let src = if is_rec then
+          (match hyp' with
+          | DTyCtr (ind, args) ->
+            let input_args = List.filteri (fun i _ -> not (List.mem i (snd rec_call))) args in
+            SrcRec (var_of_string "rec", input_args)
+          | _ -> SrcNonrec hyp')
+        else SrcNonrec hyp' in
+        let step = S_ST (typed_outputs, src, prod_sort) in
+        if check_recursive_requests && is_rec &&
+           recursive_request rec_call step <> Some hyp' then
+          failwith ("recursive request reconstruction differs for " ^ rocq_constr_to_string hyp');
+        (* Producer must come before matches - generate variable first, then match on it *)
+        [step] @ matches
+    ) pre_steps
+
+(* Helper: Memoization map type for environment states *)
+let process_choice_helper ?(eager_checks=true) (idx : int)
+                         (hyp : rocq_constr)
+                         (polarity : bool)
+                         (out : var list list)
+                         (bound : var list list)
+                         (some_bound_output_indices : var list list)
+                         (always_bound_variables : var list)
+                         (rest : (int * hypothesis_classification) list)
+                         (current_env : var list)
+                         (current_env_set : VS.t)
+                         : ((int * rocq_constr * bool) pre_schedule_step list * (int * hypothesis_classification) list * var list * VS.t) option =
+  (* Allow producing zero, one, or multiple output groups *)
+  (* Only reject if we're trying to check (out=[]) but have unbound outputs (bound <> []) *)
+  if polarity && out = [] && bound <> [] then None
+  else begin
+    let bound_flattened = List.concat bound in
+    let always_plus_some_bound = always_bound_variables @ List.concat some_bound_output_indices in
+    let to_add = List.filter (fun v -> not (VS.mem v current_env_set)) always_plus_some_bound in
+    let bound_vars = bound_flattened @ to_add in
+    
+    let new_env_set = List.fold_left (fun s v -> VS.add v s) current_env_set bound_vars in
+    let new_env = bound_vars @ current_env in
+    
+    let needs_checking env (_, cls) =
+      List.for_all (fun v -> List.mem v env) cls.always_bound &&
+      List.for_all (fun var_list -> List.for_all (fun v -> List.mem v env) var_list) cls.potential_indices
+    in
+    let (pre_checks, to_be_satisfied) =
+      if eager_checks then List.partition (needs_checking new_env) rest
+      else ([], rest) in
+    
+    let out_vars = List.concat out in
+    let final_env_set = List.fold_left (fun s v -> VS.add v s) new_env_set out_vars in
+    let final_env = out_vars @ new_env in
+    
+    let (post_checks, to_be_satisfied') =
+      if eager_checks then List.partition (needs_checking final_env) to_be_satisfied
+      else ([], to_be_satisfied) in
+    
+    let produce_step = PS_Produce (out_vars, (idx, hyp, polarity)) in
+    let new_sched = prune_empties [
+      PS_InstVars (List.sort_uniq compare bound_vars);
+      PS_Checks (List.map (fun (i, cls) -> let (h, p) = cls.hyp in (i, h, p)) pre_checks);
+      produce_step;
+      PS_Checks (List.map (fun (i, cls) -> let (h, p) = cls.hyp in (i, h, p)) post_checks)
+    ] in
+    
+    Some (new_sched, to_be_satisfied', final_env, final_env_set)
+  end
+
+(* The decision path is a stable tie key even if a future best-first queue
+   explores nodes in a different order. Sleep sets use the fixed sibling
+   order, rather than wall-clock exploration order. *)
+type classified_prefix_state = {
+  prefix_env : var list;
+  prefix_env_set : VS.t;
+  prefix_steps_rev : (int * rocq_constr * bool) pre_schedule_step list;
+  prefix_decisions_rev : (int * var list list) list;
+  prefix_remaining : (int * hypothesis_classification) list;
+  prefix_sleeping : int list;
+}
+
+(* Lower-bound facts about every completion of a prefix. [forced_checks] counts
+   remaining positive hypotheses whose arguments are all bound, which must become
+   checks. [bound_argument_occurrences] lists, per remaining positive
+   hypothesis, the distinct variables of its arguments. A variable already
+   bound when the hypothesis is scheduled is counted at least once: a fully
+   bound argument stays in the step source, and a bound variable inside a
+   constrained output moves into an equality check. [future_variable_uses] counts, for each unbound variable that
+   is a bare argument of k remaining positive hypotheses, k - 1 uses: it is
+   bound once, so at most one of them produces it and the others see it bound
+   in a fully bound argument. *)
+type prefix_floor = {
+  forced_checks : int;
+  bound_argument_occurrences : var list;
+  future_variable_uses : int;
+  remaining_hypotheses : (rocq_constr * bool) list;
+}
+
+let terminal_prefix_floor =
+  { forced_checks = 0; bound_argument_occurrences = []; future_variable_uses = 0;
+    remaining_hypotheses = [] }
+
+type prefix_search_stats = {
+  mutable visited_nodes : int;
+  mutable completed_prefixes : int;
+  mutable processed_mode_choices : int;
+}
+
+let empty_prefix_search_stats () =
+  { visited_nodes = 0; completed_prefixes = 0; processed_mode_choices = 0 }
+
+let rec add_type_dependencies variables seen v =
+  if VS.mem v seen then seen else
+  let seen = VS.add v seen in
+  match List.assoc_opt v variables with
+  | None -> seen
+  | Some ty ->
+    List.fold_left (add_type_dependencies variables) seen
+      (variables_in_hypothesis ty)
+
+(* Variables a hypothesis may read or bind, closed under variable types. *)
+let hypothesis_footprint variables (_, cls) =
+  List.fold_left (add_type_dependencies variables) VS.empty
+    (cls.always_bound @ List.concat cls.potential_indices)
+
+(* Each child commits its steps. A future branch-and-bound policy can bound
+   this whole state without assuming that earlier steps will be rebuilt. *)
+let enum_schedules_prefix_classified
+    ~(reduce_orderings : bool)
+    ~(maximal_outputs : bool)
+    ~(stats : prefix_search_stats option)
+    ~(on_prefix : (((int * var list list) list -> bool ->
+      (int * rocq_constr * bool) pre_schedule_step list -> unit) option))
+    ~(on_prefix_with_floor : (((int * var list list) list -> bool -> prefix_floor ->
+      (int * rocq_constr * bool) pre_schedule_step list -> unit) option))
+    ~(should_prune : (((int * var list list) list ->
+      (int * rocq_constr * bool) pre_schedule_step list -> bool) option))
+    ~(should_prune_with_floor : (((int * var list list) list -> prefix_floor ->
+      (int * rocq_constr * bool) pre_schedule_step list -> bool) option))
+    (variables : (var * rocq_type) list)
+    (matchable_vars : var list)
+    (hypotheses : (int * hypothesis_classification) list)
+    (initial_env : var list)
+    : ((int * rocq_constr * bool) pre_schedule_step list) Seq.t =
+  let var_names = List.map fst variables in
+  let matchable_set = VS.of_list matchable_vars in
+  let footprint h = VS.elements (hypothesis_footprint variables h) in
+  let plain_relation (_, cls) =
+    match fst cls.hyp with
+    | DTyCtr (_, args) ->
+      List.for_all (function DTyVar _ | DHole -> true | _ -> false) args
+    | _ -> false in
+  let metadata = List.map (fun ((idx, _) as h) ->
+    idx, (footprint h, plain_relation h)) hypotheses in
+  let independent env_set (left_idx, _) (right_idx, _) =
+    let left, left_plain = List.assoc left_idx metadata in
+    let right, right_plain = List.assoc right_idx metadata in
+    left_plain && right_plain &&
+    not (List.exists (fun v ->
+      not (VS.mem v env_set) && List.mem v right) left) in
+  (* These remaining positive hypotheses cannot produce an output in any
+     descendant. Eager checking is disabled, so none has been counted yet. *)
+  let forced_checks state = List.fold_left (fun count (_, cls) ->
+    let hyp, polarity = cls.hyp in
+    if polarity && List.for_all (fun v -> VS.mem v state.prefix_env_set)
+      (variables_in_hypothesis hyp)
+    then count + 1 else count) 0 state.prefix_remaining in
+  let bound_argument_occurrences state = List.concat_map (fun (_, cls) ->
+    match cls.hyp with
+    | DTyCtr (_, args), true ->
+      List.concat_map variables_in_hypothesis args |> remove_duplicates
+    | _ -> []) state.prefix_remaining in
+  let future_variable_uses state =
+    let bare = List.concat_map (fun (_, cls) ->
+      match cls.hyp with
+      | DTyCtr (_, args), true ->
+        remove_duplicates (List.filter_map (function
+          | DTyVar v when not (VS.mem v state.prefix_env_set)
+                       && List.mem v var_names -> Some v
+          | _ -> None) args)
+      | _ -> []) state.prefix_remaining in
+    List.fold_left (fun total v ->
+      total + max 0 (List.length (List.filter (( = ) v) bare) - 1))
+      0 (remove_duplicates bare) in
+  let needs_check_floor = match on_prefix_with_floor,
+    should_prune_with_floor with
+    | None, None -> false
+    | _ -> true in
+  let rec visit state () =
+    Option.iter (fun stats -> stats.visited_nodes <- stats.visited_nodes + 1) stats;
+    match state.prefix_remaining with
+    | [] ->
+      Option.iter (fun stats ->
+        stats.completed_prefixes <- stats.completed_prefixes + 1) stats;
+      let unbound = List.filter (fun v ->
+        not (VS.mem v state.prefix_env_set)) var_names in
+      let complete = List.rev state.prefix_steps_rev @
+        prune_empties [PS_InstVars unbound] in
+      Option.iter (fun observe ->
+        observe (List.rev state.prefix_decisions_rev) true complete) on_prefix;
+      Option.iter (fun observe ->
+        observe (List.rev state.prefix_decisions_rev) true terminal_prefix_floor complete)
+        on_prefix_with_floor;
+      Seq.return complete ()
+    | _ ->
+      Option.iter (fun observe ->
+        observe (List.rev state.prefix_decisions_rev) false
+          (List.rev state.prefix_steps_rev)) on_prefix;
+      let check_floor = if needs_check_floor then
+          { forced_checks = forced_checks state;
+            bound_argument_occurrences = bound_argument_occurrences state;
+            future_variable_uses = future_variable_uses state;
+            remaining_hypotheses = List.map (fun (_, cls) -> cls.hyp) state.prefix_remaining }
+        else terminal_prefix_floor in
+      Option.iter (fun observe ->
+        observe (List.rev state.prefix_decisions_rev) false check_floor
+          (List.rev state.prefix_steps_rev)) on_prefix_with_floor;
+      if (match should_prune with
+          | None -> false
+          | Some prune ->
+            prune (List.rev state.prefix_decisions_rev)
+              (List.rev state.prefix_steps_rev)) ||
+          (match should_prune_with_floor with
+          | None -> false
+          | Some prune ->
+            prune (List.rev state.prefix_decisions_rev) check_floor
+              (List.rev state.prefix_steps_rev)) then Seq.empty () else
+      (* A hypothesis commuting with every remaining one can be moved to the
+         front of any completion. Force the first such hypothesis, instead of
+         visiting every subset of independent prefixes as a sleep set would. *)
+      let universally_independent =
+        if reduce_orderings then
+          List.find_opt (fun selected ->
+            List.for_all (fun other ->
+              fst selected = fst other ||
+              independent state.prefix_env_set selected other)
+              state.prefix_remaining) state.prefix_remaining
+        else None in
+      let rec choose before explored remaining () =
+        match remaining with
+        | [] -> Seq.empty ()
+        | ((idx, cls) as selected) :: after ->
+          if (reduce_orderings && List.mem idx state.prefix_sleeping) ||
+             (match universally_independent with
+              | Some (forced_idx, _) -> idx <> forced_idx
+              | None -> false) then
+            choose (selected :: before) explored after ()
+          else
+          let rest = List.rev_append before after in
+          let (hyp, polarity) = cls.hyp in
+          let (some_bound, all_unbound) =
+            List.partition (fun group ->
+              List.exists (fun v -> VS.mem v state.prefix_env_set &&
+                not (VS.mem v matchable_set)) group
+              || List.for_all (fun v -> VS.mem v matchable_set) group)
+              cls.potential_indices
+          in
+          let rec subsets = function
+            | [] -> [[]]
+            | group :: tail ->
+              let rest = subsets tail in
+              rest @ List.map (fun selected -> group :: selected) rest
+          in
+          let output_choices =
+            if not polarity then [[]]
+            else if maximal_outputs then [all_unbound]
+            else subsets all_unbound in
+          let branch =
+            List.to_seq output_choices
+            |> Seq.filter_map (fun out ->
+              Option.iter (fun stats ->
+                stats.processed_mode_choices <-
+                  stats.processed_mode_choices + 1) stats;
+              let bound = List.filter (fun group -> not (List.mem group out)) all_unbound in
+              Option.map (fun result -> out, result)
+                (process_choice_helper ~eager_checks:false idx hyp polarity out bound some_bound
+                  cls.always_bound rest state.prefix_env state.prefix_env_set))
+            |> Seq.flat_map (fun (out, (steps, rest', next_env, next_env_set)) ->
+              let child_sleep =
+                if reduce_orderings then
+                  List.filter (fun sleeping_idx ->
+                    match List.find_opt (fun (other_idx, _) ->
+                      other_idx = sleeping_idx) rest with
+                    | Some other -> independent state.prefix_env_set selected other
+                    | None -> false)
+                    (state.prefix_sleeping @ explored)
+                else [] in
+              visit {
+                prefix_env = next_env;
+                prefix_env_set = next_env_set;
+                prefix_steps_rev =
+                  List.rev_append steps state.prefix_steps_rev;
+                prefix_decisions_rev = (idx, out) :: state.prefix_decisions_rev;
+                prefix_remaining = rest';
+                prefix_sleeping = child_sleep;
+              })
+          in
+          Seq.append branch
+            (choose (selected :: before) (idx :: explored) after) ()
+      in
+      choose [] [] state.prefix_remaining ()
+  in
+  visit {
+    prefix_env = initial_env;
+    prefix_env_set = VS.of_list initial_env;
+    prefix_steps_rev = [];
+    prefix_decisions_rev = [];
+    prefix_remaining = hypotheses;
+    prefix_sleeping = [];
+  }
+
+(* Translation of Lean's enumSchedulesChunkedWithPruning - version with proper memoization and pruning *)
+let independent_hypothesis_groups ~canon variables hypotheses fixed =
+  let fixed_set = VS.of_list (List.map canon fixed) in
+  let canonical vs = VS.fold (fun v acc ->
+    let v = canon v in if VS.mem v fixed_set then acc else VS.add v acc) vs VS.empty in
+  let merge groups vars members =
+    let touching, rest = List.partition (fun (vs, _) ->
+      not (VS.is_empty (VS.inter vs vars))) groups in
+    (List.fold_left (fun acc (vs, _) -> VS.union acc vs) vars touching,
+     members @ List.concat_map snd touching) :: rest in
+  let groups = List.fold_left (fun groups h ->
+    merge groups (canonical (hypothesis_footprint variables h)) [h])
+    [] hypotheses in
+  let groups = List.fold_left (fun groups (v, _) ->
+    let cv = canon v in
+    if VS.mem cv fixed_set || List.exists (fun (vs, _) -> VS.mem cv vs) groups
+    then groups else
+    let deps = canonical (add_type_dependencies variables VS.empty v) in
+    if List.exists (fun (vs, _) -> not (VS.is_empty (VS.inter vs deps))) groups
+    then merge groups deps [] else groups) groups variables in
+  let position (idx, _) = idx in
+  List.map (fun (vs, members) ->
+    vs, List.filter (fun h -> List.memq h members) hypotheses) groups
+  |> List.filter (fun (_, members) -> members <> [])
+  |> List.sort (fun (_, a) (_, b) ->
+       compare (List.fold_left min max_int (List.map position a))
+         (List.fold_left min max_int (List.map position b)))
+
+module ScheduleTbl = Hashtbl.Make(struct
+  type t = schedule_step list
+  let equal = ( = )
+  (* Every step, shallowly: steps embed large terms, which a deep hash
+     would traverse for every candidate. *)
+  let hash steps = List.fold_left (fun h step ->
+    h * 31 + Hashtbl.hash_param 8 32 step) 0 steps land max_int
+end)
+
+let possible_schedules_with_advanced_pruning ?(max_schedules=100000)
+    ?(reduce_orderings=true)
+    ?(maximal_outputs=false)
+    ?stats
+    ?(canon=fun v -> v)
+    ?select_groups
+    ?on_prefix
+    ?on_prefix_with_floor
+    ?should_prune_prefix
+    ?should_prune_prefix_with_floor
+    (variables : (var * rocq_type) list)
+    (hypotheses : rocq_constr list)
+    (fixed : var list)
+    (rec_call : ty_ctr * int list)
+    (ds : derive_sort) : schedule_step list list =
+  let type_vars = List.filter_map (fun (v, ty) ->
+    match ty with
+    | DTyCtr (c, _) when ty_ctr_eq c (ty_ctr_of_string "Type")
+                      || ty_ctr_eq c (ty_ctr_of_string "Prop")
+                      || ty_ctr_eq c (ty_ctr_of_string "Set") -> Some v
+    | _ -> None) variables in
+  let sorted_hypotheses =
+    List.map (fun h ->
+      let (h, polarity) = hyp_polarity h in
+      (h, variables_in_hypothesis h, polarity)) hypotheses
+    |> List.sort (fun (_, left, _) (_, right, _) ->
+      compare (List.length left) (List.length right))
+  in
+  let classified =
+    filter_mapi (fun idx (hyp, flat_vars, polarity) ->
+      let groups = match hyp with
+        | DTyCtr (_, args) -> List.map variables_in_hypothesis args
+        | _ -> [flat_vars] in
+      Some (idx, construct_hypothesis type_vars hyp groups polarity))
+      sorted_hypotheses
+  in
+  let prod_sort = match ds with
+    | D_Check | D_Enum -> PS_E
+    | D_Gen | D_Thm -> PS_G in
+  (* Conversion invents fresh names, so a prefix observed by a callback and
+     the same leaf in the candidate stream must share one conversion; leaf
+     scores cached by the callback are then found for the final candidates. *)
+  let conversions = Hashtbl.create 256 in
+  let pre_to_schedule pre =
+    match Hashtbl.find_opt conversions pre with
+    | Some converted -> converted
+    | None ->
+      let converted =
+        pre_to_schedule_advanced variables type_vars rec_call ds prod_sort pre in
+      Hashtbl.add conversions pre converted;
+      converted in
+  (* Observation is test-only. Conversion is stepwise; appending to an open
+     unconstrained block preserves the order of its already sorted members. *)
+  let observe_prefix = Option.map (fun observe path terminal pre_steps ->
+    let converted = pre_to_schedule pre_steps in
+    observe path terminal (normalize_schedule_advanced converted)) on_prefix in
+  let prune_prefix = Option.map (fun prune path pre_steps ->
+    let converted = pre_to_schedule pre_steps in
+    prune path (normalize_schedule_advanced converted)) should_prune_prefix in
+  let observe_prefix_with_floor = Option.map (fun observe path terminal floor pre_steps ->
+    let converted = pre_to_schedule pre_steps in
+    observe path terminal floor (normalize_schedule_advanced converted))
+    on_prefix_with_floor in
+  let prune_prefix_with_floor = Option.map (fun prune path floor pre_steps ->
+    let converted = pre_to_schedule pre_steps in
+    prune path floor (normalize_schedule_advanced converted))
+    should_prune_prefix_with_floor in
+  let warn_limit () =
+    Feedback.msg_warning (str (Printf.sprintf
+      "Schedule search reached its %d-candidate limit; ranking may omit better schedules"
+      max_schedules)) in
+  let take_limited stream =
+    let peek_limit = if max_schedules = max_int then max_int else max_schedules + 1 in
+    let candidates = stream |> seq_take peek_limit |> List.of_seq in
+    if List.length candidates > max_schedules then warn_limit ();
+    List.filteri (fun idx _ -> idx < max_schedules) candidates in
+  (* Several independent groups are searched separately, without score
+     pruning; a single group is searched jointly, where pruning applies. *)
+  let groups = match select_groups, on_prefix with
+    | Some select, None ->
+      (match independent_hypothesis_groups ~canon variables classified fixed with
+       | _ :: _ :: _ as groups -> Some (select, groups)
+       | _ -> None)
+    | _ -> None in
+  match groups with
+  | Some (select, groups) ->
+    (* Each group is searched with only its own variables, so its completion
+       instantiates only them. Combined candidates concatenate group cores and
+       instantiate every remaining variable at the end, as the joint search does. *)
+    let group_variables vars =
+      List.filter (fun (v, _) -> VS.mem (canon v) vars || List.mem v fixed) variables in
+    let searched = List.map (fun (vars, members) ->
+      enum_schedules_prefix_classified ~reduce_orderings ~maximal_outputs
+        ~stats:None ~on_prefix:None ~on_prefix_with_floor:None
+        ~should_prune:None ~should_prune_with_floor:None
+        (group_variables vars) type_vars members fixed
+      |> take_limited) groups in
+    let local = List.map (List.map (fun pre ->
+      normalize_schedule_advanced (pre_to_schedule pre))) searched in
+    (* Only the trailing instantiation is the completion; earlier ones bind
+       variables that a later check in the group needs. *)
+    let split_completion pre = match List.rev pre with
+      | PS_InstVars vs :: rest -> List.rev rest, vs
+      | _ -> pre, [] in
+    let core pre = fst (split_completion pre) in
+    let left_unbound pre = snd (split_completion pre) in
+    let grouped_vars = List.fold_left (fun acc (vars, _) -> VS.union acc vars)
+      VS.empty groups in
+    select local
+    |> List.map (fun choice ->
+      let parts = List.map2 (fun options i -> List.nth options i) searched choice in
+      let unbound = List.concat_map left_unbound parts in
+      let remaining = List.filter (fun (v, _) ->
+        not (List.mem v fixed) &&
+        (List.mem v unbound || not (VS.mem (canon v) grouped_vars))) variables
+        |> List.map fst in
+      List.concat_map core parts @ prune_empties [PS_InstVars remaining]
+      |> pre_to_schedule |> normalize_schedule_advanced)
+    |> List.sort_uniq compare
+  | None ->
+  let candidate_stream =
+    enum_schedules_prefix_classified ~reduce_orderings ~maximal_outputs ~stats
+      ~on_prefix:observe_prefix ~on_prefix_with_floor:observe_prefix_with_floor
+      ~should_prune:prune_prefix
+      ~should_prune_with_floor:prune_prefix_with_floor
+      variables type_vars classified fixed
+    |> Seq.map pre_to_schedule
+    |> Seq.map normalize_schedule_advanced in
+  (* Candidate identifiers follow search order, so among equal scores the
+     first schedule found wins. Score pruning relies on this: an incumbent
+     always precedes the candidates of a node explored after it. Schedules
+     share long prefixes, which the default hash's ten-node limit cannot
+     tell apart, so every step contributes to the hash. *)
+  let seen = ScheduleTbl.create 64 in
+  take_limited candidate_stream |> List.filter (fun schedule ->
+    if ScheduleTbl.mem seen schedule then false
+    else (ScheduleTbl.add seen schedule (); true))
+
+(* QC_SCHEDULE_MAX_CANDIDATES overrides the unpruned search's candidate cap,
+   for diagnosis; 0 removes it. *)
+let unpruned_candidate_cap () =
+  match Stdlib.Option.bind (Sys.getenv_opt "QC_SCHEDULE_MAX_CANDIDATES") int_of_string_opt with
+  | Some 0 -> max_int
+  | Some n when n > 0 -> n
+  | _ -> 1000
+
+let possible_schedules ?canon ?select_groups variables hypotheses fixed rec_call ds =
+  possible_schedules_with_advanced_pruning ~max_schedules:(unpruned_candidate_cap ())
+    ~maximal_outputs:true ?canon ?select_groups
+    ~reduce_orderings:(ScheduleRanking.preserves_independent_swaps
+      (ScheduleRanking.current ()))
+    variables hypotheses fixed rec_call ds
+
+(* typing g e t -> step e e' -> typing g e' t *)
+
+(* (fun '(e,t') -> typing (x :: xs) (Abs t e) (Arrow t t'))
+
+[in : x xs t] [out : e, t']*)
+
+(* typing (x :: xs) (Abs t e) (Arrow t t'), g -> x :: xs; e' -> Abs t e;    
+*)
+(* Need to use unify from UnifyQC to instantiate the initial maps! *)
+
+(* Given a type and a *)
+
+let rocq_constr_tuple_of_list xs = tuple_of_list (fun x y -> DCtr (constructor_of_string "Coq.Init.Datatypes.pair", [DHole; DHole; x; y])) xs (Some (DTyCtr (ty_ctr_of_string "Coq.Init.Datatypes.tt",[])))
+
+  
+      
+
+          
+        
+
+        
+
+(* INVARIANT: ind_vars holds, for each hypothesis inductive, the list of variables used in it that haven't already been bound.*)

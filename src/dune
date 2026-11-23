@@ -1,7 +1,7 @@
 (coq.theory
  (name QuickChick)
  (package coq-quickchick)
- (plugins coq-quickchick.plugin))
+ (plugins coq-quickchick.plugin coq-quickchick.legacy))
 
 (rule
   (alias compat)
@@ -22,3 +22,8 @@
   (alias compat)
   (target TacticsUtil.v)
   (action (run sh %{dep:../scripts/mycppo} %{dep:TacticsUtil.v.cppo} %{target})))
+
+(rule
+ (alias compat)
+ (target LegacyDerive.v)
+ (action (run sh %{dep:../scripts/mycppo} %{dep:LegacyDerive.v.cppo} %{target})))

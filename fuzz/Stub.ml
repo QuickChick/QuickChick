@@ -100,15 +100,15 @@ let calc_energy time size result =
    *)
 
   (* If the result is discarded, fuzz less. *)
-  let energy3 =
+  (* let energy3 =
     match result with
     | Some _ -> energy2
     | None -> energy2 *. 0.33
   in 
-  
+   *)
   (* Make sure that we don't go over limit. *)
 
-  let energy_pre_cap = energy3 in
+  let energy_pre_cap = energy2 in
   let energy_capped_top =
     if energy_pre_cap > havoc_max_mult *. 100.0 then
       havoc_max_mult *. 100.0 else energy_pre_cap 
@@ -117,8 +117,8 @@ let calc_energy time size result =
     if energy_capped_top < havoc_min then havoc_min
     else energy_capped_top in
 
-  let multiplier = 100 in
-  10 * (Float.to_int energy_capped_bot)
+  let multiplier = 10 in
+    multiplier * (Float.to_int energy_capped_bot)
     
 let withInstrumentation f =
   (* Reset the C-array bitmap. *)

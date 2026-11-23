@@ -1,0 +1,14 @@
+DECLARE PLUGIN "coq-quickchick.legacy"
+
+{
+open Stdarg
+let dispatch = Quickchick_plugin.Driver.dispatch
+}
+
+(* Compatibility alias for existing QuickChick developments. *)
+(* Named apart from driver.mlg's QuickChickDerive: Coq 8.18 rejects two
+   grammar extensions with one name. *)
+VERNAC COMMAND EXTEND QuickChickBareDerive CLASSIFIED AS SIDEFF
+   | ["Derive" constr(class_name) "for" constr(inductive)] ->
+     { dispatch class_name inductive }
+END

@@ -3,7 +3,7 @@ Set Warnings "-notation-overridden".
 From mathcomp Require Import ssreflect ssrfun ssrbool.
 From Coq Require Import Relations ZArith Strings.Ascii Strings.String.
 From QuickChick Require Import LazyList QuickChick.
-From doc Require Import QuickChickInterface.
+From QuickChick.Doc Require Import QuickChickInterface.
 
 
 (* This module is just to keep the BasicInterface up-to-date with the implementation. *)
@@ -149,6 +149,7 @@ Module ConsistencyCheck : QuickChickSig.
   Definition forAll := @forAll.
   Definition forAllProof := @forAllProof.
   Definition forAllShrink := @forAllShrink.
+  Definition forAllShrinkNonDet := @forAllShrinkNonDet.
   Definition testFun := @testFun .
   Definition testProd := @testProd.
   Definition testPolyFun := @testPolyFun.
@@ -173,6 +174,9 @@ Module ConsistencyCheck : QuickChickSig.
   Definition Dec_neg := @Dec_neg  .
   Definition Dec_conj := @Dec_conj .
   Definition Dec_disj := @Dec_disj .
+  Definition Dec_iff := @Dec_iff .
+  Definition Dec_True := Dec_True .
+  Definition Dec_False := Dec_False .
 
   (* Convenient notation. *)
   Notation "P '?'" := (match (@dec P _) with
@@ -229,7 +233,10 @@ Module ConsistencyCheck : QuickChickSig.
         maxSize    : nat;
         (* Verbosity. Note: Doesn't do much... *)
         (* Default true. *)
-        chatty     : bool
+        chatty     : bool;
+        (* Print results in a machine-readable format. *)
+        (* Default false. *)
+        analysis   : bool
       }.
 
 End ConsistencyCheck.
