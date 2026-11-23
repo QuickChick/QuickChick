@@ -25,7 +25,7 @@ QuickChick Derive Enumerator for (fun k => P n k).
 Parameter T : Type.
 Parameter t0 t1 : T.
 Axiom T_dec_eq : Dec_Eq T.
-Existing Instance T_dec_eq.
+#[global] Existing Instance T_dec_eq.
 Inductive R : T -> Prop :=
 | R1 : forall x y z, Nat.even x = true -> Nat.even y = true -> Nat.even z = true -> R t0.
 Inductive P' : nat -> T -> Prop :=
