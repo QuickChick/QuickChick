@@ -1,7 +1,7 @@
 QuickChick
 ==========
 
-[![CircleCI](https://circleci.com/gh/QuickChick/QuickChick.svg?style=svg)](https://circleci.com/gh/QuickChick/QuickChick)
+[![Docker CI](https://github.com/QuickChick/QuickChick/actions/workflows/docker-action.yml/badge.svg)](https://github.com/QuickChick/QuickChick/actions/workflows/docker-action.yml)
 [![project chat](https://img.shields.io/badge/zulip-join_chat-brightgreen.svg)](https://coq.zulipchat.com/#narrow/stream/237977-Coq-users)
 
 ## Description
