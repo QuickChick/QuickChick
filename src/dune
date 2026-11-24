@@ -1,7 +1,8 @@
 (coq.theory
  (name QuickChick)
  (package coq-quickchick)
- (plugins coq-quickchick.plugin))
+ (plugins coq-quickchick.plugin)
+ (flags :standard -w -deprecated-from-Coq,-deprecated-dirpath-Coq,-ltac2-unused-variable,-hiding-delimiting-key))
 
 (rule
   (alias compat)

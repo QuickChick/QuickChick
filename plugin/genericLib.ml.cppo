@@ -906,7 +906,7 @@ let constr_of_type name ty_params dep_type =
     msg_debug (str "Finding index: " ++ str (Id.to_string x) ++ str " " ++ int i ++ str " " ++ int j ++ fnl ());
     match vars with
     | [] -> begin match locate_constant_of_id x with
-            | Some c -> Constr.mkConst c
+            | Some c -> Compat.MonoConstr.mkConst c
             | None -> find_param x (List.length params + i) 1 params
             end
     (* TODO: Find DeBruijn equation *)
@@ -948,13 +948,13 @@ let constr_of_type name ty_params dep_type =
          let c' = if cname = "Prop" then Constr.mkProp
                   else if cname = "Type" then Constr.mkType Univ.Universe.type1
                   else if cname = name then Constr.mkRel i
-                  else Constr.mkInd (locate_ind c) in
+                  else Compat.MonoConstr.mkInd (locate_ind c) in
          Constr.mkApp (c', Array.of_list (List.map (aux vars ty_params i) dts))
        end
     | DCtr (c,dts) ->
        begin
          msg_debug (str "In DCtr" ++ fnl ());
-         Constr.mkApp (Constr.mkConstruct (locate_constructor c), Array.of_list (List.map (aux vars ty_params i) dts))
+         Constr.mkApp (Compat.MonoConstr.mkConstruct (locate_constructor c), Array.of_list (List.map (aux vars ty_params i) dts))
        end
     | DTyVar x ->
        begin

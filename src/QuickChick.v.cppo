@@ -35,7 +35,7 @@ Global Set Warnings "-extraction-reserved-identifier".
 (* TODO: Figure out better place for these *)
 (* String and Ascii Instances *)
 
-Require Export Ascii String.
+From Coq Require Export Ascii String.
 
 (* Derive (Arbitrary, Show) for ascii. *)
 

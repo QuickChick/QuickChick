@@ -24,7 +24,7 @@ license: "MIT"
 homepage: "https://github.com/QuickChick/QuickChick"
 bug-reports: "https://github.com/QuickChick/QuickChick/issues"
 depends: [
-  "dune" {>= "3.12"}
+  "dune" {>= "3.21" & < "3.24"}
   "ocaml" {>= "4.07"}
   "menhir" {build}
   "cppo" {build & >= "1.6.8"}
@@ -37,6 +37,7 @@ depends: [
   "odoc" {with-doc}
 ]
 dev-repo: "git+https://github.com/QuickChick/QuickChick.git"
+x-maintenance-intent: ["(latest)"]
 build: [
   ["dune" "subst"] {dev}
   ["dune" "build" "-p" name "-j" jobs "@install" "@runtest" {with-test} "@doc" {with-doc} "--stop-on-first-error"]

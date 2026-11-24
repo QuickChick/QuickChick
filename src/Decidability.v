@@ -199,7 +199,7 @@ Proof. dec_eq. Defined.
 Proof. dec_eq. Defined.
 
 (* Everything that uses the Decidable Class *)
-Require Import DecidableClass.
+From Coq Require Import DecidableClass.
 
 #[global] Instance dec_class_dec P (H : Decidable P): Dec P.
 Proof.

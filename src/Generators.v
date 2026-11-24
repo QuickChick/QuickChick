@@ -401,14 +401,14 @@ Notation " 'elems' [ x ; y ] " := (elems_ x (cons x (cons y nil))) : qc_scope.
 Notation " 'elems' [ x ; y ; .. ; z ] " :=
   (elems_ x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
 Notation " 'elems' ( x ;; l ) " :=
-  (elems_ x (cons x l)) (at level 1, no associativity) : qc_scope.
+  (elems_ x (cons x l)) (at level 0) : qc_scope.
 
 Notation " 'oneOf' [ x ] " := (oneOf_ x (cons x nil)) : qc_scope.
 Notation " 'oneOf' [ x ; y ] " := (oneOf_ x (cons x (cons y nil))) : qc_scope.
 Notation " 'oneOf' [ x ; y ; .. ; z ] " :=
   (oneOf_ x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
 Notation " 'oneOf' ( x ;; l ) " :=
-  (oneOf_ x (cons x l))  (at level 1, no associativity) : qc_scope.
+  (oneOf_ x (cons x l))  (at level 0) : qc_scope.
 
 Notation " 'freq' [ x ] " := (freq_ x nil) : qc_scope.
 Notation " 'freq' [ ( n , x ) ; y ] " :=
@@ -416,7 +416,7 @@ Notation " 'freq' [ ( n , x ) ; y ] " :=
 Notation " 'freq' [ ( n , x ) ; y ; .. ; z ] " :=
   (freq_ x (cons (n, x) (cons y .. (cons z nil) ..))) : qc_scope.
 Notation " 'freq' ( ( n , x ) ;; l ) " :=
-  (freq_ x (cons (n, x) l)) (at level 1, no associativity) : qc_scope.
+  (freq_ x (cons (n, x) l)) (at level 0) : qc_scope.
 
 End QcDefaultNotation.
 

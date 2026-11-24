@@ -7,16 +7,16 @@ MAKE SURE TO EDIT THE .cppo SOURCE OF THIS FILE RATHER THAN THE GENERATED RESULT
 
 Set Warnings "-notation-overridden".
 
-Require Import ZArith.
+From Coq Require Import ZArith.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Strings.String.
 From QuickChick Require Import
   RandomQC RoseTrees Test Show Checker.
 
 Require Import ExtrOcamlBasic.
-Require Import ExtrOcamlString.
-Require Import ExtrOcamlNatInt.
-Require Import ExtrOcamlZBigInt.
+From Coq Require Import ExtrOcamlString.
+From Coq Require Import ExtrOcamlNatInt.
+From Coq Require Import ExtrOcamlZBigInt.
 
 Extraction Blacklist String List Nat.
 

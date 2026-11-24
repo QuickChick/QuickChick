@@ -272,7 +272,7 @@ Instance showEx {A} `{_ : Show A} P : Show ({x : A | P x}) :=
     show ex := let '(exist _ x _) := ex in show x
   |}.
 
-Require Import Ascii.
+From Coq Require Import Ascii.
 Definition nl : string := String "010" EmptyString.
 
 Definition smart_paren (s : string) : string :=

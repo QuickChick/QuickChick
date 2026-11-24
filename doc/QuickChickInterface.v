@@ -156,7 +156,7 @@ Module QcDefaultNotation.
   Notation " 'elems' [ x ; y ; .. ; z ] " :=
     (elems_ x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
   Notation " 'elems' ( x ;; l ) " :=
-    (elems_ x (cons x l)) (at level 1, no associativity) : qc_scope.
+    (elems_ x (cons x l)) (at level 0) : qc_scope.
 
   (** [oneOf] is a shorthand for [oneOf_] without a default argument. *)
   Notation " 'oneOf' [ x ] " :=
@@ -166,7 +166,7 @@ Module QcDefaultNotation.
   Notation " 'oneOf' [ x ; y ; .. ; z ] " :=
     (oneOf_ x (cons x (cons y .. (cons z nil) ..))) : qc_scope.
   Notation " 'oneOf' ( x ;; l ) " :=
-    (oneOf_ x (cons x l))  (at level 1, no associativity) : qc_scope.
+    (oneOf_ x (cons x l)) (at level 0) : qc_scope.
 
   (** [freq] is a shorthand for [freq_] without a default argument. *)
   Notation " 'freq' [ x ] " :=
@@ -176,7 +176,7 @@ Module QcDefaultNotation.
   Notation " 'freq' [ ( n , x ) ; y ; .. ; z ] " :=
     (freq_ x (cons (n, x) (cons y .. (cons z nil) ..))) : qc_scope.
   Notation " 'freq' ( ( n , x ) ;; l ) " :=
-    (freq_ x (cons (n, x) l)) (at level 1, no associativity) : qc_scope.
+    (freq_ x (cons (n, x) l)) (at level 0) : qc_scope.
 
 End QcDefaultNotation.
 

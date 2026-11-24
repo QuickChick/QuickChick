@@ -52,7 +52,7 @@ Inductive SplitDirection := Left | Right.
 
 Definition SplitPath := list SplitDirection.
 
-Require Import List. Import ListNotations.
+From Coq Require Import List. Import ListNotations.
 Fixpoint varySeedAux (p : SplitPath) (rst : RandomSeedTree) : RandomSeed :=
   let '(RstNode s t1 t2) := rst in
   match p with

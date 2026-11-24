@@ -1,7 +1,7 @@
 From Coq Require Import Arith.
 From ExtLib.Structures Require Export
      Functor Applicative Monad.
-Require Import List.
+From Coq Require Import List.
 Import ListNotations.
 
 From QuickChick Require Import Tactics.

@@ -2,9 +2,9 @@
 
 (* CH: We already have a similar class in RandomQC.v, why not use that
    one instead (maybe after moving it to separate file)? *)
-Require Import OrderedType.
+From Coq Require Import OrderedType.
 
-Require Import Bool.
+From Coq Require Import Bool.
 Module BoolOT <: OrderedType.
 
 Definition t := bool.
@@ -31,7 +31,7 @@ Defined.
 
 End BoolOT.
 
-Require Import Ascii NArith.
+From Coq Require Import Ascii NArith.
 Module AsciiOT <: OrderedType.
 
 Definition t := ascii.
