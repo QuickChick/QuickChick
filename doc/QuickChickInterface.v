@@ -786,7 +786,7 @@ Parameter forAllProof :
 
 (** ** Mutant Annotations *)
 
-(** A mutant annotation consists of 4 components. First an anottation 
+(** A mutant annotation consists of 4 components. First an annotation
     that signifies the beginning of the mutant [(*! *)]. That is followed
     by the actual code. Then, we can include an optional annotation 
     (in a comment with double exclamation marks) that corresponds to 
