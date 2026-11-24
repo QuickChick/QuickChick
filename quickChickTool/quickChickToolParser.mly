@@ -33,6 +33,12 @@ type node =
 %token<string> T_EndComment
 %token<string> T_Eof
 
+/* After a mutant, T_StartMutants could either continue the current
+   mutants block (as an empty mutant) or start a new block.
+   Prefer the former (shift), as Menhir did by default. */
+%nonassoc below_StartMutants
+%nonassoc T_StartMutants
+
 %start program
 %type <QuickChickToolTypes.section list> program
 %type <QuickChickToolTypes.section> section
@@ -83,7 +89,7 @@ code:                 T_Char { [$1] }
                               } */
 
 
-mutants:              mutant_tag { [$1] }
+mutants:              mutant_tag %prec below_StartMutants { [$1] }
                     | mutant_tag mutants { $1 :: $2 }
 
 mutant_tag:           T_StartMutTag code T_EndComment mutant
