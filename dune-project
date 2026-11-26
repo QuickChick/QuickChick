@@ -1,6 +1,7 @@
-(lang dune 3.12)
+(lang dune 3.21)
 (using coq 0.7)
 (using menhir 2.0)
+(warnings (deprecated_coq_lang disabled))
 (name coq-quickchick)
 (version dev)
 
@@ -30,6 +31,7 @@
   - QuickChick plugin for running tests in a Coq session.
   - Includes a mutation testing tool.")
  (depends
+  (dune (< 3.24))
   (ocaml (>= 4.07))
   (menhir :build)
   (cppo (and :build (>= 1.6.8)))

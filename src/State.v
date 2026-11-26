@@ -4,7 +4,7 @@ Require Import RandomQC.
 Require Import Coq.Strings.String.
 
 Require Import StringOT.
-Require Import FSets.FMapAVL.
+From Coq Require Import FSets.FMapAVL.
 
 Module Map := FMapAVL.Make(StringOT).
 

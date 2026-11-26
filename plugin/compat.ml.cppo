@@ -10,3 +10,8 @@ let unCNotation11 cs error = match cs.CAst.v with
     Some ((a, b))
   | _ -> None
 
+#if COQ_VERSION >= (8, 18, 0)
+module MonoConstr = Constr.UnsafeMonomorphic
+#else
+module MonoConstr = Constr
+#endif

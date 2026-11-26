@@ -60,7 +60,7 @@ Infix "\subset" := set_incl (at level 70, no associativity) : set_scope.
 Notation "[ 'set' x : T | P ]" := (fun x : T => P)
   (at level 0, x at level 99, only parsing) : set_scope.
 Notation "[ 'set' x | P ]" := [set x : _ | P]
-  (at level 0, x, P at level 99, format "[ 'set'  x  |  P ]", only parsing) : set_scope.
+  (at level 0, x, P at level 99, only parsing) : set_scope.
 
 Definition set0 {T} := [set _ : T | False].
 
@@ -118,7 +118,7 @@ Notation "\bigcup_ i F" := (bigcup setT (fun i => F))
            format "'[' \bigcup_ i '/  '  F ']'") : set_scope.
 Notation "\bigcup_ ( i : t ) F" := (bigcup (@setT t) (fun i => F))
   (at level 41, F at level 41, i at level 60,
-           format "'[' \bigcup_ ( i   :  t ) '/  '  F ']'", only parsing) : set_scope.
+           only parsing) : set_scope.
 Notation "\bigcup_ ( i 'in' A ) F" := (bigcup A (fun i => F))
   (at level 41, F at level 41, i, A at level 60,
            format "'[' \bigcup_ ( i  'in'  A ) '/  '  F ']'") : set_scope.

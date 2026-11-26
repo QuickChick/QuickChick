@@ -3,6 +3,7 @@ plugin/META.coq-quickchick.in
 #endif
 -R src QuickChick
 -I plugin
+-arg -w -arg -deprecated-from-Coq,-deprecated-dirpath-Coq,-ltac2-unused-variable,-hiding-delimiting-key
 
 plugin/quickChick.mli
 plugin/driver.mli

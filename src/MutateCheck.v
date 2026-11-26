@@ -5,7 +5,7 @@ Class Mutateable (A : Type) : Type :=
   mutate : A -> list A
 }.
 
-Require Import List.
+From Coq Require Import List.
 Import ListNotations.
 
 (* Default mutateable instance for lists *)
