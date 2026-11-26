@@ -1,2 +1,2 @@
 -R _build/default/src QuickChick
--I _build/default/plugin
+-I _build/install/default/lib
