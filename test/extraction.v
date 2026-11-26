@@ -12,3 +12,8 @@ QuickChick (Z.eqb (Z.of_num_int (Z.to_num_int 1)) 1).
 
 (* Test extraction of Nat.sub (#442) *)
 QuickChick (Nat.eqb (Nat.sub 0 1) 0).
+
+(* Test extraction of randomR with large ranges *)
+QuickChick (
+  forAll (choose (0%N, N.pow 2 120)) (fun _ =>
+  forAll (choose (0%Z, Z.pow 2 120)) (fun _ => true))).
