@@ -80,16 +80,34 @@ Extract Constant randomRInt  =>
    then failwith ""choose called with unordered arguments""
    else
     let range_Z = Big_int_Z.succ_big_int (Big_int_Z.sub_big_int y x) in
-    let range_int = Big_int_Z.int_of_big_int range_Z in
-    (Big_int_Z.add_big_int x (Big_int_Z.big_int_of_int (Random.State.int r range_int)), r))".
+    if Big_int_Z.lt_big_int range_Z (Big_int_Z.big_int_of_int (1 lsl 30)) then
+      let range_int = Big_int_Z.int_of_big_int range_Z in
+      (Big_int_Z.add_big_int x (Big_int_Z.big_int_of_int (Random.State.int r range_int)), r)
+    else
+      let bound = Big_int_Z.shift_left_big_int range_Z 30 in
+      let rec draw acc cap =
+        if Big_int_Z.lt_big_int cap bound
+        then draw (Big_int_Z.add_int_big_int (Random.State.bits r) (Big_int_Z.shift_left_big_int acc 30))
+                  (Big_int_Z.shift_left_big_int cap 30)
+        else acc in
+      (Big_int_Z.add_big_int x (Big_int_Z.mod_big_int (draw Big_int_Z.zero_big_int Big_int_Z.unit_big_int) range_Z), r))".
 Extract Constant randomRN =>
   "(fun (x,y) r ->
    if Big_int_Z.lt_big_int y x
    then failwith ""choose called with unordered arguments""
    else
     let range_Z = Big_int_Z.succ_big_int (Big_int_Z.sub_big_int y x) in
-    let range_int = Big_int_Z.int_of_big_int range_Z in
-    (Big_int_Z.add_big_int x (Big_int_Z.big_int_of_int (Random.State.int r range_int)), r))".
+    if Big_int_Z.lt_big_int range_Z (Big_int_Z.big_int_of_int (1 lsl 30)) then
+      let range_int = Big_int_Z.int_of_big_int range_Z in
+      (Big_int_Z.add_big_int x (Big_int_Z.big_int_of_int (Random.State.int r range_int)), r)
+    else
+      let bound = Big_int_Z.shift_left_big_int range_Z 30 in
+      let rec draw acc cap =
+        if Big_int_Z.lt_big_int cap bound
+        then draw (Big_int_Z.add_int_big_int (Random.State.bits r) (Big_int_Z.shift_left_big_int acc 30))
+                  (Big_int_Z.shift_left_big_int cap 30)
+        else acc in
+      (Big_int_Z.add_big_int x (Big_int_Z.mod_big_int (draw Big_int_Z.zero_big_int Big_int_Z.unit_big_int) range_Z), r))".
 Extract Constant newRandomSeed => "(Random.State.make_self_init ())".
 
 Extract Inductive Lazy => "Lazy.t" [lazy].
